@@ -1,73 +1,53 @@
 import streamlit as st
 import collections
 
-st.set_page_config(page_title="TOOL BẮT CẦU BỆT 2026", layout="wide")
+st.set_page_config(page_title="BẠCH THỦ BAO LÔ 2026", layout="centered")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #050505; color: #ffffff; }
-    .bet-box { background: linear-gradient(90deg, #ff0000 0%, #000000 100%); padding: 20px; border-radius: 15px; border-left: 10px solid #ffff00; margin: 20px 0; }
-    .so-chot { font-size: 120px !important; color: #ffff00; font-weight: bold; line-height: 1; text-shadow: 5px 5px #ff0000; }
-    .detected-text { font-size: 24px; color: #00ff00; font-weight: bold; }
+    .stApp { background-color: #000; color: #fff; }
+    .box-chot { background: #1a1a1a; border: 4px solid #f1c40f; border-radius: 20px; padding: 40px; text-align: center; box-shadow: 0px 0px 30px #f1c40f; }
+    .so-vip { font-size: 150px !important; color: #f1c40f; font-weight: bold; text-shadow: 0 0 20px #fff; line-height: 1.2; }
+    .stButton>button { width: 100%; background: #f1c40f; color: #000; font-weight: bold; font-size: 20px; height: 3em; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏹 THẦN TOÁN v6.0: CHUYÊN SĂN CẦU BỆT & BAO LÔ")
+st.title("🏆 CHỐT BẠCH THỦ BAO LÔ 🏆")
 
-# Nhập liệu - Ván mới nhất dán dưới cùng
-data_input = st.text_area("👇 Dán danh sách kết quả (Ván mới nhất nằm ở dòng CUỐI CÙNG):", height=200)
+# Nhập kết quả
+data_input = st.text_area("👇 Dán danh sách kết quả (5 số mỗi dòng):", height=200)
 
-if st.button("🚀 QUÉT CẦU & CHỐT SỐ"):
+if st.button("🔥 CHỐT BẠCH THỦ DUY NHẤT"):
     lines = [l.strip() for l in data_input.split('\n') if len(l.strip()) == 5]
     
-    if len(lines) < 5:
-        st.error("❌ Anh dán thêm kết quả đi, ít nhất 5 ván em mới soi được cầu bệt!")
+    if len(lines) < 10:
+        st.error("⚠️ Anh dán ít nhất 10 kỳ để em soi 'tâm điểm' cho chuẩn nhé!")
     else:
-        # Lấy dữ liệu ván gần nhất để check bệt
-        last_line = lines[-1]
-        all_data_str = "".join(lines)
+        # Thuật toán: Phân tích tần suất và loại bỏ các số 'rác'
+        full_text = "".join(lines)
+        counts = collections.Counter(full_text)
         
-        # --- THUẬT TOÁN NHẬN DIỆN CẦU BỆT ---
-        st.subheader("🕵️ PHÂN TÍCH NHỊP CẦU")
+        # Lấy 2 con mạnh nhất
+        top_2 = counts.most_common(2)
         
-        # Tìm con số bệt mạnh nhất (vừa về kỳ trước và có tần suất cao)
-        counts = collections.Counter(all_data_str)
-        most_common_global = counts.most_common(5)
-        
-        # Kiểm tra xem có con nào trong ván vừa rồi đang bệt không
-        bet_candidate = None
-        for num in last_line:
-            # Nếu số này vừa về và 3 ván gần đây nổ từ 2 lần trở lên -> CẦU BỆT
-            recent_3_vans = "".join(lines[-3:])
-            if recent_3_vans.count(num) >= 2:
-                bet_candidate = num
-                break
-        
-        # Nếu không thấy bệt, chọn số có nhịp rơi đẹp nhất (tránh con số 9 nếu nó đang 'ngáo')
-        if bet_candidate:
-            final_selection = bet_candidate
-            status_msg = f"🔥 PHÁT HIỆN CẦU BỆT CON: {final_selection}"
+        # Logic chốt Bạch Thủ: 
+        # Nếu con mạnh nhất đã nổ quá nhiều (trên 30% tổng số), nó dễ bị khan -> lấy con mạnh thứ 2.
+        # Ngược lại thì lấy con mạnh nhất.
+        if int(top_2[0][1]) > (len(full_text) * 0.25):
+            bach_thu = top_2[1][0]
         else:
-            # Thuật toán lấy số 'Đang lên' (không lấy con cao nhất để tránh kẹt số)
-            final_selection = most_common_global[1][0] if most_common_global[0][0] == '9' else most_common_global[0][0]
-            status_msg = "📉 CẦU ĐANG ĐI NHỊP ĐẢO - CHỐT SỐ RƠI"
+            bach_thu = top_2[0][0]
 
-        # HIỂN THỊ KẾT QUẢ
         st.markdown(f"""
-            <div class="bet-box">
-                <p class="detected-text">{status_msg}</p>
-                <div style="text-align: center;">
-                    <span style="font-size: 20px;">BẠCH THỦ BAO LÔ (VỀ LÀ ĂN)</span><br>
-                    <span class="so-chot">{final_selection}</span>
-                </div>
+            <div class="box-chot">
+                <p style="font-size: 25px; color: #fff;">🎯 BẠCH THỦ BAO LÔ 🎯</p>
+                <span class="so-vip">{bach_thu}</span>
+                <p style="font-size: 18px; color: #aaa; margin-top: 10px;">
+                    (Chỉ cần 1 con duy nhất - Nổ ở đâu cũng ăn)
+                </p>
             </div>
         """, unsafe_allow_html=True)
+        
+        st.info("💡 Lời khuyên: Con số này đang có tần suất rơi ổn định nhất. Anh có thể đánh bao lô hoặc làm số đá đều đẹp.")
 
-        # BẢNG ĐỐI CHIẾU NHANH
-        st.write("---")
-        st.write("📊 **Thống kê nhanh:**")
-        cols = st.columns(5)
-        for i, (num, freq) in enumerate(most_common_global):
-            cols[i].metric(label=f"Số {num}", value=f"{freq} lần")
-
-st.info("💡 **Kinh nghiệm:** Nếu anh thấy nó báo 'CẦU BỆT', anh có thể vào tiền mạnh tay hơn một chút. Nếu nó báo 'NHỊP ĐẢO', anh nên đánh nhẹ tay để thăm dò.")
+st.markdown("<p style='text-align: center; color: #555;'>Phiên bản tối ưu hóa cho Bạch Thủ Duy Nhất v7.0</p>", unsafe_allow_html=True)
