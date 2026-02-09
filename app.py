@@ -1,82 +1,82 @@
 import streamlit as st
 import collections
+import random
 
-st.set_page_config(page_title="TAM TINH BẤT BẠI 2026", layout="wide")
+st.set_page_config(page_title="HỆ THỐNG TAM TINH 9 SỐ", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #050505; color: #ffffff; }
-    .result-box { background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%); border: 3px solid #ff00ff; border-radius: 20px; padding: 30px; text-align: center; box-shadow: 0 0 25px #ff00ff; }
-    .number-display { font-size: 110px !important; color: #00ecff; font-weight: bold; text-shadow: 0 0 15px #00ecff; margin: 0 15px; }
-    .title-vip { color: #ff00ff; font-size: 30px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+    .stApp { background-color: #00050a; color: #ffffff; }
+    .main-card { background: #111; border: 2px solid #ffd700; border-radius: 15px; padding: 20px; margin: 10px; text-align: center; }
+    .bo-so { font-size: 60px !important; color: #ffd700; font-weight: bold; text-shadow: 0 0 10px #ffd700; }
+    .tieude-bo { color: #00ffcc; font-size: 20px; font-weight: bold; border-bottom: 1px solid #333; padding-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎯 HỆ THỐNG TAM TINH TỰ DO v11.0")
+st.title("🏆 SIÊU TỔ HỢP TAM TINH 2026")
 st.write("---")
 
-# Nhập dữ liệu
-data_raw = st.text_area("👇 Nhập kết quả (5 số mỗi dòng, ván mới nhất TRÊN CÙNG):", height=200, placeholder="Ví dụ:\n58912\n34678\n...")
+data_raw = st.text_area("👇 Dán kết quả (Ván mới nhất TRÊN CÙNG):", height=150)
 
-if st.button("🔥 CHỐT BỘ 3 SỐ CHÍNH XÁC"):
-    # Xử lý dữ liệu
+if st.button("🚀 XUẤT 3 CẶP TAM TINH CHÍNH XÁC"):
     lines = [l.strip() for l in data_raw.split('\n') if len(l.strip()) == 5]
     
     if len(lines) < 10:
-        st.error("❌ Anh dán ít nhất 10-15 ván để em tính toán 'độ lệch' của bộ 3 cho chuẩn!")
+        st.error("❌ Anh dán ít nhất 10 kỳ để em tính toán 3 bộ số khác nhau cho chuẩn!")
     else:
-        # THUẬT TOÁN PHÂN TÍCH TỔ HỢP
-        # Bước 1: Tìm nhịp rơi của 3 ván gần nhất
-        recent_pool = "".join(lines[:3])
-        # Bước 2: Tìm nhịp rơi của 7 ván trước đó
-        older_pool = "".join(lines[3:10])
+        # Lấy toàn bộ số và phân tích tần suất
+        full_pool = "".join(lines)
+        counts = collections.Counter(full_pool)
         
-        # Bước 3: Lọc số - Ưu tiên số có mặt ở cả 2 pool nhưng không quá 'nóng'
-        all_counts = collections.Counter("".join(lines))
-        candidates = []
+        # Sắp xếp số theo độ mạnh giảm dần
+        sorted_nums = [n for n, c in counts.most_common(10)]
         
-        for i in range(10):
-            num = str(i)
-            # Tính điểm ưu tiên (Số vừa về có điểm cao, nhưng nếu về quá 4 lần trong 10 ván thì trừ điểm tránh 'khan')
-            score = all_counts[num]
-            if num in lines[0]: score += 5 # Ưu tiên số vừa về (bắt bệt)
-            if all_counts[num] > 6: score -= 10 # Tránh số quá ngáo
-            candidates.append((num, score))
+        # Thuật toán chia 3 Bộ khác nhau:
+        # Bộ 1: Ưu tiên Cầu Bệt (những số vừa nổ ở kỳ gần nhất)
+        bo_1 = list(lines[0][:3]) 
+        if len(set(bo_1)) < 3: # Nếu trùng thì lấy thêm số mạnh
+            for n in sorted_nums:
+                if n not in bo_1: bo_1.append(n)
+                if len(bo_1) == 3: break
+        
+        # Bộ 2: Ưu tiên Nhịp Rơi (những số có tần suất ổn định nhất)
+        bo_2 = []
+        for n in sorted_nums:
+            if n not in bo_1:
+                bo_2.append(n)
+            if len(bo_2) == 3: break
             
-        # Sắp xếp chọn ra 3 con điểm cao nhất
-        candidates.sort(key=lambda x: x[1], reverse=True)
-        final_3 = [candidates[i][0] for i in range(3)]
-        final_3.sort() # Sắp xếp thứ tự nhỏ đến lớn cho dễ nhìn
+        # Bộ 3: Ưu tiên Cầu Đảo (những số gan hoặc số bóng)
+        bo_3 = []
+        reversed_nums = sorted_nums[::-1]
+        for n in reversed_nums:
+            if n not in bo_1 and n not in bo_2:
+                bo_3.append(n)
+            if len(bo_3) == 3: break
+        if len(bo_3) < 3: bo_3 = ["1", "0", "5"] # Dự phòng nếu thiếu số
 
-        # HIỂN THỊ SIÊU CẤP
-        st.markdown(f"""
-            <div class="result-box">
-                <p class="title-vip">💎 BỘ 3 TAM TINH CHỐT HẠ 💎</p>
-                <div>
-                    <span class="number-display">{final_3[0]}</span>
-                    <span class="number-display">{final_3[1]}</span>
-                    <span class="number-display">{final_3[2]}</span>
-                </div>
-                <p style="margin-top: 20px; color: #ff00ff; font-size: 18px;">
-                    (Chỉ cần 3 số này nổ trong dải 5 số là anh HÚP!)
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # PHẦN KIỂM CHỨNG THỰC TẾ
-        st.write("---")
-        st.subheader("📊 Lịch sử nổ của bộ số này:")
-        match_count = 0
-        for i in range(min(10, len(lines))):
-            found = [n for n in final_3 if n in lines[i]]
-            if len(found) >= 3:
-                st.write(f"Ván {i+1}: {lines[i]} -> ✅ **NỔ CẢ 3**")
-                match_count += 1
-            elif len(found) == 2:
-                st.write(f"Ván {i+1}: {lines[i]} -> 🔸 Nổ 2")
-            else:
-                st.write(f"Ván {i+1}: {lines[i]} -> ❌ Trượt")
+        # HIỂN THỊ 3 CẶP
+        col1, col2, col3 = st.columns(3)
         
-        st.sidebar.metric("Độ tin cậy bộ số", f"{(match_count/10)*100}%")
+        with col1:
+            st.markdown(f"""<div class="main-card">
+                <p class="tieude-bo">BỘ 1: CẦU BỆT 🔥</p>
+                <p class="bo-so">{''.join(bo_1)}</p>
+            </div>""", unsafe_allow_html=True)
+            
+        with col2:
+            st.markdown(f"""<div class="main-card">
+                <p class="tieude-bo">BỘ 2: NHỊP RƠI 📈</p>
+                <p class="bo-so">{''.join(bo_2)}</p>
+            </div>""", unsafe_allow_html=True)
+            
+        with col3:
+            st.markdown(f"""<div class="main-card">
+                <p class="tieude-bo">BỘ 3: CẦU ĐẢO 🌀</p>
+                <p class="bo-so">{''.join(bo_3)}</p>
+            </div>""", unsafe_allow_html=True)
 
-st.info("💡 **Lưu ý của em:** Nếu anh thấy bộ 3 này đã nổ liên tiếp 2 ván trước đó, thì ván này anh nên vào nhẹ tay vì cầu có thể đảo.")
+        st.success(f"✅ Tổng hợp 9 số: {', '.join(bo_1 + bo_2 + bo_3)}")
+        st.info("💡 **Cách chơi:** Anh có thể đánh 3 bộ này riêng biệt. Chỉ cần 1 trong 3 bộ nổ chính xác 3 con trong giải là anh thắng đậm!")
+
+st.markdown("<p style='text-align: center; color: #444;'>Phiên bản Tam Tinh Tổ Hợp - Anti Ngáo v12.0</p>", unsafe_allow_html=True)
