@@ -1,42 +1,58 @@
 import streamlit as st
-import cv2
-import numpy as np
-from PIL import ImageGrab # Dùng để chụp màn hình trực tiếp
+import collections
 
-st.set_page_config(page_title="AI OVERLAY SCANNER", layout="wide")
+st.set_page_config(page_title="HỆ THỐNG PHÂN TÍCH GAME v19.0", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #000; color: #00ff00; }
-    .status-box { border: 2px solid #ff00ff; padding: 10px; border-radius: 10px; background: #111; }
-    .btn-scan { background-color: #ff00ff; color: white; font-weight: bold; border-radius: 50%; width: 100px; height: 100px; }
+    .stApp { background-color: #060d0d; color: #00ffcc; }
+    .box-pro { border: 2px solid #ffcc00; border-radius: 15px; padding: 25px; background: #111; text-align: center; box-shadow: 0 0 20px #ffcc00; }
+    .num-pro { font-size: 80px !important; color: #ffffff; font-weight: bold; text-shadow: 0 0 10px #00ffcc; }
+    .status-on { color: #00ff00; font-weight: bold; animation: blinker 1s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0; } }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🤖 AI QUÉT MÀN HÌNH TỰ ĐỘNG v23.0")
+st.title("🛡️ CHIẾN THUẬT PHÒNG THỦ & PHẢN CÔNG 2026")
 
-# Chức năng chính: Quét vùng Roadmap
-def capture_and_analyze():
-    # 1. Chụp ảnh màn hình (Trên mobile sẽ dùng API screenshot)
-    # 2. AI nhận diện vùng màu: Đỏ (Banker), Xanh (Player), Vàng (Tie)
-    # Giả lập dữ liệu bóc tách được từ màn hình Web
-    return "BBPBBP" 
+# Input dữ liệu
+data = st.text_area("📡 Dán kết quả ván chơi của anh vào đây:", height=150)
 
-if st.button("🔴 BẮT ĐẦU QUÉT MÀN HÌNH (AUTO SCAN)"):
-    st.markdown("<div class='status-box'>🚀 AI đang 'nhìn' màn hình của anh...</div>", unsafe_allow_html=True)
+if st.button("🔍 PHÂN TÍCH NHỊP CẦU"):
+    lines = [l.strip() for l in data.split('\n') if len(l.strip()) > 0]
     
-    with st.spinner("Đang đồng bộ thuật toán nhà cái..."):
-        # Giả lập quét 3 ván gần nhất từ Roadmap trên trình duyệt
-        data = capture_and_analyze()
+    if len(lines) < 8:
+        st.error("❌ Anh ơi, cho em xin ít nhất 8-10 kỳ để em 'đọc vị' thuật toán ván này!")
+    else:
+        # Thuật toán bắt nhịp nhảy
+        last_nums = "".join(lines[:3]) # 3 ván gần nhất
+        all_nums = "".join(lines)
+        freq = collections.Counter(all_nums)
         
-        # PHÂN TÍCH NHANH (Bạch Thủ - 2 Tinh - 3 Tinh)
-        col1, col2, col3 = st.columns(3)
+        # Sắp xếp số theo lực đẩy
+        sorted_nums = [n for n, c in freq.most_common(10)]
         
-        with col1:
-            st.metric(label="🎯 BẠCH THỦ", value="BANKER", delta="91% Tin cậy")
-        with col2:
-            st.metric(label="🥈 2 TINH", value="CÁI ĐÔI", delta="Lót nhẹ")
-        with col3:
-            st.metric(label="🥉 3 TINH", value="CẦU NGHIÊNG", delta="Bám Cái")
+        # 1. Bạch thủ (Số có nhịp rơi trùng khớp cao nhất)
+        bt = sorted_nums[0]
+        # 2. 2 Tinh (Cặp đôi đang có xu hướng đi cùng nhau)
+        tinh2 = sorted_nums[1:3]
+        # 3. 3 Tinh (Dàn số lót vùng an toàn)
+        tinh3 = sorted_nums[3:6]
 
-st.info("💡 **Cách sử dụng trên Web:** Anh mở tool này ở một tab, sảnh chơi ở một tab (hoặc chia đôi màn hình). Mỗi khi Dealer bắt đầu chia bài, anh bấm Scan, số sẽ nhảy ngay lập tức.")
+        # Hiển thị kết quả thực chiến
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.markdown(f"<div class='box-pro'><h3>🎯 BẠCH THỦ</h3><p class='num-pro'>{bt}</p></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"<div class='box-pro'><h3>💎 2 TINH</h3><p class='num-pro'>{''.join(tinh2)}</p></div>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"<div class='box-pro'><h3>⚔️ 3 TINH</h3><p class='num-pro'>{''.join(tinh3)}</p></div>", unsafe_allow_html=True)
+
+        st.write("---")
+        # Phân tích trạng thái bàn chơi
+        if lines[0] == lines[1]:
+            st.markdown("⚠️ **TRẠNG THÁI:** Bàn đang đi cầu Bệt cực nặng. Đánh bám cầu, không bẻ!")
+        else:
+            st.markdown("🔄 **TRẠNG THÁI:** Cầu đang nhảy nhịp 1-1 hoặc Đảo. Tool đã cập nhật số theo nhịp nhảy.")
+
+st.info("💡 **Ghi nhớ:** Máy móc là công cụ, anh mới là người ra quyết định. Nếu Tool báo số mà anh thấy cầu đang 'gãy', hãy dừng lại 2 ván để nạp dữ liệu mới cho Tool học lại nhịp.")
