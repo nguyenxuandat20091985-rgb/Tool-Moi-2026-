@@ -1,77 +1,73 @@
 import streamlit as st
 import collections
 
-# Cấu hình giao diện cực mạnh, dễ nhìn trên điện thoại
-st.set_page_config(page_title="TRÙM BAO LÔ 2026", layout="wide")
+st.set_page_config(page_title="TOOL BẮT CẦU BỆT 2026", layout="wide")
 
 st.markdown("""
     <style>
-    .main { background-color: #000000; }
-    .stTextArea textarea { background-color: #1a1a1a; color: #00ff00; font-size: 18px !important; border: 2px solid #00ff00; }
-    .result-card { background: #111; padding: 20px; border-radius: 15px; border: 2px solid #ff4b4b; text-align: center; }
-    .bt-number { font-size: 100px !important; color: #ffff00; font-weight: bold; text-shadow: 3px 3px #ff0000; }
-    .win-tag { background-color: #28a745; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; }
-    .loss-tag { background-color: #dc3545; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; }
+    .stApp { background-color: #050505; color: #ffffff; }
+    .bet-box { background: linear-gradient(90deg, #ff0000 0%, #000000 100%); padding: 20px; border-radius: 15px; border-left: 10px solid #ffff00; margin: 20px 0; }
+    .so-chot { font-size: 120px !important; color: #ffff00; font-weight: bold; line-height: 1; text-shadow: 5px 5px #ff0000; }
+    .detected-text { font-size: 24px; color: #00ff00; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎰 HỆ THỐNG BAO LÔ THỰC CHIẾN v5.0")
-st.write("---")
+st.title("🏹 THẦN TOÁN v6.0: CHUYÊN SĂN CẦU BỆT & BAO LÔ")
 
-# Nhập dữ liệu
-data_raw = st.text_area("👇 Dán kết quả (Càng nhiều càng chuẩn, ván mới nhất ở DƯỚI CÙNG):", height=200)
+# Nhập liệu - Ván mới nhất dán dưới cùng
+data_input = st.text_area("👇 Dán danh sách kết quả (Ván mới nhất nằm ở dòng CUỐI CÙNG):", height=200)
 
-if st.button("🚀 PHÂN TÍCH MA TRẬN SỐ"):
-    # Xử lý dữ liệu: bỏ dòng trống, lấy 5 số mỗi dòng
-    lines = [l.strip() for l in data_raw.split('\n') if len(l.strip()) == 5]
+if st.button("🚀 QUÉT CẦU & CHỐT SỐ"):
+    lines = [l.strip() for l in data_input.split('\n') if len(l.strip()) == 5]
     
     if len(lines) < 5:
-        st.error("❌ Anh nhập thêm ít nhất 5-10 ván để em chạy ma trận nhé!")
+        st.error("❌ Anh dán thêm kết quả đi, ít nhất 5 ván em mới soi được cầu bệt!")
     else:
-        st.subheader("📊 KIỂM CHỨNG 5 VÁN VỪA QUA")
+        # Lấy dữ liệu ván gần nhất để check bệt
+        last_line = lines[-1]
+        all_data_str = "".join(lines)
         
-        win_count = 0
-        # Duyệt lại 5 ván gần nhất để xem nếu dùng tool thì thắng hay thua
-        for i in range(len(lines)-5, len(lines)):
-            if i <= 0: continue
-            # Lấy dữ liệu trước ván đó để dự đoán
-            past_data = lines[:i]
-            actual_result = lines[i] # Dòng kết quả thực tế
-            
-            # Thuật toán: Tìm số có tần suất nổ 'nhịp' nhất (không phải nhiều nhất)
-            flat_list = "".join(past_data)
-            counts = collections.Counter(flat_list)
-            # Lấy số có tần suất vừa phải (thường là số đang vào cầu)
-            predicted = counts.most_common(3)[1][0] # Lấy số đứng thứ 2 trong top
-            
-            check = "✅ ĂN" if predicted in actual_result else "❌ XỊT"
-            if "✅" in check: win_count += 1
-            
-            col1, col2, col3 = st.columns([1, 2, 1])
-            col1.write(f"Ván {i}")
-            col2.write(f"Dự đoán: **{predicted}** ⮕ Kết quả: **{actual_result}**")
-            col3.markdown(f"<span class='{'win-tag' if '✅' in check else 'loss-tag'}'>{check}</span>", unsafe_allow_html=True)
+        # --- THUẬT TOÁN NHẬN DIỆN CẦU BỆT ---
+        st.subheader("🕵️ PHÂN TÍCH NHỊP CẦU")
+        
+        # Tìm con số bệt mạnh nhất (vừa về kỳ trước và có tần suất cao)
+        counts = collections.Counter(all_data_str)
+        most_common_global = counts.most_common(5)
+        
+        # Kiểm tra xem có con nào trong ván vừa rồi đang bệt không
+        bet_candidate = None
+        for num in last_line:
+            # Nếu số này vừa về và 3 ván gần đây nổ từ 2 lần trở lên -> CẦU BỆT
+            recent_3_vans = "".join(lines[-3:])
+            if recent_3_vans.count(num) >= 2:
+                bet_candidate = num
+                break
+        
+        # Nếu không thấy bệt, chọn số có nhịp rơi đẹp nhất (tránh con số 9 nếu nó đang 'ngáo')
+        if bet_candidate:
+            final_selection = bet_candidate
+            status_msg = f"🔥 PHÁT HIỆN CẦU BỆT CON: {final_selection}"
+        else:
+            # Thuật toán lấy số 'Đang lên' (không lấy con cao nhất để tránh kẹt số)
+            final_selection = most_common_global[1][0] if most_common_global[0][0] == '9' else most_common_global[0][0]
+            status_msg = "📉 CẦU ĐANG ĐI NHỊP ĐẢO - CHỐT SỐ RƠI"
 
-        # CHỐT SỐ VÁN TIẾP THEO
-        st.write("---")
-        st.subheader("🔥 CHỐT SỐ VÀNG VÁN KẾ TIẾP")
-        
-        # Lấy toàn bộ số đã nhập
-        full_data = "".join(lines)
-        c = collections.Counter(full_data)
-        
-        # Thuật toán chốt: Kết hợp số hay về và số vừa mới về
-        top_nums = c.most_common(3)
-        final_bt = top_nums[0][0] # Số mạnh nhất
-        final_st = top_nums[1][0] # Số mạnh thứ 2
-        
+        # HIỂN THỊ KẾT QUẢ
         st.markdown(f"""
-            <div class='result-card'>
-                <p style='color: white; font-size: 20px;'>BẠCH THỦ BAO LÔ</p>
-                <span class='bt-number'>{final_bt}</span>
-                <p style='color: #00ff00; font-size: 25px;'>Song Thủ Lót: {final_st}</p>
-                <p style='color: #aaa;'>Tỉ lệ nổ dự kiến: {75 + (win_count*4)}%</p>
+            <div class="bet-box">
+                <p class="detected-text">{status_msg}</p>
+                <div style="text-align: center;">
+                    <span style="font-size: 20px;">BẠCH THỦ BAO LÔ (VỀ LÀ ĂN)</span><br>
+                    <span class="so-chot">{final_selection}</span>
+                </div>
             </div>
         """, unsafe_allow_html=True)
 
-st.warning("⚠️ **Lưu ý:** Nếu 5 ván gần nhất Tool báo XỊT liên tục (ví dụ xịt 4/5), thì ván này anh nên **ĐÁNH NGƯỢC** lại hoặc nghỉ. Cầu đang gãy thì không nên cố anh nhé!")
+        # BẢNG ĐỐI CHIẾU NHANH
+        st.write("---")
+        st.write("📊 **Thống kê nhanh:**")
+        cols = st.columns(5)
+        for i, (num, freq) in enumerate(most_common_global):
+            cols[i].metric(label=f"Số {num}", value=f"{freq} lần")
+
+st.info("💡 **Kinh nghiệm:** Nếu anh thấy nó báo 'CẦU BỆT', anh có thể vào tiền mạnh tay hơn một chút. Nếu nó báo 'NHỊP ĐẢO', anh nên đánh nhẹ tay để thăm dò.")
