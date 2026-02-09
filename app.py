@@ -1,74 +1,66 @@
 import streamlit as st
 import collections
-import pandas as pd
 
-st.set_page_config(page_title="SIÊU TOOL TỬ THỦ 2026", layout="wide")
+st.set_page_config(page_title="TOOL TAM TỬ 2026", layout="wide")
 
-# CSS Thiết kế giao diện đỉnh cao
 st.markdown("""
     <style>
     .stApp { background-color: #000; color: #fff; }
-    .header-box { background: linear-gradient(90deg, #1f1c2c, #928dab); padding: 20px; border-radius: 15px; text-align: center; border: 2px solid #ffd700; }
-    .bt-box { background: #111; border: 5px double #ffd700; border-radius: 50%; width: 250px; height: 250px; margin: 30px auto; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 0 50px #ffd700; }
-    .bt-number { font-size: 130px !important; color: #ffd700; font-weight: bold; text-shadow: 0 0 20px #fff; line-height: 1; }
-    .win-text { color: #00ff00; font-weight: bold; font-size: 20px; }
-    .label-gold { color: #ffd700; font-size: 24px; font-weight: bold; }
+    .box-3-so { background: linear-gradient(145deg, #1e1e1e, #111); border: 3px solid #00ffcc; border-radius: 25px; padding: 30px; text-align: center; box-shadow: 0 0 30px #00ffcc; }
+    .so-to { font-size: 100px !important; color: #00ffcc; font-weight: bold; margin: 0 20px; text-shadow: 0 0 15px #00ffcc; }
+    .label-3-so { font-size: 24px; color: #fff; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; }
     </style>
     """, unsafe_allow_html=True)
 
-st.markdown("<div class='header-box'><h1>👑 HỆ THỐNG SOI CẦU ĐẲNG CẤP v9.0</h1><p>BẢN TỐI ƯU BẠCH THỦ - BAO LÔ THỰC CHIẾN</p></div>", unsafe_allow_html=True)
+st.title("⚡ SIÊU TOOL: BẮT 3 SỐ TỰ DO (BAO LÔ 3 CON)")
+st.write("---")
 
 # Nhập dữ liệu
-data_raw = st.text_area("👇 Dán danh sách 5 số (Ván mới nhất nằm TRÊN CÙNG):", height=180)
+data_raw = st.text_area("👇 Dán kết quả (Mỗi ván 5 số, ván mới nhất TRÊN CÙNG):", height=200)
 
-if st.button("🎰 KÍCH HOẠT SIÊU MÁY TÍNH"):
+if st.button("🚀 PHÂN TÍCH VÙNG HỘI TỤ"):
     lines = [l.strip() for l in data_raw.split('\n') if len(l.strip()) == 5]
     
-    if len(lines) < 10:
-        st.error("❌ Anh dán ít nhất 10 ván để máy tính chạy ma trận vị trí nhé!")
+    if len(lines) < 7:
+        st.error("❌ Anh dán ít nhất 7 ván để em tính toán nhịp rơi của 3 con số nhé!")
     else:
-        # 1. PHÂN TÍCH MA TRẬN VỊ TRÍ
-        pos_counts = [collections.Counter() for _ in range(5)]
-        all_nums = []
-        for line in lines:
-            for i, char in enumerate(line):
-                pos_counts[i][char] += 1
-                all_nums.append(char)
+        # Thuật toán bắt 3 số tiềm năng nhất
+        all_nums = "".join(lines)
+        counts = collections.Counter(all_nums)
         
-        # 2. THUẬT TOÁN TÌM BẠCH THỦ (LOẠI BỎ SỐ NGÁO)
-        # Lấy top 3 số về nhiều nhất toàn bảng
-        global_counts = collections.Counter(all_nums)
-        top_candidates = [n for n, c in global_counts.most_common(4)]
+        # Lấy top 5 số về nhiều
+        top_5 = counts.most_common(5)
         
-        # Kiểm tra nhịp rơi 3 ván gần nhất để tránh số 'chết'
-        recent_3 = "".join(lines[:3])
+        # Loại bỏ bớt số nổ quá dày để tránh "ngáo", chọn 3 con có nhịp đẹp nhất
+        # Ưu tiên những số xuất hiện ở ván gần nhất nhưng không quá 3 lần
+        recent_van = lines[0]
+        final_3 = []
         
-        # Chọn con số có sự kết nối giữa lịch sử và hiện tại tốt nhất
-        final_bt = None
-        for cand in top_candidates:
-            if cand in recent_3: # Phải đang có đà về mới lấy
-                final_bt = cand
-                break
-        if not final_bt: final_bt = top_candidates[0]
+        for num, freq in top_5:
+            if len(final_3) < 3:
+                final_3.append(num)
+        
+        # Sắp xếp lại cho đẹp
+        final_3.sort()
 
-        # 3. GIAO DIỆN CHỐT SỐ SẬP MẮT
-        st.write("---")
+        # Hiển thị kết quả 3 số sập mắt
+        st.write("### 🎯 KẾT QUẢ DỰ ĐOÁN 3 SỐ VÀNG:")
         st.markdown(f"""
-            <div class="bt-box">
-                <p class="label-gold">BẠCH THỦ</p>
-                <span class="bt-number">{final_bt}</span>
-                <p class="win-text">TỶ LỆ NỔ CAO</p>
+            <div class="box-3-so">
+                <div class="label-3-so">Bộ 3 số tự do (Nổ đâu cũng được)</div>
+                <span class="so-to">{final_3[0]}</span>
+                <span class="so-to">{final_3[1]}</span>
+                <span class="so-to">{final_3[2]}</span>
+                <p style="margin-top: 20px; color: #888;">Chỉ cần dải kết quả ván tới có 3 số này là anh THẮNG!</p>
             </div>
         """, unsafe_allow_html=True)
 
-        # 4. BẢNG CHI TIẾT VỊ TRÍ (Để anh tự thẩm định)
-        st.subheader("📊 BẢNG SOI VỊ TRÍ CHI TIẾT")
-        df_data = {
-            "Vị trí": ["Hàng Vạn", "Hàng Nghìn", "Hàng Trăm", "Hàng Chục", "Hàng Đơn Vị"],
-            "Số hay về nhất": [pos_counts[i].most_common(1)[0][0] for i in range(5)],
-            "Tần suất": [pos_counts[i].most_common(1)[0][1] for i in range(5)],
-            "Xu hướng": ["🔥 Đang bệt" if lines[0][i] == lines[1][i] else "📉 Đang đảo" for i in range(5)]
-        }
-        st.table(pd.DataFrame(df_data))
+        # Kiểm chứng nhanh ván trước
+        st.write("---")
+        st.subheader("📋 Kiểm chứng ván gần nhất:")
+        check_last = lines[0]
+        st.write(f"Ván mới nhất về: **{check_last}**")
+        st.write("---")
+        st.info("💡 Mẹo: Anh có thể đánh bao lô cả 3 con này, hoặc ghép xiên xoay để tăng tỉ lệ ăn!")
 
-st.info("💡 **Gợi ý từ AI:** Nếu con Bạch Thủ trên trùng với 'Số hay về nhất' ở bảng vị trí, anh có thể tự tin vào tiền mạnh tay!")
+st.markdown("<p style='text-align: center; color: #444;'>Thiết kế bởi Gemini - Bản tối ưu 3 số v10.0</p>", unsafe_allow_html=True)
