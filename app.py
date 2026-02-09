@@ -1,74 +1,74 @@
 import streamlit as st
 import collections
+import pandas as pd
 
-st.set_page_config(page_title="HỆ THỐNG SOI CẦU CHUYÊN NGHIỆP 2026", layout="wide")
+st.set_page_config(page_title="SIÊU TOOL TỬ THỦ 2026", layout="wide")
 
-# Giao diện cực chất cho dân chuyên nghiệp
+# CSS Thiết kế giao diện đỉnh cao
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; color: white; }
-    .main-box { background: #1c1f26; border-radius: 20px; padding: 30px; border: 2px solid #3e4451; text-align: center; }
-    .bt-title { color: #f39c12; font-size: 28px; font-weight: bold; text-transform: uppercase; }
-    .bt-number { font-size: 150px !important; color: #ff0000; font-weight: bold; text-shadow: 0 0 20px #ff0000; line-height: 1; }
-    .status-bar { background: #2c3e50; padding: 10px; border-radius: 10px; margin-top: 20px; }
+    .stApp { background-color: #000; color: #fff; }
+    .header-box { background: linear-gradient(90deg, #1f1c2c, #928dab); padding: 20px; border-radius: 15px; text-align: center; border: 2px solid #ffd700; }
+    .bt-box { background: #111; border: 5px double #ffd700; border-radius: 50%; width: 250px; height: 250px; margin: 30px auto; display: flex; align-items: center; justify-content: center; flex-direction: column; box-shadow: 0 0 50px #ffd700; }
+    .bt-number { font-size: 130px !important; color: #ffd700; font-weight: bold; text-shadow: 0 0 20px #fff; line-height: 1; }
+    .win-text { color: #00ff00; font-weight: bold; font-size: 20px; }
+    .label-gold { color: #ffd700; font-size: 24px; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🔥 HỆ THỐNG PHÂN TÍCH BẠCH THỦ BAO LÔ")
-st.write("---")
+st.markdown("<div class='header-box'><h1>👑 HỆ THỐNG SOI CẦU ĐẲNG CẤP v9.0</h1><p>BẢN TỐI ƯU BẠCH THỦ - BAO LÔ THỰC CHIẾN</p></div>", unsafe_allow_html=True)
 
-# Nhập dữ liệu - Ván mới nhất dán dưới cùng
-data_input = st.text_area("👇 Dán kết quả (Càng nhiều ván càng chuẩn - Mỗi ván 5 số):", height=180, placeholder="Ví dụ:\n12345\n67890\n...")
+# Nhập dữ liệu
+data_raw = st.text_area("👇 Dán danh sách 5 số (Ván mới nhất nằm TRÊN CÙNG):", height=180)
 
-if st.button("🚀 BẮT ĐẦU PHÂN TÍCH TỔNG LỰC"):
-    # Xử lý dữ liệu
-    lines = [l.strip() for l in data_input.split('\n') if len(l.strip()) == 5]
+if st.button("🎰 KÍCH HOẠT SIÊU MÁY TÍNH"):
+    lines = [l.strip() for l in data_raw.split('\n') if len(l.strip()) == 5]
     
-    if len(lines) < 8:
-        st.error("❌ Dữ liệu quá ít! Anh cần dán ít nhất 8-10 kỳ để AI tìm ra 'nhịp cầu'.")
+    if len(lines) < 10:
+        st.error("❌ Anh dán ít nhất 10 ván để máy tính chạy ma trận vị trí nhé!")
     else:
-        # Thuật toán bắt nhịp rơi (Tập trung vào 3 kỳ gần nhất và 5 kỳ trước đó)
-        recent_data = "".join(lines[-3:]) # 3 ván gần nhất
-        older_data = "".join(lines[-8:-3]) # 5 ván trước đó
+        # 1. PHÂN TÍCH MA TRẬN VỊ TRÍ
+        pos_counts = [collections.Counter() for _ in range(5)]
+        all_nums = []
+        for line in lines:
+            for i, char in enumerate(line):
+                pos_counts[i][char] += 1
+                all_nums.append(char)
         
-        counts_recent = collections.Counter(recent_data)
-        counts_older = collections.Counter(older_data)
+        # 2. THUẬT TOÁN TÌM BẠCH THỦ (LOẠI BỎ SỐ NGÁO)
+        # Lấy top 3 số về nhiều nhất toàn bảng
+        global_counts = collections.Counter(all_nums)
+        top_candidates = [n for n, c in global_counts.most_common(4)]
         
-        # Tìm con số tiềm năng: Có xuất hiện ở kỳ trước nhưng không quá dày đặc
-        potential = []
-        for i in range(10):
-            num = str(i)
-            # Điều kiện: Có nổ ở kỳ cũ và đang bắt đầu nổ lại ở kỳ gần đây
-            if counts_recent[num] > 0 and counts_older[num] > 0:
-                potential.append((num, counts_recent[num] + counts_older[num]))
+        # Kiểm tra nhịp rơi 3 ván gần nhất để tránh số 'chết'
+        recent_3 = "".join(lines[:3])
         
-        # Chốt Bạch Thủ
-        if potential:
-            # Sắp xếp theo số lần xuất hiện hợp lý nhất
-            potential.sort(key=lambda x: x[1], reverse=True)
-            chot_bt = potential[0][0]
-        else:
-            # Nếu cầu loạn, lấy số có tần suất ổn định nhất
-            chot_bt = collections.Counter("".join(lines)).most_common(2)[0][0]
+        # Chọn con số có sự kết nối giữa lịch sử và hiện tại tốt nhất
+        final_bt = None
+        for cand in top_candidates:
+            if cand in recent_3: # Phải đang có đà về mới lấy
+                final_bt = cand
+                break
+        if not final_bt: final_bt = top_candidates[0]
 
-        # Hiển thị bảng chốt
+        # 3. GIAO DIỆN CHỐT SỐ SẬP MẮT
+        st.write("---")
         st.markdown(f"""
-            <div class="main-box">
-                <p class="bt-title">🎯 BẠCH THỦ BAO LÔ KỲ TỚI 🎯</p>
-                <div class="bt-number">{chot_bt}</div>
-                <div class="status-bar">
-                    <p style="margin:0;">Trạng thái cầu: <span style="color:#00ff00;">ĐANG CHẠY 📈</span></p>
-                    <p style="margin:0; font-size: 14px; color:#bdc3c7;">(Chỉ cần số {chot_bt} xuất hiện ở bất kỳ đâu trong 5 số là THẮNG)</p>
-                </div>
+            <div class="bt-box">
+                <p class="label-gold">BẠCH THỦ</p>
+                <span class="bt-number">{final_bt}</span>
+                <p class="win-text">TỶ LỆ NỔ CAO</p>
             </div>
         """, unsafe_allow_html=True)
-        
-        # Thống kê nhanh để anh kiểm chứng
-        st.write("---")
-        st.subheader("📊 Thống kê nhịp số (Số lần nổ):")
-        cols = st.columns(10)
-        all_nums = "".join(lines)
-        for i in range(10):
-            cols[i].metric(label=f"Số {i}", value=all_nums.count(str(i)))
 
-st.warning("💡 **Lời khuyên:** Bản này đã lọc bỏ tình trạng báo số 'ngáo'. Anh hãy dán khoảng 15 ván liên tục để thấy sức mạnh của nhịp cầu!")
+        # 4. BẢNG CHI TIẾT VỊ TRÍ (Để anh tự thẩm định)
+        st.subheader("📊 BẢNG SOI VỊ TRÍ CHI TIẾT")
+        df_data = {
+            "Vị trí": ["Hàng Vạn", "Hàng Nghìn", "Hàng Trăm", "Hàng Chục", "Hàng Đơn Vị"],
+            "Số hay về nhất": [pos_counts[i].most_common(1)[0][0] for i in range(5)],
+            "Tần suất": [pos_counts[i].most_common(1)[0][1] for i in range(5)],
+            "Xu hướng": ["🔥 Đang bệt" if lines[0][i] == lines[1][i] else "📉 Đang đảo" for i in range(5)]
+        }
+        st.table(pd.DataFrame(df_data))
+
+st.info("💡 **Gợi ý từ AI:** Nếu con Bạch Thủ trên trùng với 'Số hay về nhất' ở bảng vị trí, anh có thể tự tin vào tiền mạnh tay!")
