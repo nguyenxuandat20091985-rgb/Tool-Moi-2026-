@@ -1,63 +1,61 @@
 import streamlit as st
 import collections
 
-st.set_page_config(page_title="TOOL CỨU CÁNH 2026", layout="centered")
+st.set_page_config(page_title="TOOL KIỂM CHỨNG KẾT QUẢ", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #1a1a1a; color: white; }
-    .chot-so { background-color: #ffeb3b; color: #000; padding: 20px; border-radius: 15px; text-align: center; font-size: 25px; font-weight: bold; border: 4px solid #f44336; }
-    .so-vip { font-size: 90px !important; color: #d32f2f; display: block; }
+    .win { color: #28a745; font-weight: bold; font-size: 20px; }
+    .loss { color: #dc3545; font-weight: bold; font-size: 20px; }
+    .big-box { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border: 2px solid #343a40; text-align: center; }
+    .number-bt { font-size: 80px; color: #ff4b4b; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🔥 HỆ THỐNG SOI CẦU NGƯỢC (CHỐT NHỊP GAN)")
+st.title("🛡️ HỆ THỐNG SOI CẦU & KIỂM CHỨNG THẮNG THUA")
 
-data_input = st.text_area("👇 Nhập 10-15 ván gần nhất (5 số/dòng):", height=150)
+# Ô nhập dữ liệu lịch sử
+data_input = st.text_area("👇 Nhập kết quả (Ván mới nhất nằm TRÊN CÙNG):", height=200, 
+                         placeholder="Ví dụ:\n12345 (Ván mới nhất)\n67890\n...")
 
-if st.button("🚀 LỌC SỐ ĐIỂM RƠI"):
+if st.button("🚀 PHÂN TÍCH & ĐỐI CHIẾU"):
     lines = [l.strip() for l in data_input.split('\n') if len(l.strip()) == 5]
     
-    if len(lines) < 10:
-        st.error("❌ Anh ơi, nhập thêm ván đi! Dưới 10 ván AI không tính được nhịp rơi đâu.")
+    if len(lines) < 5:
+        st.error("❌ Nhập thêm ván đi anh, ít nhất 5 ván mới đối chiếu được!")
     else:
-        st.subheader("🎯 BẢNG CHỐT GIỜ G")
+        # 1. PHẦN KIỂM CHỨNG (Check xem ván trước đoán đúng hay sai)
+        st.subheader("📋 BẢNG THẨM ĐỊNH 5 VÁN GẦN NHẤT")
         
-        # Phân tích từng hàng
-        final_numbers = []
-        for i in range(5):
-            digits = [int(line[i]) for line in lines]
-            # Thuật toán tìm số "vắng mặt" lâu nhất nhưng có dấu hiệu quay lại
-            counts = collections.Counter(digits)
-            
-            # Tìm những số chưa xuất hiện trong 3 ván gần đây nhưng có tổng tần suất ổn định
-            recent_digits = digits[:3]
-            candidates = [n for n in range(10) if n not in recent_digits]
-            
-            if not candidates: # Nếu ván nào cũng có thì lấy số ít về nhất
-                best_n = sorted(counts, key=counts.get)[0]
-            else:
-                # Trong các con chưa về, chọn con có tần suất tổng cao nhất (sắp nổ)
-                best_n = max(candidates, key=lambda x: counts[x])
-            
-            final_numbers.append(str(best_n))
-
-        # Hiển thị Bạch Thủ và Song Thủ
-        bt_lo = "".join(final_numbers[3:]) # Lấy 2 số cuối làm song thủ
+        win_count = 0
+        check_data = []
         
-        st.markdown(f"""
-            <div class='chot-so'>
-                <p>🌟 BẠCH THỦ (Hàng Đơn Vị) 🌟</p>
-                <span class='so-vip'>{final_numbers[4]}</span>
-            </div>
-            <br>
-            <div class='chot-so' style='background-color: #fff;'>
-                <p>🎁 SONG THỦ LÔ (2 Số cuối) 🎁</p>
-                <span class='so-vip' style='color: #2e7d32;'>{final_numbers[3]}{final_numbers[4]}</span>
-            </div>
-        """, unsafe_allow_html=True)
+        # Thử đối chiếu cầu hàng đơn vị (số cuối)
+        for i in range(min(5, len(lines)-1)):
+            current_win_num = lines[i][4] # Số thực tế ván này
+            # Thuật toán ván trước đó đã dự đoán (giả định dựa trên nhịp)
+            prev_data = lines[i+1:]
+            predicted_num = collections.Counter([l[4] for l in prev_data]).most_common(1)[0][0]
+            
+            status = "✅ ĂN" if current_win_num == predicted_num else "❌ XỊT"
+            if status == "✅ ĂN": win_count += 1
+            
+            check_data.append({"Ván": f"Ván {i+1}", "Số dự đoán": predicted_num, "Kết quả thật": current_win_num, "Trạng thái": status})
+        
+        st.table(check_data)
+        st.write(f"📊 **Tỉ lệ thắng hiện tại của Tool:** {(win_count/5)*100}%")
 
+        # 2. PHẦN CHỐT SỐ CHO VÁN TIẾP THEO
         st.write("---")
-        st.write("📊 **Dàn giải mã 5 hàng:** " + " - ".join(final_numbers))
+        st.markdown("<div class='big-box'>", unsafe_allow_html=True)
+        st.write("🎯 **DỰ ĐOÁN VÁN TIẾP THEO (BẠCH THỦ ĐUÔI)**")
+        
+        # Thuật toán bắt nhịp rơi
+        all_last_nums = [l[4] for l in lines]
+        final_bt = collections.Counter(all_last_nums).most_common(1)[0][0]
+        
+        st.markdown(f"<span class='number-bt'>{final_bt}</span>", unsafe_allow_html=True)
+        st.write("💡 *Nếu bảng trên đang XỊT nhiều, ván này anh nên nhẹ tay hoặc đánh đảo số!*")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-st.warning("⚠️ Chú ý: Tool này đánh theo kiểu 'Săn số sắp nổ'. Anh nên theo đều tay 2-3 ván nếu cầu đang nhịp ngắn nhé!")
+st.warning("⚠️ Giải thích: Tool lấy dữ liệu anh nhập để tự 'soi gương' lại chính nó. Nếu anh thấy nó đang báo XỊT liên tục thì tức là cầu đang gãy, anh đừng theo!")
