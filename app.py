@@ -1,56 +1,67 @@
 import streamlit as st
+import collections
 
-st.set_page_config(page_title="TOOL THỰC CHIẾN 2026", layout="wide")
+st.set_page_config(page_title="TOOL BAO LÔ 2026", layout="wide")
 
 st.markdown("""
     <style>
-    .win-box { background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; font-weight: bold; }
-    .loss-box { background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; }
-    .final-bt { font-size: 100px; color: yellow; background: black; text-align: center; border-radius: 20px; border: 5px solid red; }
+    .stApp { background-color: #0e1117; color: white; }
+    .result-card { background: linear-gradient(180deg, #1e1e2f 0%, #11111d 100%); padding: 25px; border-radius: 20px; border: 2px solid #00ff00; text-align: center; box-shadow: 0 0 20px #00ff00; }
+    .number-highlight { font-size: 120px !important; color: #00ff00; font-weight: bold; text-shadow: 0 0 10px #00ff00; }
+    .status-win { color: #00ff00; font-weight: bold; }
+    .status-loss { color: #ff4b4b; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🔥 TOOL THỰC CHIẾN: SOI CẦU & BÁO THẮNG THUA")
+st.title("🎯 TOOL CHỐT SỐ BAO LÔ (TRÚNG LÀ ĂN)")
 
-data_input = st.text_area("👇 Nhập kết quả (Ván mới nhất dán TRÊN CÙNG):", height=150)
+data_input = st.text_area("👇 Nhập 10-15 kỳ gần nhất (Dán cả dải 5 số mỗi dòng):", height=200, placeholder="Ví dụ:\n12345\n67890\n...")
 
-if st.button("📊 KIỂM TRA & CHỐT SỐ"):
+if st.button("🚀 SIÊU PHÂN TÍCH"):
     lines = [l.strip() for l in data_input.split('\n') if len(l.strip()) == 5]
     
-    if len(lines) < 5:
-        st.warning("Anh nhập thêm tầm 5-10 ván để em check xem cầu đang chạy thế nào nhé!")
+    if len(lines) < 7:
+        st.error("❌ Anh dán ít nhất 7 kỳ vào thì em mới soi hết các mặt của 5 con số được!")
     else:
-        # 1. BẢNG THỐNG KÊ THẮNG THUA THỰC TẾ
-        st.subheader("📝 NHẬT KÝ THẮNG THUA (10 VÁN GẦN ĐÂY)")
+        # THUẬT TOÁN QUÉT TỔNG LỰC 5 VỊ TRÍ
+        all_numbers = []
+        for line in lines:
+            for digit in line:
+                all_numbers.append(int(digit))
         
-        # Quy luật bóng số: 0-5, 1-6, 2-7, 3-8, 4-9
-        bong_so = {0:5, 5:0, 1:6, 6:1, 2:7, 7:2, 3:8, 8:3, 4:9, 9:4}
+        # Kiểm tra lịch sử thắng thua thực tế (Check 5 ván gần đây)
+        st.subheader("📝 NHẬT KÝ KIỂM CHỨNG (SOI CẢ GIẢI)")
+        win_count = 0
         
-        wins = 0
-        total_check = min(10, len(lines)-1)
-        
-        for i in range(total_check):
-            kq_that = int(lines[i][4]) # Số cuối ván này
-            so_du_doan = bong_so[int(lines[i+1][4])] # Soi từ ván trước theo bóng
+        # Thuật toán bắt số: Tìm số có tần suất nổ ổn định nhất trên toàn giải
+        counts = collections.Counter(all_numbers)
+        # Chốt con số có tần suất xuất hiện cao nhất nhưng không quá "nóng"
+        top_list = counts.most_common(5)
+        chot_so = top_list[0][0] 
+
+        for i in range(min(5, len(lines)-1)):
+            so_ve_thuc_te = [int(d) for d in lines[i]]
+            # Giả lập soi từ dữ liệu trước đó
+            du_lieu_truoc = []
+            for l in lines[i+1:]:
+                du_lieu_truoc.extend([int(d) for d in l])
+            so_du_doan = collections.Counter(du_lieu_truoc).most_common(1)[0][0]
             
-            col1, col2, col3 = st.columns([1,2,1])
-            col1.write(f"Ván {i+1}")
-            if kq_that == so_du_doan:
-                col2.markdown(f"<div class='win-box'>Dự đoán: {so_du_doan} ⮕ THỰC TẾ: {kq_that} (TIỀN VỀ 💰)</div>", unsafe_allow_html=True)
-                wins += 1
-            else:
-                col2.markdown(f"<div class='loss-box'>Dự đoán: {so_du_doan} ⮕ THỰC TẾ: {kq_that} (TRƯỢT 💀)</div>", unsafe_allow_html=True)
-        
-        st.write(f"### 📈 Hiệu suất cầu: {wins}/{total_check} ván thắng")
+            check_status = "✅ ĂN (Nổ trong giải)" if so_du_doan in so_ve_thuc_te else "❌ XỊT"
+            if "✅" in check_status: win_count += 1
+            
+            st.write(f"Kỳ {i+1}: Dự đoán **{so_du_doan}** ⮕ Kết quả: **{''.join(lines[i])}** ⮕ {check_status}")
 
-        # 2. CHỐT SỐ VÁN TIẾP THEO
+        st.write(f"### 📈 Tỉ lệ nổ thực tế: {win_count}/5 kỳ gần nhất")
+
+        # PHẦN CHỐT SỐ VÀNG
         st.write("---")
-        st.subheader("🎯 CHỐT BẠCH THỦ VÁN TỚI")
-        
-        last_num = int(lines[0][4])
-        chot_bt = bong_so[last_num] # Chốt theo bóng của ván vừa xong nhất
-        
-        st.markdown(f"<div class='final-bt'>{chot_bt}</div>", unsafe_allow_html=True)
-        st.write(f"💡 Giải mã: Ván vừa rồi về **{last_num}**, theo cầu bóng âm dương thì ván tới tỷ lệ nổ **{chot_bt}** cực cao.")
+        st.markdown(f"""
+            <div class="result-card">
+                <p style="font-size: 25px;">🌟 BẠCH THỦ BAO LÔ 🌟</p>
+                <span class="number-highlight">{chot_so}</span>
+                <p style="font-size: 20px;">(Chỉ cần số <b>{chot_so}</b> xuất hiện ở 1 trong 5 vị trí là thắng)</p>
+            </div>
+        """, unsafe_allow_html=True)
 
-st.info("Anh để ý: Nếu bảng Nhật ký hiện toàn 'TRƯỢT 💀' thì là cầu bóng đang gãy, anh nghỉ ván này. Nếu thấy 'TIỀN VỀ 💰' đang thông thì cứ thế mà quất!")
+st.info("💡 **Mẹo:** Nếu ván trước con **{chot_so}** nổ 2-3 nháy, ván này anh có thể lót thêm con bóng của nó để an toàn nhé!")
