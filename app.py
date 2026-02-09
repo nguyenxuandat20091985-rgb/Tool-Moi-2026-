@@ -1,76 +1,78 @@
 import streamlit as st
 import collections
+import numpy as np
 
-st.set_page_config(page_title="SIÊU AI TAM TINH 2026", layout="wide")
+st.set_page_config(page_title="AI DYNAMIC 2026 - CHỐT SỐ BIẾN THIÊN", layout="wide")
 
-# Giao diện đẳng cấp Cyberpunk
 st.markdown("""
     <style>
-    .stApp { background-color: #020a0d; color: #00ffcc; }
-    .card-ai { background: rgba(0, 255, 204, 0.05); border: 1px solid #00ffcc; border-radius: 15px; padding: 20px; text-align: center; box-shadow: 0 0 15px #00ffcc; }
-    .number-gold { font-size: 70px !important; color: #ffff00; font-weight: bold; text-shadow: 2px 2px #ff0000; }
-    .title-ai { font-size: 22px; font-weight: bold; color: #00ffcc; text-transform: uppercase; margin-bottom: 15px; }
+    .stApp { background-color: #050505; color: #00ff00; }
+    .status-card { background: #111; border-left: 5px solid #ff0000; padding: 15px; margin-bottom: 20px; }
+    .bo-so-vip { font-size: 80px !important; color: #ffff00; font-weight: bold; text-shadow: 3px 3px #ff0000; line-height: 1.2; }
+    .highlight { color: #ff00ff; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🤖 SIÊU TRÍ TUỆ NHÂN TẠO TAM TINH v13.0")
-st.write("---")
+st.title("⚡ AI DYNAMIC v14.0: HỆ THỐNG TỔNG HỢP NGUỒN TỐI TÂN")
+st.markdown("<p class='highlight'>Cảnh báo: Dữ liệu biến thiên theo từng kỳ - Cập nhật liên tục</p>", unsafe_allow_html=True)
 
-data_raw = st.text_area("👇 Dán danh sách 5 số (Ván mới nhất TRÊN CÙNG):", height=180)
+# Nhập dữ liệu
+data_raw = st.text_area("👇 Dán danh sách 5 số (Ván mới nhất TRÊN CÙNG):", height=200)
 
-if st.button("🧠 KÍCH HOẠT THUẬT TOÁN AI"):
+if st.button("🔄 PHÂN TÍCH BIẾN THIÊN & CHỐT BỘ 9 SỐ"):
     lines = [l.strip() for l in data_raw.split('\n') if len(l.strip()) == 5]
     
-    if len(lines) < 12:
-        st.error("❌ Dữ liệu quá ít! Anh dán thêm tầm 12-20 ván để AI 'học' nhịp cầu nhé.")
+    if len(lines) < 5:
+        st.error("❌ Cần ít nhất 5 kỳ gần nhất để kích hoạt chế độ Biến Thiên!")
     else:
-        # 1. Phân tích chuỗi số (Sequence Analysis)
-        all_nums = "".join(lines)
-        freq = collections.Counter(all_nums)
+        # --- THUẬT TOÁN TỔNG HỢP NGUỒN THÔNG MINH ---
         
-        # 2. Thuật toán lọc số thông minh (Anti-Stupid)
-        # Lọc ra danh sách 9 số tiềm năng nhất, bỏ qua số "rác"
-        candidates = [n for n, c in freq.most_common(10)]
-        
-        # 3. Phân bổ vào 3 bộ Tam Tinh khác nhau hoàn toàn
-        # Bộ 1: Bộ số đang "Hot" (Tần suất cao nhất)
-        bo_1 = candidates[0:3]
-        
-        # Bộ 2: Bộ số "Tiềm năng" (Nhịp rơi đều)
-        bo_2 = candidates[3:6]
-        
-        # Bộ 3: Bộ số "Ẩn số" (Dễ nổ bất ngờ - Cầu đảo)
-        bo_3 = candidates[6:9]
+        # 1. Trọng số thời gian: Kỳ càng mới điểm càng cao
+        weighted_counts = collections.Counter()
+        for i, line in enumerate(lines[:15]): # Chỉ tập trung 15 kỳ gần nhất
+            weight = 15 - i # Kỳ mới nhất (i=0) có điểm là 15, kỳ cũ giảm dần
+            for char in line:
+                weighted_counts[char] += weight
 
-        # Hiển thị 3 bộ 
-        st.subheader("🎯 KẾT QUẢ PHÂN TÍCH 3 BỘ TAM TINH")
-        c1, c2, c3 = st.columns(3)
+        # 2. Xử lý "Số ngáo" (Số nổ quá dày trong 3 kỳ gần nhất sẽ bị giảm ưu tiên)
+        recent_3 = "".join(lines[:3])
+        recent_counts = collections.Counter(recent_3)
         
-        with c1:
-            st.markdown(f"""<div class="card-ai">
-                <p class="title-ai">Bộ 1: CHỦ LỰC</p>
-                <p class="number-gold">{''.join(bo_1)}</p>
-                <p>Xác suất: 89%</p>
-            </div>""", unsafe_allow_html=True)
-            
-        with c2:
-            st.markdown(f"""<div class="card-ai">
-                <p class="title-ai">Bộ 2: PHÒNG THỦ</p>
-                <p class="number-gold">{''.join(bo_2)}</p>
-                <p>Xác suất: 75%</p>
-            </div>""", unsafe_allow_html=True)
-            
-        with c3:
-            st.markdown(f"""<div class="card-ai">
-                <p class="title-ai">Bộ 3: ĐỘT PHÁ</p>
-                <p class="number-gold">{''.join(bo_3)}</p>
-                <p>Xác suất: 68%</p>
-            </div>""", unsafe_allow_html=True)
+        final_scores = []
+        for num in "0123456789":
+            score = weighted_counts[num]
+            if recent_counts[num] >= 3: score *= 0.5 # Giảm nhiệt nếu nổ quá 'điên'
+            final_scores.append((num, score))
+        
+        # Sắp xếp theo điểm số thực tế
+        final_scores.sort(key=lambda x: x[1], reverse=True)
+        top_9 = [x[0] for x in final_scores[:9]]
 
-        # 4. Phân tích xác suất nổ
+        # 3. Chia thành 3 bộ Tam Tinh độc lập
+        bo_1 = top_9[0:3]
+        bo_2 = top_9[3:6]
+        bo_3 = top_9[6:9]
+
+        # HIỂN THỊ KẾT QUẢ SẬP MẮT
         st.write("---")
-        st.subheader("📈 BIỂU ĐỒ NHỊP RƠI (AI ANALYTICS)")
-        chart_data = { "Số": [str(i) for i in range(10)], "Tần suất": [all_nums.count(str(i)) for i in range(10)] }
-        st.bar_chart(chart_data, x="Số", y="Tần suất")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown(f"<div class='status-card'><h3>BỘ 1: ƯU TIÊN 1</h3><p class='bo-so-vip'>{''.join(bo_1)}</p></div>", unsafe_allow_html=True)
+        with col2:
+            st.markdown(f"<div class='status-card'><h3>BỘ 2: ƯU TIÊN 2</h3><p class='bo-so-vip'>{''.join(bo_2)}</p></div>", unsafe_allow_html=True)
+        with col3:
+            st.markdown(f"<div class='status-card'><h3>BỘ 3: DỰ PHÒNG</h3><p class='bo-so-vip'>{''.join(bo_3)}</p></div>", unsafe_allow_html=True)
 
-st.info("💡 **Gợi ý:** Nếu anh thấy Bộ 1 và Bộ 2 có con số nào liên quan đến nhau, hãy ghép chúng lại để đánh xiên. Chúc anh rực rỡ!")
+        # PHẦN CHIẾN THUẬT
+        st.write("---")
+        st.subheader("🎯 CHIẾN THUẬT ĐẦU TƯ (AI ADVICE)")
+        
+        # Phân tích xem cầu đang Bệt hay Đảo
+        is_bet = any(lines[0][i] == lines[1][i] for i in range(5))
+        if is_bet:
+            st.warning("⚠️ PHÁT HIỆN CẦU BỆT: Giữ nguyên bộ số cũ và vào tiền đều tay.")
+        else:
+            st.success("🔄 CẦU ĐẢO NHỊP: AI đã cập nhật bộ số mới theo dòng chảy.")
+
+st.info("💡 **Gợi ý:** Anh hãy nhập thêm 1 kỳ mới nhất vừa ra và bấm nút lần nữa, anh sẽ thấy 3 bộ số này thay đổi ngay lập tức để bám đuổi kết quả!")
