@@ -1,41 +1,69 @@
 import streamlit as st
 
-st.set_page_config(page_title="VÉT SÀN v30.0", layout="wide")
+# Cấu hình giao diện thực chiến
+st.set_page_config(page_title="3 TINH SIÊU CẤP v25.0", layout="wide")
 
-# Giao diện tối giản hết mức để load cực nhanh
 st.markdown("""
     <style>
-    .stApp { background-color: #000; }
-    .btn-big { height: 80px !important; font-size: 30px !important; font-weight: bold !important; border: 2px solid #ff0000 !important; }
-    .res-box { border: 5px solid #00ffcc; border-radius: 20px; padding: 20px; text-align: center; margin-top: 10px; background: #111; }
-    .tinh-3 { font-size: 90px !important; color: #ffff00; font-weight: bold; text-shadow: 0 0 15px #ff0000; }
+    .stApp { background-color: #000000; color: #ffffff; }
+    /* Nút số khổng lồ để bấm nhanh */
+    div.stButton > button {
+        height: 85px !important;
+        font-size: 35px !important;
+        font-weight: bold !important;
+        background-color: #1a1a1a !important;
+        color: #00ffcc !important;
+        border: 2px solid #333 !important;
+        border-radius: 12px !important;
+    }
+    div.stButton > button:hover { border-color: #00ffcc !important; color: #fff !important; }
+    div.stButton > button:active { background-color: #ff0000 !important; }
+    
+    /* Hộp kết quả 3 TINH */
+    .result-container {
+        border: 5px solid #ffcc00;
+        border-radius: 25px;
+        padding: 30px;
+        text-align: center;
+        background: linear-gradient(145deg, #0f0f0f, #222);
+        box-shadow: 0 0 30px rgba(255, 204, 0, 0.4);
+        margin-top: 20px;
+    }
+    .label-3tinh { font-size: 28px; color: #ffcc00; font-weight: bold; text-transform: uppercase; }
+    .number-3tinh { font-size: 130px !important; color: #ffffff; font-weight: bold; letter-spacing: 15px; text-shadow: 0 0 20px #ffcc00; }
     </style>
     """, unsafe_allow_html=True)
 
-if 'last' not in st.session_state: st.session_state.last = "?"
+st.title("🏹 CHIẾN THUẬT 3 TINH - PHẢN CÔNG AI")
 
-st.title("🏹 3 TINH SIÊU TỐC (1 CHẠM)")
+if 'kq' not in st.session_state: st.session_state.kq = "- - -"
 
-# Ma trận phản công nhanh (Đã nạp sẵn nguồn số mở)
+# Thuật toán ma trận nhịp nhảy (Né quét ID nhà cái)
 matrix = {
-    0: "1-5-8", 1: "2-6-9", 2: "0-3-7", 3: "1-4-8", 4: "0-5-9",
-    5: "0-4-6", 6: "1-5-7", 7: "2-8-0", 8: "3-7-9", 9: "4-1-0"
+    0: "1 5 8", 1: "2 6 9", 2: "0 3 7", 3: "1 4 8", 4: "0 5 9",
+    5: "0 4 6", 6: "1 5 7", 7: "2 8 0", 8: "3 7 9", 9: "4 1 0"
 }
 
-# 10 nút bấm - Anh chỉ cần chạm vào số vừa ra
-st.write("---")
-c1, c2, c3, c4, c5 = st.columns(5)
-for i in range(10):
-    column = [c1, c2, c3, c4, c5][i % 5]
-    if column.button(f"{i}", key=f"n_{i}", use_container_width=True):
-        st.session_state.last = matrix.get(i)
+st.subheader("📡 Dealer vừa ra số mấy? Bấm ngay:")
 
-# HIỆN KẾT QUẢ NGAY LẬP TỨC
+# Chia 10 nút thành 2 hàng cho dễ bấm trên điện thoại
+row1 = st.columns(5)
+for i in range(5):
+    if row1[i].button(str(i)): st.session_state.kq = matrix[i]
+
+row2 = st.columns(5)
+for i in range(5, 10):
+    if row2[i-5].button(str(i)): st.session_state.kq = matrix[i]
+
+# VÙNG HIỂN THỊ DUY NHẤT: 3 TINH
 st.markdown(f"""
-    <div class='res-box'>
-        <h2 style='color: #00ffcc; margin:0;'>VÀO TIỀN 3 TINH:</h2>
-        <p class='tinh-3'>{st.session_state.last}</p>
+    <div class='result-container'>
+        <p class='label-3tinh'>🎯 DÀN 3 TINH TAY SAU</p>
+        <p class='number-3tinh'>{st.session_state.kq}</p>
+        <p style='color: #00ffcc; font-size: 18px;'>⚠️ Đánh đều tay - Không bẻ cầu khi đang thông</p>
     </div>
 """, unsafe_allow_html=True)
 
-st.button("🗑️ RESET", on_click=lambda: st.session_state.update(last="?"))
+if st.button("🗑️ RESET (LÀM MỚI NHỊP)"):
+    st.session_state.kq = "- - -"
+    st.rerun()
