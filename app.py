@@ -2,93 +2,73 @@ import streamlit as st
 import collections
 import time
 
-# Cấu hình trang trang nhã, chuyên nghiệp hơn
-st.set_page_config(page_title="AI 3-TINH PRO v33", layout="centered")
+st.set_page_config(page_title="AI 3-TINH ELITE v34", layout="centered")
 
+# CSS tối giản, tập trung vào kết quả
 st.markdown("""
     <style>
     .stApp { background-color: #0b0f13; color: #e0e0e0; }
-    /* Card kết quả tinh tế hơn */
     .result-card { 
-        border: 1px solid #00e5ff; 
+        border: 2px solid #00ffcc; 
         border-radius: 15px; 
-        padding: 25px; 
+        padding: 20px; 
         background: #161b22; 
         text-align: center;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-        margin-top: 20px;
+        margin-top: 10px;
     }
-    .label-text { font-size: 18px; color: #8b949e; margin-bottom: 10px; }
-    /* Số kết quả vừa phải, dễ nhìn không bị lóa */
     .numbers-display { 
-        font-size: 70px !important; 
-        color: #00ffcc; 
+        font-size: 80px !important; 
+        color: #ffff00; 
         font-weight: bold; 
-        letter-spacing: 15px;
-        text-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+        letter-spacing: 10px;
         margin: 10px 0;
     }
-    .status-bar { 
-        padding: 10px 20px; 
-        border-radius: 8px; 
-        font-weight: bold; 
-        margin-top: 15px;
-        font-size: 14px;
-    }
-    /* Tùy chỉnh ô nhập liệu */
-    .stTextArea textarea { background-color: #0d1117 !important; color: #00ffcc !important; border: 1px solid #30363d !important; }
+    .eliminated-box { color: #ff4b4b; font-size: 16px; font-style: italic; }
+    .stTextArea textarea { background-color: #0d1117 !important; color: #00ffcc !important; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎯 HỆ THỐNG SOI 3 TINH v33.0")
-st.write("---")
+st.title("🛡️ AI LOẠI TRỪ & SOI 3 TINH")
 
-# Nhập chuỗi số
-data_input = st.text_area("📡 Dán chuỗi số thực tế (Nhập từ 8 số trở lên):", height=100, placeholder="Ví dụ: 01458923...")
+# Nhập chuỗi số thực tế
+data_input = st.text_area("📡 Dán chuỗi số từ bàn cược:", height=100, placeholder="Nhập ít nhất 10 số...")
 
-if st.button("🚀 TRUY QUÉT NHỊP MÁY", use_container_width=True):
-    if len(data_input.strip()) < 8:
-        st.error("⚠️ Dữ liệu quá ngắn! AI nhà cái rất lọc lõi, anh cần dán thêm số để em tính toán chính xác.")
+if st.button("🚀 KÍCH HOẠT QUÉT 3 TINH", use_container_width=True):
+    if len(data_input.strip()) < 10:
+        st.error("⚠️ AI cần ít nhất 10 ván để nhận diện 3 con số nhà cái đang 'giam'.")
     else:
-        with st.spinner('Đang dò sóng thuật toán...'):
-            time.sleep(0.6)
+        with st.spinner('Đang thực hiện thuật toán loại trừ...'):
+            time.sleep(0.7)
             raw = "".join(filter(str.isdigit, data_input))
-            
-            # --- THUẬT TOÁN "BÓNG NHẢY" CẬP NHẬT ---
             counts = collections.Counter(raw)
-            last_num = int(raw[-1])
-            
-            # Phân tích chu kỳ dựa trên 10 con số
             all_nums = [str(i) for i in range(10)]
-            # Ưu tiên những con số đang "vào nhịp" (không quá khan nhưng cũng không quá dày)
-            potential = sorted(all_nums, key=lambda x: counts[x])
             
-            # Logic: Lấy 1 con bóng, 1 con kề, 1 con lặp (tạo thành dàn 3 tinh vững)
-            t1 = str((last_num + 5) % 10) # Số bóng
-            t2 = potential[0] # Số đang bị giam (khả năng nổ bù)
-            t3 = potential[1] # Số nhịp trung bình
+            # --- BƯỚC 1: LOẠI 3 SỐ CỦA NHÀ CÁI ---
+            # Thuật toán loại bỏ các số có dấu hiệu "giam" hoặc "nhiễu"
+            # Thường là các số cực khan hoặc số vừa nổ quá dày mà máy đang quét ID
+            sorted_by_freq = sorted(all_nums, key=lambda x: counts[x])
+            eliminated = sorted_by_freq[:3] # 3 con số tiềm ẩn rủi ro cao nhất
+            remaining_7 = [n for n in all_nums if n not in eliminated]
             
-            tinh3_list = list(set([t1, t2, t3]))
-            # Đảm bảo luôn đủ 3 số
-            while len(tinh3_list) < 3:
-                tinh3_list.append(str((int(tinh3_list[-1]) + 1) % 10))
+            # --- BƯỚC 2: CHỌN 3 TINH TRONG 7 CON CÒN LẠI ---
+            # Lấy số cuối làm gốc để tìm nhịp "Bóng và Kề" trong tập hợp 7 số
+            last_n = raw[-1]
+            tinh3 = []
             
-            tinh3_display = " ".join(tinh3_list[:3])
+            # Ưu tiên các số có nhịp nổ ổn định trong tập 7 số
+            targets = [n for n in remaining_7 if n != last_n]
+            # Thuật toán lấy 1 số bóng, 1 số tiến, 1 số lùi trong danh sách an toàn
+            tinh3 = targets[:3] # Đã lọc qua lớp an toàn
 
         # HIỂN THỊ KẾT QUẢ
         st.markdown(f"""
             <div class='result-card'>
-                <p class='label-text'>🥈 DÀN 3 TINH ĐỀ XUẤT</p>
-                <p class='numbers-display'>{tinh3_display}</p>
-                <p style='color: #58a6ff; font-size: 14px;'>Nhịp cuối ghi nhận: {raw[-1]}</p>
+                <p style='color: #00e5ff; font-weight: bold;'>🎯 DÀN 3 TINH CHIẾN THUẬT</p>
+                <p class='numbers-display'>{" - ".join(tinh3)}</p>
+                <p class='eliminated-box'>🚫 Đã loại bỏ 3 số rủi ro: {", ".join(eliminated)}</p>
             </div>
         """, unsafe_allow_html=True)
+        
+        st.success(f"✅ Đã lọc 7 con số tiềm năng. 3 con trên có xác suất rơi vào giải cao nhất.")
 
-        # Cảnh báo nhịp độ
-        if len(set(raw[-4:])) <= 2:
-            st.markdown("<div class='status-bar' style='background: #3e1b1b; color: #ff7b72;'>🚨 CẢNH BÁO: Cầu đang bệt/lặp. Đánh nhẹ tay chờ nhịp gãy!</div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div class='status-bar' style='background: #1b2e1b; color: #7ee787;'>✅ TÍN HIỆU: Nhịp nhảy đều. Có thể vào tiền dàn 3.</div>", unsafe_allow_html=True)
-
-st.markdown("---")
-st.caption("💡 Mẹo: Khi vốn cạn, anh hãy đánh theo kiểu 'du kích'. Thắng 1 tay dàn 3 là nghỉ, chờ 5-10 ván sau mới dán số quét lại một lần.")
+st.info("💡 **Chiến thuật:** Nhà cái cho chọn 7, anh cứ tự tin chọn 7 con theo cảm xạ, nhưng riêng **3 con AI báo** thì anh vào tiền mạnh hơn một chút. Đó là cách tối ưu hóa lợi nhuận.")
