@@ -9,23 +9,25 @@ from datetime import datetime
 from pathlib import Path
 
 # ================= CONFIG & API =================
-st.set_page_config(page_title="TITAN v1500-FIX HYBRID", layout="wide")
+st.set_page_config(page_title="TITAN v1500 FINAL", layout="wide")
 
-# API KEY MỚI CỦA ANH
+# API KEY CỦA ANH
 API_KEY = "AIzaSyBRo51DqVoC7BSv3ipUrY8GaEVfi0cVQxc"
 
 try:
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash') # Dùng bản Flash để tốc độ nhanh hơn cho LotoBet
+    model = genai.GenerativeModel('gemini-1.5-flash')
 except:
-    st.error("Lỗi cấu hình API. Vui lòng kiểm tra lại Key.")
+    st.error("Cấu hình API gặp vấn đề.")
 
 DATA_FILE = "titan_dataset.json"
 
 # ================= CORE ENGINE =================
 def load_data():
     if Path(DATA_FILE).exists():
-        with open(DATA_FILE, "r") as f: return json.load(f)
+        try:
+            with open(DATA_FILE, "r") as f: return json.load(f)
+        except: return []
     return []
 
 def save_data(data):
@@ -45,41 +47,32 @@ def get_titan_score(digits_list):
     ranked = sorted(score, key=score.get, reverse=True)
     return ranked, score
 
-# ================= AI BRAIN WITH RETRY =================
 def ask_gemini_smart(history, current_predict):
-    prompt = f"""
-    Hệ thống soi cầu LotoBet chuyên nghiệp.
-    Dữ liệu 15 kỳ gần nhất: {history[-15:]}
-    TITAN đề xuất: {current_predict}
-    
-    Yêu cầu:
-    1. Phân tích nhịp cầu (Bệt/Nhảy).
-    2. Tỉ lệ nổ của {current_predict} trong 2 kỳ tới?
-    3. Lời khuyên đi vốn cực ngắn gọn.
-    """
-    for _ in range(3): # Thử lại tối đa 3 lần nếu lag
+    prompt = f"LotoBet Data: {history[-15:]}. TITAN suggest: {current_predict}. Give advice."
+    for _ in range(3):
         try:
             response = model.generate_content(prompt)
             return response.text
-        except Exception as e:
+        except:
             time.sleep(1)
             continue
-    return "⚠️ AI đang quá tải do nhiều người dùng. Anh hãy bấm 'PHÂN TÍCH' lại lần nữa nhé!"
+    return "AI đang bận, anh bấm Phân Tích lại nhé!"
 
-# ================= GIAO DIỆN =================
-st.markdown("<h1 style='text-align: center; color: #00ffcc;'>🚀 TITAN v1500-FIX HYBRID</h1>", unsafe_allow_html=True)
+# ================= GIAO DIỆN CHUẨN =================
+st.markdown("<h1 style='text-align: center; color: #00ffcc;'>🛡️ TITAN v1500 FINAL</h1>", unsafe_allow_html=True)
 
+# Thanh nhập liệu bên trái (Sidebar)
 with st.sidebar:
     st.header("📥 NHẬP DỮ LIỆU")
-    raw_input = st.text_area("Dán kết quả KuBet (Dòng hoặc dãy số):", height=200, placeholder="Ví dụ: 12345\n67890...")
-    btn_run = st.button("🔥 PHÂN TÍCH NGAY", use_container_width=True)
-    if st.button("Xóa dữ liệu cũ"):
+    raw_input = st.text_area("Dán số vào đây:", height=200)
+    btn_run = st.button("🔥 CHỐT SỐ AI", use_container_width=True)
+    if st.button("Xóa dữ liệu"):
         st.session_state.dataset = []
         save_data([])
-        st.success("Đã xóa!")
+        st.rerun()
 
+# Khu vực hiển thị kết quả
 if btn_run and raw_input:
-    # Lọc lấy các số từ chuỗi nhập vào
     new_nums = re.findall(r"\d{1,5}", raw_input)
     if new_nums:
         st.session_state.dataset += [n for n in new_nums if n not in st.session_state.dataset]
@@ -92,28 +85,23 @@ if btn_run and raw_input:
             p1 = ranked[:3]
             
             c1, c2 = st.columns([1, 1])
-            
             with c1:
                 st.markdown(f"""
                 <div style='background: #1a1a1a; padding: 20px; border-radius: 15px; border: 2px solid red; text-align: center;'>
-                    <h2 style='color: white;'>🎯 KẾT QUẢ TITAN</h2>
+                    <h2 style='color: white;'>DỰ ĐOÁN</h2>
                     <h1 style='color: yellow; font-size: 60px;'>{" - ".join(p1)}</h1>
-                    <p style='color: #aaa;'>Dự phòng: {", ".join(ranked[3:6])}</p>
                 </div>
                 """, unsafe_allow_html=True)
                 st.bar_chart(pd.Series(scores))
             
             with c2:
-                st.markdown("<div style='background: #001a1a; padding: 20px; border-radius: 15px; border: 2px solid #00ffcc;'>", unsafe_allow_html=True)
-                st.subheader("🧠 CHUYÊN GIA AI PHÁN")
-                with st.spinner("Đang "soi" nhà cái..."):
+                st.subheader("🧠 AI TƯ VẤN")
+                # SỬA LỖI Ở DÒNG NÀY (Dùng dấu nháy đơn bao ngoài dấu nháy kép)
+                with st.spinner('Đang phân tích...'):
                     advice = ask_gemini_smart(st.session_state.dataset, p1)
-                    st.write(advice)
-                st.markdown("</div>", unsafe_allow_html=True)
+                    st.info(advice)
         else:
-            st.warning("Anh nhập thêm ít nhất 5-10 kỳ nữa để AI làm việc nhé!")
-    else:
-        st.error("Không tìm thấy số hợp lệ. Anh copy đúng định dạng kết quả nhé.")
+            st.warning("Nhập thêm kết quả để AI soi chuẩn hơn anh nhé!")
 
 st.divider()
-st.caption(f"Dữ liệu đang lưu trữ: {len(st.session_state.dataset)} kỳ quay.")
+st.caption(f"Số kỳ đã lưu: {len(st.session_state.dataset)}")
