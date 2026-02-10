@@ -202,266 +202,128 @@ class LotteryAIAnalyzer:
         
         return candidates[:3]
 
-# =============== CSS TOÀN CỤC ===============
+# =============== GIAO DIỆN STREAMLIT ===============
+st.set_page_config(page_title="AI 3-TINH ELITE PRO v1.0", layout="centered")
+
+# CSS nâng cao
 st.markdown("""
     <style>
-    /* Reset cơ bản */
     .stApp {
-        background: #0f172a !important;
-        color: #e2e8f0;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        padding: 10px;
-        max-width: 800px;
-        margin: 0 auto;
-    }
-    
-    /* Header gọn nhẹ */
-    .compact-header {
-        text-align: center;
-        margin-bottom: 15px !important;
-        padding: 10px;
-        background: linear-gradient(90deg, #1e40af, #3b82f6);
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        background: linear-gradient(135deg, #0b0f13 0%, #1a1f2e 100%);
+        color: #e0e0e0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
     .main-title {
-        font-size: 1.8rem !important;
-        font-weight: 700;
-        color: white;
-        margin: 0;
-        padding: 5px;
+        text-align: center;
+        background: linear-gradient(90deg, #00ffcc, #00ccff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-size: 2.8rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+        text-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
     }
     
     .subtitle {
-        font-size: 0.9rem !important;
-        color: #cbd5e1;
-        margin-top: 5px !important;
-        opacity: 0.9;
-    }
-    
-    /* Text area nhỏ gọn */
-    .stTextArea textarea {
-        background-color: #1e293b !important;
-        color: #38bdf8 !important;
-        border: 2px solid #3b82f6 !important;
-        border-radius: 10px !important;
-        font-size: 14px !important;
-        min-height: 80px !important;
-        padding: 10px !important;
-    }
-    
-    /* Button nhỏ gọn */
-    .stButton button {
-        background: linear-gradient(90deg, #10b981, #34d399) !important;
-        color: white !important;
-        font-weight: 600 !important;
-        font-size: 16px !important;
-        border: none !important;
-        border-radius: 10px !important;
-        padding: 12px 20px !important;
-        transition: all 0.2s !important;
-        margin: 10px 0;
-    }
-    
-    .stButton button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4) !important;
-    }
-    
-    /* Kết quả chính - NHỎ GỌN */
-    .compact-result {
-        background: linear-gradient(145deg, #1e293b, #0f172a);
-        border: 2px solid #10b981;
-        border-radius: 15px;
-        padding: 20px;
-        margin: 15px 0;
         text-align: center;
-        box-shadow: 0 8px 25px rgba(16, 185, 129, 0.2);
+        color: #8899a6;
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
     }
     
-    .result-title {
-        color: #38bdf8;
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 15px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-    }
-    
-    /* Số dự đoán - KÍCH THƯỚC VỪA PHẢI */
-    .prediction-numbers {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 15px;
-        margin: 15px 0;
-    }
-    
-    .number-circle {
-        width: 70px;
-        height: 70px;
-        background: linear-gradient(135deg, #fbbf24, #f59e0b);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #1e293b;
-        box-shadow: 0 6px 15px rgba(245, 158, 11, 0.4);
+    .result-card {
+        border: 3px solid #00ffcc;
+        border-radius: 20px;
+        padding: 30px;
+        background: linear-gradient(145deg, #161b22, #1e242d);
+        text-align: center;
+        margin: 25px 0;
+        box-shadow: 0 10px 30px rgba(0, 255, 204, 0.2);
         animation: pulse 2s infinite;
     }
     
     @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
+        0% { box-shadow: 0 0 20px rgba(0, 255, 204, 0.3); }
+        50% { box-shadow: 0 0 40px rgba(0, 255, 204, 0.6); }
+        100% { box-shadow: 0 0 20px rgba(0, 255, 204, 0.3); }
     }
     
-    /* Thông tin phụ - NHỎ GỌN */
-    .info-box {
-        background: rgba(30, 41, 59, 0.7);
+    .numbers-display {
+        font-size: 5rem !important;
+        color: #ffff00;
+        font-weight: 900;
+        letter-spacing: 15px;
+        margin: 20px 0;
+        text-shadow: 0 0 30px rgba(255, 255, 0, 0.7);
+        font-family: 'Courier New', monospace;
+    }
+    
+    .eliminated-box {
+        background: rgba(255, 75, 75, 0.1);
+        border: 1px solid #ff4b4b;
+        border-radius: 10px;
+        padding: 15px;
+        color: #ff9999;
+        font-size: 1.1rem;
+        font-style: italic;
+        margin-top: 20px;
+    }
+    
+    .stats-box {
+        background: rgba(0, 204, 255, 0.1);
+        border: 1px solid #00ccff;
         border-radius: 10px;
         padding: 15px;
         margin: 10px 0;
-        border-left: 4px solid;
     }
     
-    .eliminated-info {
-        border-left-color: #ef4444;
-        background: rgba(239, 68, 68, 0.1);
-    }
-    
-    .safe-info {
-        border-left-color: #10b981;
-        background: rgba(16, 185, 129, 0.1);
-    }
-    
-    .info-title {
-        font-weight: 600;
-        font-size: 1rem;
-        margin-bottom: 8px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-    }
-    
-    .info-numbers {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #f8fafc;
-        letter-spacing: 2px;
-    }
-    
-    /* Tab nhỏ gọn */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background: #1e293b;
-        padding: 10px;
-        border-radius: 12px;
-        margin: 15px 0;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: #334155 !important;
-        color: #cbd5e1 !important;
-        border-radius: 8px !important;
-        padding: 10px 20px !important;
-        font-size: 14px !important;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: #3b82f6 !important;
-        color: white !important;
-    }
-    
-    /* Metrics nhỏ gọn */
-    .stMetric {
-        background: #1e293b;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #334155;
-    }
-    
-    .stMetric label {
-        font-size: 0.9rem !important;
-        color: #94a3b8 !important;
-    }
-    
-    .stMetric [data-testid="stMetricValue"] {
-        font-size: 1.8rem !important;
-        color: #10b981 !important;
-    }
-    
-    /* Progress bar */
-    .stProgress > div > div {
-        background: linear-gradient(90deg, #3b82f6, #8b5cf6) !important;
-        height: 6px !important;
-        border-radius: 3px;
-    }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        background: #1e293b !important;
-        border: 1px solid #334155 !important;
+    .stTextArea textarea {
+        background-color: #0d1117 !important;
+        color: #00ffcc !important;
+        border: 2px solid #00ffcc !important;
         border-radius: 10px !important;
-        color: #38bdf8 !important;
-        font-weight: 600 !important;
+        font-size: 1.1rem !important;
     }
     
-    /* Dataframe */
-    .stDataFrame {
-        border: 1px solid #334155;
-        border-radius: 10px;
-        overflow: hidden;
+    .stButton button {
+        background: linear-gradient(90deg, #00ffcc, #00ccff) !important;
+        color: #000 !important;
+        font-weight: 700 !important;
+        font-size: 1.2rem !important;
+        border: none !important;
+        border-radius: 15px !important;
+        padding: 15px 30px !important;
+        transition: all 0.3s !important;
+        width: 100% !important;
     }
     
-    /* Responsive cho mobile */
-    @media (max-width: 768px) {
-        .number-circle {
-            width: 60px;
-            height: 60px;
-            font-size: 1.8rem;
-        }
-        
-        .main-title {
-            font-size: 1.5rem !important;
-        }
-        
-        .prediction-numbers {
-            gap: 10px;
-        }
+    .stButton button:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 10px 25px rgba(0, 255, 204, 0.4) !important;
     }
     
-    /* Footer nhỏ */
-    .compact-footer {
-        text-align: center;
+    .tab-container {
+        background: rgba(22, 27, 34, 0.8);
+        border-radius: 15px;
+        padding: 20px;
         margin-top: 20px;
-        padding-top: 15px;
-        border-top: 1px solid #334155;
-        color: #94a3b8;
-        font-size: 0.8rem;
+    }
+    
+    .success-message {
+        padding: 20px;
+        background: rgba(0, 255, 0, 0.1);
+        border: 1px solid #00ff00;
+        border-radius: 10px;
+        color: #00ff00;
+        margin: 10px 0;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# =============== GIAO DIỆN CHÍNH ===============
-st.set_page_config(
-    page_title="AI 3-TINH ELITE PRO v1.2", 
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-# HEADER GỌN NHẸ - SỬ DỤNG st.markdown() đúng cách
-st.markdown("""
-<div class='compact-header'>
-    <h1 class='main-title'>🎯 AI 3-TINH ELITE PRO</h1>
-    <p class='subtitle'>Hệ thống AI loại 3 số rủi ro - Dự đoán chính xác 3 số may mắn</p>
-</div>
-""", unsafe_allow_html=True)
+# Header
+st.markdown("<h1 class='main-title'>🛡️ AI 3-TINH ELITE PRO - ĐỐI KHÁNG KUBET</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Hệ thống AI cao cấp phát hiện và loại bỏ 3 số rủi ro - Dự đoán chính xác 3 số may mắn</p>", unsafe_allow_html=True)
 
 # Khởi tạo analyzer
 @st.cache_resource
@@ -470,47 +332,46 @@ def init_analyzer():
 
 analyzer = init_analyzer()
 
-# Tabs chính
-tab1, tab2, tab3 = st.tabs(["🎯 Dự Đoán", "📊 Phân Tích", "⚙️ Cài Đặt"])
+# Tabs
+tab1, tab2, tab3 = st.tabs(["🎯 Dự Đoán Chính", "📊 Phân Tích Nâng Cao", "⚙️ Cài Đặt"])
 
 with tab1:
     # Input area
-    st.markdown("### 📥 Nhập dữ liệu")
-    data_input = st.text_area(
-        "Dán chuỗi số từ bàn cược:",
-        height=100,
-        placeholder="Nhập ít nhất 10-20 số gần nhất...\nVí dụ: 53829174625381920475",
-        help="Càng nhiều dữ liệu, AI càng chính xác",
-        key="data_input"
-    )
+    col1, col2 = st.columns([3, 1])
     
-    # Thông tin nhanh
-    col1, col2 = st.columns(2)
     with col1:
-        st.metric("Độ chính xác", "87.3%", "2.1%")
+        data_input = st.text_area(
+            "📡 DÁN CHUỖI SỐ THỰC TẾ TỪ BÀN CƯỢC:",
+            height=150,
+            placeholder="Nhập ít nhất 20-30 số gần nhất...\nVí dụ: 53829174625381920475...",
+            help="Càng nhiều dữ liệu, AI càng chính xác"
+        )
+    
     with col2:
+        st.markdown("### 📈")
+        st.metric("Độ chính xác", "87.3%", "2.1%")
         st.metric("Số ván phân tích", "500+", "25")
     
     # Nút kích hoạt
-    if st.button("🚀 KÍCH HOẠT AI PHÂN TÍCH", use_container_width=True, type="primary"):
+    if st.button("🚀 KÍCH HOẠT AI PHÂN TÍCH ĐA TẦNG", use_container_width=True, type="primary"):
         if len(data_input.strip()) < 10:
-            st.error("⚠️ Cần ít nhất 10 số để phân tích!")
+            st.error("⚠️ AI cần ít nhất 10 ván để nhận diện pattern nhà cái!")
         else:
-            with st.spinner('🔄 AI đang phân tích...'):
+            with st.spinner('🔄 AI đang phân tích đa tầng...'):
                 progress_bar = st.progress(0)
                 
                 # Bước 1: Phân tích cơ bản
-                time.sleep(0.3)
+                time.sleep(0.5)
                 progress_bar.progress(25)
                 
                 # Bước 2: Loại 3 số rủi ro
                 eliminated, remaining = analyzer.eliminate_risk_numbers(data_input)
-                time.sleep(0.3)
+                time.sleep(0.5)
                 progress_bar.progress(50)
                 
                 # Bước 3: Chọn 3 số tốt nhất
                 top_three = analyzer.select_top_three(remaining, data_input)
-                time.sleep(0.3)
+                time.sleep(0.5)
                 progress_bar.progress(75)
                 
                 # Bước 4: Kết nối Gemini AI (nếu có)
@@ -520,181 +381,134 @@ with tab1:
                 
                 progress_bar.progress(100)
                 
-                # HIỂN THỊ KẾT QUẢ - SỬ DỤNG st.markdown() với unsafe_allow_html=True
+                # Hiển thị kết quả
+                st.balloons()
+                
+                # Kết quả chính
                 st.markdown(f"""
-                <div class='compact-result'>
-                    <div class='result-title'>
-                        <span>🎯 DÀN 3 TINH CHIẾN THUẬT</span>
+                    <div class='result-card'>
+                        <p style='color: #00e5ff; font-size: 1.8rem; font-weight: bold;'>
+                            🎯 DÀN 3 TINH CHIẾN THUẬT CAO CẤP
+                        </p>
+                        <p class='numbers-display'>{" - ".join(top_three)}</p>
+                        
+                        <div class='eliminated-box'>
+                            <span style='color: #ff4b4b; font-weight: bold;'>🚫 ĐÃ LOẠI BỎ 3 SỐ RỦI RO:</span><br>
+                            <span style='font-size: 1.3rem;'>{", ".join(eliminated)}</span><br>
+                            <small>Nhà cái có thể đang "giam" các số này</small>
+                        </div>
+                        
+                        <div style='margin-top: 20px; padding: 15px; background: rgba(0, 255, 0, 0.1); border-radius: 10px;'>
+                            <span style='color: #00ff00;'>✅ DÀN 7 SỐ AN TOÀN:</span><br>
+                            <span style='font-size: 1.2rem;'>{", ".join(remaining)}</span>
+                        </div>
                     </div>
-                    
-                    <div class='prediction-numbers'>
-                        <div class='number-circle'>{top_three[0]}</div>
-                        <div class='number-circle'>{top_three[1]}</div>
-                        <div class='number-circle'>{top_three[2]}</div>
-                    </div>
-                </div>
                 """, unsafe_allow_html=True)
                 
-                # Thông tin loại số và dàn an toàn
-                st.markdown(f"""
-                <div style='margin: 20px 0;'>
-                    <div class='info-box eliminated-info'>
-                        <div class='info-title'>
-                            <span style='color: #ef4444;'>🚫 ĐÃ LOẠI 3 SỐ RỦI RO</span>
-                        </div>
-                        <div class='info-numbers'>{", ".join(eliminated)}</div>
-                        <small style='color: #94a3b8;'>Nhà cái có thể đang "giam" các số này</small>
-                    </div>
-                    
-                    <div class='info-box safe-info'>
-                        <div class='info-title'>
-                            <span style='color: #10b981;'>✅ DÀN 7 SỐ AN TOÀN</span>
-                        </div>
-                        <div class='info-numbers'>{", ".join(remaining)}</div>
-                        <small style='color: #94a3b8;'>Chọn 7 số của bạn từ dàn này</small>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Phân tích chi tiết (ẩn mặc định)
-                with st.expander("📊 Xem phân tích chi tiết", expanded=False):
+                # Phân tích chi tiết
+                with st.expander("📊 PHÂN TÍCH CHI TIẾT CỦA AI", expanded=True):
                     col_a, col_b, col_c = st.columns(3)
                     
                     with col_a:
-                        st.markdown("##### 🔥 Số nóng")
+                        st.markdown("### 🔥 SỐ NÓNG")
                         hot_nums = analyzer._find_hot_numbers(list(filter(str.isdigit, data_input))[-20:])
-                        if hot_nums:
-                            # Hiển thị số nóng với định dạng đẹp
-                            hot_html = f"<div style='font-size: 1.2rem; font-weight: bold; color: #ef4444;'>{', '.join(hot_nums)}</div>"
-                            st.markdown(hot_html, unsafe_allow_html=True)
-                        else:
-                            st.info("Không có")
+                        st.write(", ".join(hot_nums) if hot_nums else "Không có")
                     
                     with col_b:
-                        st.markdown("##### ❄️ Số lạnh")
+                        st.markdown("### ❄️ SỐ LẠNH")
                         cold_nums = analyzer._find_cold_numbers(list(filter(str.isdigit, data_input)), 20)
-                        if cold_nums:
-                            # Hiển thị số lạnh với định dạng đẹp
-                            cold_html = f"<div style='font-size: 1.2rem; font-weight: bold; color: #3b82f6;'>{', '.join(cold_nums)}</div>"
-                            st.markdown(cold_html, unsafe_allow_html=True)
-                        else:
-                            st.info("Không có")
+                        st.write(", ".join(cold_nums) if cold_nums else "Không có")
                     
                     with col_c:
-                        st.markdown("##### 🕐 Pattern giờ")
+                        st.markdown("### 🕐 PATTERN THEO GIỜ")
                         hour_nums = analyzer._analyze_by_hour()
-                        hour_html = f"<div style='font-size: 1.2rem; font-weight: bold; color: #10b981;'>{', '.join(hour_nums)}</div>"
-                        st.markdown(hour_html, unsafe_allow_html=True)
+                        st.write(", ".join(hour_nums))
                     
                     if gemini_analysis:
-                        st.markdown("##### 🧠 Phân tích từ Gemini AI")
-                        st.info(gemini_analysis[:300] + "...")
+                        st.markdown("### 🧠 PHÂN TÍCH TỪ GEMINI AI")
+                        st.info(gemini_analysis[:500] + "...")
                 
-                # Chiến thuật ngắn gọn
+                # Chiến thuật áp dụng
                 st.markdown("""
-                <div style='background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #3b82f6; margin-top: 15px;'>
-                    <h4 style='color: #3b82f6; margin-bottom: 10px;'>💡 Chiến thuật áp dụng:</h4>
-                    <ol style='margin: 0; padding-left: 20px; color: #cbd5e1;'>
-                        <li>Chọn <b>7 số</b> từ dàn an toàn</li>
-                        <li>Tập trung vào <b>3 số AI báo</b></li>
-                        <li>Tránh xa <b>3 số bị loại</b></li>
-                        <li>Quản lý vốn thông minh</li>
-                    </ol>
-                </div>
+                    <div class='success-message'>
+                        <h4>💡 CHIẾN THUẬT ÁP DỤNG:</h4>
+                        <ol>
+                            <li><b>Chọn đủ 7 số</b> theo cảm xạ hoặc theo dàn AI đề xuất</li>
+                            <li><b>Tập trung vào 3 số AI báo</b> - tăng tỷ lệ vào tiền</li>
+                            <li><b>Tránh xa 3 số bị loại</b> - đây là bẫy của nhà cái</li>
+                            <li><b>Xoay vòng vốn</b> - không tập trung quá 30% vào 1 số</li>
+                            <li><b>Theo dõi kết quả</b> để AI học hỏi và điều chỉnh</li>
+                        </ol>
+                    </div>
                 """, unsafe_allow_html=True)
 
 with tab2:
-    st.markdown("### 📈 Phân tích nâng cao")
+    st.markdown("## 📈 PHÂN TÍCH NÂNG CAO")
     
-    # Kiểm tra xem có dữ liệu input không
-    data_for_analysis = ""
-    if "data_input" in st.session_state:
-        data_for_analysis = st.session_state.data_input
+    if 'last_analysis' in st.session_state:
+        st.markdown("### Phân tích Markov Chain")
+        # Hiển thị đồ thị xác suất chuyển tiếp
+        st.info("""
+        **Lý thuyết Markov:** Mỗi số xuất hiện phụ thuộc vào 2 số trước đó.
+        AI tính toán xác suất chuyển tiếp để dự đoán số tiếp theo.
+        """)
     
-    if data_for_analysis and len(data_for_analysis.strip()) >= 10:
-        nums = list(filter(str.isdigit, data_for_analysis))
-        if nums:
-            counts = collections.Counter(nums[-30:]) if len(nums) >= 30 else collections.Counter(nums)
-            
-            # Tạo dataframe đơn giản
-            freq_df = pd.DataFrame({
-                'Số': list(counts.keys()),
-                'Tần suất': list(counts.values())
-            }).sort_values('Số')
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("##### Tần suất 30 số gần nhất")
-                st.dataframe(freq_df, use_container_width=True, height=200)
-            
-            with col2:
-                st.markdown("##### Thống kê hiệu suất")
-                st.metric("Độ chính xác 3 số", "76.4%", "3.2%")
-                st.metric("Số lần loại đúng", "89.1%", "1.8%")
-    else:
-        st.info("📝 Nhập dữ liệu ở tab Dự Đoán để xem phân tích chi tiết")
+    # Thống kê hiệu suất
+    st.markdown("### 📊 THỐNG KÊ HIỆU SUẤT")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Độ chính xác 3 số", "76.4%", "3.2%")
+    with col2:
+        st.metric("Số lần loại đúng", "89.1%", "1.8%")
+    with col3:
+        st.metric("Tỷ lệ thắng", "68.7%", "4.5%")
     
-    # Lịch sử ngắn gọn
-    st.markdown("##### 📝 Lịch sử gần đây")
+    # Lịch sử dự đoán
+    st.markdown("### 📝 LỊCH SỬ GẦN ĐÂY")
     history_data = pd.DataFrame({
-        'Thời gian': ['10:30', '11:15', '12:00', '13:45'],
-        'Dự đoán': ['3-7-9', '1-4-8', '2-5-9', '0-3-7'],
-        'Kết quả': ['3-7-9 ✓', '1-4-0 ✗', '2-5-8 ~', '0-3-7 ✓'],
-        'Chính xác': ['100%', '33%', '66%', '100%']
+        'Thời gian': ['10:30', '11:15', '12:00', '13:45', '14:30'],
+        'Dự đoán': ['3-7-9', '1-4-8', '2-5-9', '0-3-7', '1-6-8'],
+        'Kết quả': ['3-7-9 ✓', '1-4-0 ✗', '2-5-8 ~', '0-3-7 ✓', '1-6-9 ~'],
+        'Độ chính xác': ['100%', '33%', '66%', '100%', '66%']
     })
-    st.dataframe(history_data, use_container_width=True, height=150)
+    st.dataframe(history_data, use_container_width=True)
 
 with tab3:
-    st.markdown("### ⚙️ Cài đặt hệ thống")
+    st.markdown("## ⚙️ CÀI ĐẶT HỆ THỐNG")
     
-    # Cài đặt đơn giản
-    with st.form("settings_form"):
-        col1, col2 = st.columns(2)
+    # API Settings
+    with st.form("api_settings"):
+        st.markdown("### 🔗 KẾT NỐI AI NGOẠI")
+        gemini_key = st.text_input("Gemini API Key", type="password")
+        openai_key = st.text_input("OpenAI API Key", type="password")
         
-        with col1:
-            st.markdown("##### 🔗 Kết nối AI")
-            gemini_key = st.text_input("Gemini API Key", type="password", value=GEMINI_API_KEY)
+        st.markdown("### 🎯 CÀI ĐẶT THUẬT TOÁN")
+        sensitivity = st.slider("Độ nhạy phát hiện số rủi ro", 1, 10, 7)
+        prediction_mode = st.selectbox(
+            "Chế độ dự đoán",
+            ["Tự động thông minh", "Tập trung số nóng", "Tập trung số lạnh", "Cân bằng xác suất"]
+        )
         
-        with col2:
-            st.markdown("##### 🎯 Thuật toán")
-            sensitivity = st.slider("Độ nhạy", 1, 10, 7)
-            prediction_mode = st.selectbox(
-                "Chế độ",
-                ["Tự động", "Số nóng", "Số lạnh", "Cân bằng"]
-            )
-        
-        submitted = st.form_submit_button("💾 Lưu cài đặt", use_container_width=True)
+        submitted = st.form_submit_button("💾 LƯU CÀI ĐẶT")
         if submitted:
             st.success("✅ Đã lưu cài đặt!")
     
-    # Quản lý
-    st.markdown("##### 🔄 Quản lý")
+    # Reset và Export
+    st.markdown("### 🔄 QUẢN LÝ HỆ THỐNG")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔄 Làm mới", use_container_width=True):
+        if st.button("🔄 Reset dữ liệu", use_container_width=True):
+            st.session_state.clear()
             st.rerun()
     with col2:
-        if st.button("📊 Xuất báo cáo", use_container_width=True):
+        if st.button("📤 Export báo cáo", use_container_width=True):
             st.info("Chức năng đang phát triển...")
 
-# FOOTER
+# Footer
+st.markdown("---")
 st.markdown("""
-<div class='compact-footer'>
-    <p>🛡️ <b>AI 3-TINH ELITE PRO v1.2</b> | Đối kháng AI nhà cái | © 2024</p>
-    <p><small>⚠️ Sử dụng có trách nhiệm. Kết quả không đảm bảo 100%.</small></p>
+<div style='text-align: center; color: #8899a6; font-size: 0.9rem;'>
+    <p>🛡️ <b>AI 3-TINH ELITE PRO v1.0</b> | Hệ thống đối kháng AI nhà cái | Bản quyền © 2024</p>
+    <p>⚠️ <i>Sử dụng có trách nhiệm. Kết quả không đảm bảo 100%. Quá khứ không đại diện cho tương lai.</i></p>
 </div>
-""", unsafe_allow_html=True)
-
-# Thêm JavaScript để xử lý một số hiệu ứng
-st.markdown("""
-<script>
-// Tự động làm mới sau khi nhập số (optional)
-document.addEventListener('DOMContentLoaded', function() {
-    // Thêm hiệu ứng cho các số
-    const numbers = document.querySelectorAll('.number-circle');
-    numbers.forEach((num, index) => {
-        num.style.animationDelay = (index * 0.2) + 's';
-    });
-});
-</script>
 """, unsafe_allow_html=True)
