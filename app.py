@@ -1,138 +1,164 @@
 import streamlit as st
-import collections
 import requests
-import time
 import re
-import json
-import threading
-import websocket
+import time
+from datetime import datetime
+from collections import Counter
 
-st.set_page_config(page_title="AI 3-TINH ELITE v95 AUTO DETECTOR",layout="centered")
+# ================= CONFIG =================
+st.set_page_config(
+    page_title="AI TITAN CORE FINAL",
+    layout="wide"
+)
 
 # ================= SESSION =================
-for k in ["manual","paste","url","socket","live","html"]:
-    if k not in st.session_state:
-        st.session_state[k]=""
+for key in ["history","heatmap","timeline","dataset"]:
+    if key not in st.session_state:
+        st.session_state[key]=[]
+
+if isinstance(st.session_state.heatmap,list):
+    st.session_state.heatmap={}
 
 # ================= UI =================
-st.title("🔥 AI 3-TINH ELITE v95 - AUTO DATA DETECTOR")
+st.title("☠️ AI TITAN CORE – FINAL ALL IN ONE")
 
-tab1,tab2,tab3,tab4=st.tabs([
-"✍️ Nhập tay",
-"📋 Paste HTML",
-"🌐 URL AUTO SCAN",
-"⚡ WebSocket"
-])
+mode=st.radio(
+    "Nguồn dữ liệu",
+    ["Nhập tay","Paste HTML/Text","URL Auto Feed"]
+)
 
-with tab1:
-    st.session_state.manual=st.text_area("Chuỗi số:",value=st.session_state.manual)
+manual=""
+paste=""
+url=""
 
-with tab2:
-    st.session_state.paste=st.text_area("HTML/Text:",value=st.session_state.paste,height=150)
+if mode=="Nhập tay":
+    manual=st.text_area("Nhập chuỗi số")
 
-with tab3:
-    st.session_state.url=st.text_input("URL trang hoặc API:",value=st.session_state.url)
-    auto=st.checkbox("Auto refresh 5s")
+elif mode=="Paste HTML/Text":
+    paste=st.text_area("Paste HTML/Text")
 
-with tab4:
-    st.session_state.socket=st.text_input("WebSocket wss://",value=st.session_state.socket)
+elif mode=="URL Auto Feed":
+    url=st.text_input("Nhập URL")
 
-# ================= TOOL =================
-def digits(t):
-    return "".join(re.findall(r'\d',str(t)))
+poll=st.slider("Auto Refresh (giây)",0,30,0)
 
-# auto scan api trong html
-def find_api(html):
-    links=re.findall(r'https?://[^\s"\']+',html)
-    return [l for l in links if "api" in l or "json" in l or "result" in l]
+# ================= FUNCTIONS =================
+def extract_numbers(text):
+    return re.findall(r"\d+",text)
 
-# fetch html
-def fetch_html(url):
+def fetch_url(url):
     try:
-        r=requests.get(url,timeout=10,headers={"User-Agent":"Mozilla/5.0"})
+        headers={"User-Agent":"Mozilla/5.0"}
+        r=requests.get(url,headers=headers,timeout=10)
         return r.text
     except:
         return ""
 
-# fetch json
-def fetch_json(url):
-    try:
-        r=requests.get(url,timeout=10)
-        return digits(json.dumps(r.json()))
-    except:
-        return ""
+def auto_parse(html):
+    nums=re.findall(r">\s*(\d{1,5})\s*<",html)
+    if nums:
+        return nums
+    return extract_numbers(html)
 
-# websocket
-def socket_worker(url):
-    def on_message(ws,msg):
-        st.session_state.live+=digits(msg)
-    ws=websocket.WebSocketApp(url,on_message=on_message)
-    ws.run_forever()
+def update_heatmap(nums):
+    for n in nums:
+        for d in n:
+            st.session_state.heatmap[d]=st.session_state.heatmap.get(d,0)+1
 
-# ================= AI =================
-def analyze(raw):
+def analyze_patterns(nums):
+    patterns=[]
+    last=nums[-15:]
 
-    nums=list(raw)
-    freq=collections.Counter(nums)
+    for i in range(len(last)-1):
+        a=last[i]
+        b=last[i+1]
 
-    score={str(i):0 for i in range(10)}
+        if a==b:
+            patterns.append("bệt")
+        elif a[::-1]==b:
+            patterns.append("đảo")
+        elif a[-1]==b[-1]:
+            patterns.append("lặp đuôi")
+        else:
+            patterns.append("nhảy")
 
-    for n in score:
-        score[n]+=1-(freq.get(n,0)/max(len(nums),1))
+    return Counter(patterns)
 
-    eliminated=sorted(score,key=score.get,reverse=True)[:3]
-    remaining=[str(i) for i in range(10) if str(i) not in eliminated]
-    final=sorted(remaining,key=lambda x:freq.get(x,0),reverse=True)[:3]
+def titan_engine(nums):
 
-    return eliminated,remaining,final
+    if not nums:
+        return "Không có dữ liệu"
 
-# ================= SOCKET START =================
-if st.button("🔌 START SOCKET"):
-    if st.session_state.socket.startswith("ws"):
-        threading.Thread(target=socket_worker,
-        args=(st.session_state.socket,),
-        daemon=True).start()
-        st.success("Socket running")
+    digits=[]
+    for n in nums:
+        digits+=list(n)
+
+    freq=Counter(digits).most_common(5)
+
+    recent=nums[-20:]
+    recent_digits=[]
+    for n in recent:
+        recent_digits+=list(n)
+
+    momentum=Counter(recent_digits).most_common(3)
+
+    patterns=analyze_patterns(nums)
+
+    return {
+        "freq":freq,
+        "momentum":momentum,
+        "patterns":patterns
+    }
+
+# ================= INPUT =================
+nums=[]
+
+if mode=="Nhập tay":
+    nums=extract_numbers(manual)
+
+elif mode=="Paste HTML/Text":
+    nums=extract_numbers(paste)
+
+elif mode=="URL Auto Feed":
+    if url:
+        html=fetch_url(url)
+        nums=auto_parse(html)
 
 # ================= RUN =================
-if st.button("🚀 CHẠY AI v95",use_container_width=True):
+if st.button("🚀 CHẠY TITAN ENGINE"):
 
-    raw=""
-    raw+=digits(st.session_state.manual)
-    raw+=digits(st.session_state.paste)
+    st.session_state.dataset+=nums
 
-    # URL AUTO
-    if st.session_state.url:
+    update_heatmap(nums)
 
-        html=fetch_html(st.session_state.url)
-        raw+=digits(html)
+    result=titan_engine(st.session_state.dataset)
 
-        apis=find_api(html)
+    st.session_state.timeline.append(nums[-5:])
 
-        for a in apis[:3]:
-            raw+=fetch_json(a)
+    st.session_state.history.append({
+        "time":datetime.now().strftime("%H:%M:%S"),
+        "result":result,
+        "count":len(st.session_state.dataset)
+    })
 
-    raw+=st.session_state.live
-
-    if len(raw)<10:
-        st.warning("Chưa đủ dữ liệu")
-    else:
-        eliminated,remaining,tinh3=analyze(raw)
-
-        big="".join([f"<h1 style='color:yellow'>{n}</h1>" for n in tinh3])
-
-        st.markdown(f"""
-        <div style='border:2px solid #00ffcc;padding:20px;border-radius:15px'>
-        <h3>🎯 DÀN 3 TINH</h3>
-        {big}
-        <p>🚫 Loại: {", ".join(eliminated)}</p>
-        <p>✅ 7 số: {", ".join(remaining)}</p>
-        </div>
-        """,unsafe_allow_html=True)
-
-# ================= AUTO REFRESH =================
-if "auto" in locals() and auto:
-    time.sleep(5)
+# ================= AUTO =================
+if poll>0:
+    time.sleep(poll)
     st.rerun()
 
-st.info("🔥 v95 Engine: Auto HTML Scan + API Detect + WebSocket Feed + Hybrid Input")
+# ================= DASHBOARD =================
+st.divider()
+
+st.subheader("🔥 Heatmap")
+st.write(st.session_state.heatmap)
+
+st.subheader("🧠 Timeline gần")
+for t in st.session_state.timeline[-10:]:
+    st.write(t)
+
+st.subheader("📊 Dashboard AI")
+for item in reversed(st.session_state.history[-10:]):
+    st.write(item)
+
+st.subheader("📂 Dataset size")
+st.write(len(st.session_state.dataset))
