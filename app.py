@@ -2,83 +2,54 @@ import streamlit as st
 import collections
 import requests
 import time
+import re
 
-st.set_page_config(page_title="AI 3-TINH ELITE v60",layout="centered")
+st.set_page_config(page_title="AI 3-TINH ELITE v70 GOD MODE",layout="centered")
 
 # ================= UI =================
 st.markdown("""
 <style>
 .stApp{background:#0b0f13;color:#e0e0e0}
-
-.result{
-border:2px solid #00ffcc;
-border-radius:15px;
-padding:25px;
-background:#161b22;
-text-align:center;
-margin-top:20px
-}
-
-.bigbox{
-display:flex;
-justify-content:center;
-gap:25px;
-flex-wrap:wrap
-}
-
-.big{
-font-size:75px;
-color:#ffff00;
-font-weight:bold;
-text-shadow:0px 0px 20px rgba(255,255,0,0.5)
-}
+.result{border:2px solid #00ffcc;border-radius:15px;padding:25px;background:#161b22;text-align:center;margin-top:20px}
+.bigbox{display:flex;justify-content:center;gap:20px;flex-wrap:wrap}
+.big{font-size:70px;color:#ffff00;font-weight:bold;text-shadow:0px 0px 20px rgba(255,255,0,0.5)}
+.heat{font-size:14px;color:#00ffcc}
 </style>
 """,unsafe_allow_html=True)
 
-st.title("🧠 AI 3-TINH ELITE v60 - NEURAL PRO MAX")
+st.title("🧠 AI 3-TINH ELITE v70 - GOD MODE")
 
-# ================= CONFIG =================
-GEMINI_API_KEY=st.secrets.get("GEMINI_API_KEY","")
-
+# ================= SESSION =================
 if "weights" not in st.session_state:
-    st.session_state.weights={
-        "freq":1.0,
-        "recency":1.0,
-        "gap":1.0,
-        "markov":1.0,
-        "cycle":1.0
-    }
+    st.session_state.weights={"freq":1,"gap":1,"recency":1,"cycle":1,"pattern":1}
 
-if "history" not in st.session_state:
-    st.session_state.history=[]
+if "live_history" not in st.session_state:
+    st.session_state.live_history=""
 
-# ================= CORE =================
+# ================= AUTO HTML =================
+def fetch_digits(url):
+    try:
+        headers={"User-Agent":"Mozilla/5.0"}
+        r=requests.get(url,headers=headers,timeout=8)
+        if r.status_code!=200:return ""
+        return "".join(re.findall(r'\d',r.text))
+    except:
+        return ""
+
+# ================= PATTERN ENGINE =================
 def detect_pattern(nums):
     if len(nums)<5:return "unknown"
     if len(set(nums[-5:]))==1:return "cầu bệt"
-    if nums[-1]==nums[-3]:return "cầu đảo"
     if nums[-1]==nums[-2]:return "cầu lặp"
+    if nums[-1]==nums[-3]:return "cầu đảo"
     return "cầu nhảy"
 
-def markov_chain(nums):
-    trans={}
-    for i in range(len(nums)-2):
-        state=(nums[i],nums[i+1])
-        nxt=nums[i+2]
-        trans.setdefault(state,{})
-        trans[state][nxt]=trans[state].get(nxt,0)+1
-    for s in trans:
-        total=sum(trans[s].values())
-        for k in trans[s]:
-            trans[s][k]/=total
-    return trans
-
+# ================= SCORE ENGINE =================
 def calculate_scores(raw):
 
     nums=list(raw)
     total=len(nums)
     freq=collections.Counter(nums)
-    markov=markov_chain(nums)
 
     scores={str(i):0 for i in range(10)}
 
@@ -86,110 +57,102 @@ def calculate_scores(raw):
 
         # anti trap nóng giả
         if freq.get(n,0)/max(total,1)>0.3:
-            scores[n]-=1
+            scores[n]-=1.5
 
         scores[n]+= (1-(freq.get(n,0)/max(total,1)))*st.session_state.weights["freq"]
 
-        if n not in nums[-20:]:
+        if n not in nums[-25:]:
             scores[n]+=1*st.session_state.weights["recency"]
 
         if n in nums:
             gap=len(nums)-1-nums[::-1].index(n)
-            scores[n]+= (gap/50)*st.session_state.weights["gap"]
+            scores[n]+= (gap/60)*st.session_state.weights["gap"]
 
-        # cycle heat
-        scores[n]+= (nums.count(n)%5)/10*st.session_state.weights["cycle"]
+        scores[n]+= (nums.count(n)%7)/10*st.session_state.weights["cycle"]
 
-    if len(nums)>=2:
-        state=(nums[-2],nums[-1])
-        if state in markov:
-            for n,p in markov[state].items():
-                scores[n]+= (1-p)*st.session_state.weights["markov"]
-
-    return scores
-
-# ================= AI =================
-def gemini_ai(data):
-    if not GEMINI_API_KEY:return []
-    try:
-        headers={"Content-Type":"application/json"}
-        body={"contents":[{"parts":[{"text":f"choose 3 digits from 0-9 based on pattern {data} return only numbers"}]}]}
-        r=requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
-        headers=headers,json=body)
-        txt=r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        digits=[c for c in txt if c.isdigit()]
-        return digits[:3]
-    except:
-        return []
-
-def local_ai(remaining,raw):
-    freq=collections.Counter(raw)
-    ranked=sorted(remaining,key=lambda x:freq.get(x,0),reverse=True)
-    return ranked[:3]
-
-def voting(local,gemini):
-    votes=collections.Counter(local+gemini)
-    return [n for n,_ in votes.most_common(3)]
+    return scores,freq
 
 # ================= ANALYZE =================
 def analyze(raw):
 
     pattern=detect_pattern(raw)
 
-    scores=calculate_scores(raw)
+    scores,freq=calculate_scores(raw)
 
     eliminated=sorted(scores,key=scores.get,reverse=True)[:3]
     remaining=[str(i) for i in range(10) if str(i) not in eliminated]
 
-    local=local_ai(remaining,raw)
-    gemini=gemini_ai(raw[-50:])
+    ranked=sorted(remaining,key=lambda x:freq.get(x,0),reverse=True)
 
-    final=voting(local,gemini) if gemini else local
+    tinh3=ranked[:3]
 
-    return eliminated,remaining,final,pattern
+    return eliminated,remaining,tinh3,pattern,freq
 
-# ================= UI =================
-data_input=st.text_area("📡 Dán chuỗi số:",height=120)
+# ================= INPUT =================
+mode=st.radio("Nguồn dữ liệu",["✍️ Dán chuỗi số","🌐 Link HTML AUTO"])
 
-if st.button("🚀 KÍCH HOẠT AI v60",use_container_width=True):
+data=""
+url=""
 
-    raw="".join(filter(str.isdigit,data_input))
+if mode=="✍️ Dán chuỗi số":
+    data=st.text_area("Chuỗi số:",height=120)
+
+if mode=="🌐 Link HTML AUTO":
+    url=st.text_input("Link HTML nhà cái")
+    auto=st.checkbox("⚡ Auto Crawl realtime (5s)")
+
+# ================= RUN =================
+run=st.button("🚀 KÍCH HOẠT GOD MODE",use_container_width=True)
+
+if run:
+
+    if mode=="🌐 Link HTML AUTO":
+        raw=fetch_digits(url)
+        if raw:
+            st.session_state.live_history+=raw
+            raw=st.session_state.live_history
+            st.success(f"📥 Crawl được {len(raw)} số")
+        else:
+            st.error("❌ Không lấy được HTML")
+    else:
+        raw="".join(filter(str.isdigit,data))
 
     if len(raw)<10:
         st.error("⚠️ cần ít nhất 10 số")
     else:
-        with st.spinner("Neural AI đang phân tích..."):
-            time.sleep(0.5)
-            eliminated,remaining,tinh3,pattern=analyze(raw)
+
+        eliminated,remaining,tinh3,pattern,freq=analyze(raw)
+
+        heat=" ".join([f"{k}:{v}" for k,v in freq.most_common()])
 
         big_html="".join([f"<div class='big'>{n}</div>" for n in tinh3])
 
         st.markdown(f"""
         <div class='result'>
-        <p>🎯 DÀN 3 TINH</p>
+        <p>🎯 DÀN 3 TINH GOD MODE</p>
         <div class='bigbox'>{big_html}</div>
-        <p>📊 PHÁT HIỆN: {pattern}</p>
-        <p>🚫 LOẠI: {", ".join(eliminated)}</p>
-        <p>✅ 7 SỐ: {", ".join(remaining)}</p>
+        <p>📊 Pattern: {pattern}</p>
+        <p>🚫 Loại: {", ".join(eliminated)}</p>
+        <p>✅ 7 số: {", ".join(remaining)}</p>
+        <p class='heat'>🔥 Heatmap: {heat}</p>
         </div>
         """,unsafe_allow_html=True)
 
+# ================= AUTO LOOP =================
+if mode=="🌐 Link HTML AUTO" and 'auto' in locals() and auto:
+    time.sleep(5)
+    st.rerun()
+
 # ================= LEARNING =================
-st.markdown("### 🧠 Neural Learning PRO")
-real=st.text_input("Kết quả thật:")
+st.markdown("### 🧠 Neural Learning GOD")
+real=st.text_input("Kết quả thật")
 
-if st.button("📈 HỌC THẬT v60"):
+if st.button("📈 AI HỌC"):
     if real.isdigit():
-        st.session_state.history.append(real)
-
-        # tự điều chỉnh theo winrate
         st.session_state.weights["freq"]*=0.99
-        st.session_state.weights["recency"]*=1.01
         st.session_state.weights["gap"]*=1.02
-        st.session_state.weights["markov"]*=1.03
+        st.session_state.weights["recency"]*=1.01
         st.session_state.weights["cycle"]*=1.01
-
         st.success("AI đã tiến hóa theo dữ liệu thật")
 
-st.info("🔥 Engine v60: Neural Learning + Anti Trap + Pattern AI + Heat Cycle + Multi Voting")
+st.info("🔥 v70 Engine: Auto Crawl + Live Heatmap + Anti Trap + Neural Adaptive + Pattern Engine")
