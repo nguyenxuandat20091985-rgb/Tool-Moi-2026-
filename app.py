@@ -3,30 +3,26 @@ import re
 import json
 import pandas as pd
 import google.generativeai as genai
+import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 # ================= CONFIG & API =================
-st.set_page_config(page_title="TITAN v1500 HYBRID AI", layout="wide")
+st.set_page_config(page_title="TITAN v1500-FIX HYBRID", layout="wide")
 
-# Thiết lập Gemini API
-API_KEY = "AIzaSyDyyGUWbrxYlBq4X1RDzOVgL9cZiwp0KeY"
-genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+# API KEY MỚI CỦA ANH
+API_KEY = "AIzaSyBRo51DqVoC7BSv3ipUrY8GaEVfi0cVQxc"
 
-DATA_FILE = "titan_v1500_dataset.json"
+try:
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash') # Dùng bản Flash để tốc độ nhanh hơn cho LotoBet
+except:
+    st.error("Lỗi cấu hình API. Vui lòng kiểm tra lại Key.")
 
-# ================= STYLE =================
-st.markdown("""
-    <style>
-    .stApp { background-color: #050a0f; color: #e0e0e0; }
-    .ai-box { border: 2px dashed #00bfff; padding: 15px; border-radius: 10px; background: #0b1622; }
-    .titan-result { border: 2px solid #ff4b4b; padding: 20px; border-radius: 15px; background: #1a0a0a; text-align: center; }
-    </style>
-    """, unsafe_allow_html=True)
+DATA_FILE = "titan_dataset.json"
 
-# ================= CORE LOGIC (GIỮ NGUYÊN BẢN GỐC) =================
+# ================= CORE ENGINE =================
 def load_data():
     if Path(DATA_FILE).exists():
         with open(DATA_FILE, "r") as f: return json.load(f)
@@ -46,90 +42,78 @@ def get_titan_score(digits_list):
         score[i] += freq.get(i, 0) * 1.0
         score[i] += recent.get(i, 0) * 1.5
         if recent.get(i, 0) == 0: score[i] += 8
-    return sorted(score, key=score.get, reverse=True), score
+    ranked = sorted(score, key=score.get, reverse=True)
+    return ranked, score
 
-# ================= AI HYBRID ENGINE =================
-def ask_gemini(history, current_predict, patterns):
+# ================= AI BRAIN WITH RETRY =================
+def ask_gemini_smart(history, current_predict):
     prompt = f"""
-    Bạn là chuyên gia phân tích xác suất LotoBet. 
-    Dữ liệu lịch sử: {history[-15:]}
-    Mẫu hình hiện tại: {patterns}
-    Hệ thống TITAN đang đề xuất 3 số: {current_predict}
+    Hệ thống soi cầu LotoBet chuyên nghiệp.
+    Dữ liệu 15 kỳ gần nhất: {history[-15:]}
+    TITAN đề xuất: {current_predict}
     
-    Hãy phân tích:
-    1. Tỉ lệ nổ của 3 số này trong kỳ tới (%)?
-    2. Có dấu hiệu nhà cái đảo cầu (cầu lừa) không?
-    3. Lời khuyên đi vốn (Ví dụ: Đánh mạnh, đánh nhẹ, hoặc bỏ qua).
-    Trả lời ngắn gọn, quyết đoán.
+    Yêu cầu:
+    1. Phân tích nhịp cầu (Bệt/Nhảy).
+    2. Tỉ lệ nổ của {current_predict} trong 2 kỳ tới?
+    3. Lời khuyên đi vốn cực ngắn gọn.
     """
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except:
-        return "⚠️ Không kết nối được bộ não AI. Hãy kiểm tra lại API Key hoặc kết nối mạng."
+    for _ in range(3): # Thử lại tối đa 3 lần nếu lag
+        try:
+            response = model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            time.sleep(1)
+            continue
+    return "⚠️ AI đang quá tải do nhiều người dùng. Anh hãy bấm 'PHÂN TÍCH' lại lần nữa nhé!"
 
-# ================= UI LAYOUT =================
-st.title("🛡️ TITAN v1500 HYBRID AI CORE")
-st.subheader("Sự kết hợp giữa Thống kê v1300 và Trí tuệ Gemini")
+# ================= GIAO DIỆN =================
+st.markdown("<h1 style='text-align: center; color: #00ffcc;'>🚀 TITAN v1500-FIX HYBRID</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("⚙️ Control Panel")
-    manual_input = st.text_area("Nhập kết quả mới (Ví dụ: 12345):", height=150)
-    run_btn = st.button("🚀 PHÂN TÍCH HYBRID", use_container_width=True)
-    if st.button("Reset Data"):
+    st.header("📥 NHẬP DỮ LIỆU")
+    raw_input = st.text_area("Dán kết quả KuBet (Dòng hoặc dãy số):", height=200, placeholder="Ví dụ: 12345\n67890...")
+    btn_run = st.button("🔥 PHÂN TÍCH NGAY", use_container_width=True)
+    if st.button("Xóa dữ liệu cũ"):
         st.session_state.dataset = []
         save_data([])
-        st.rerun()
+        st.success("Đã xóa!")
 
-col1, col2 = st.columns([1, 1])
-
-if run_btn and manual_input:
-    # 1. Xử lý dữ liệu
-    nums = re.findall(r"\d{1,5}", manual_input)
-    new_data = [n for n in nums if n not in st.session_state.dataset]
-    st.session_state.dataset += new_data
-    save_data(st.session_state.dataset)
-    
-    all_digits = list("".join(st.session_state.dataset))
-    
-    if len(all_digits) > 20:
-        # 2. Chạy TITAN CORE
-        ranked, full_scores = get_titan_score(all_digits)
-        p1 = ranked[:3]
+if btn_run and raw_input:
+    # Lọc lấy các số từ chuỗi nhập vào
+    new_nums = re.findall(r"\d{1,5}", raw_input)
+    if new_nums:
+        st.session_state.dataset += [n for n in new_nums if n not in st.session_state.dataset]
+        save_data(st.session_state.dataset)
         
-        # 3. Giả lập detect patterns
-        patterns = "Bệt/Nhảy xen kẽ" # Có thể nâng cấp hàm này
+        all_digits = list("".join(st.session_state.dataset))
         
-        with col1:
-            st.markdown(f"""
-            <div class="titan-result">
-                <h3 style='color: white;'>🎯 TITAN DỰ ĐOÁN</h3>
-                <h1 style='color: #ff4b4b; font-size: 70px;'>{" - ".join(p1)}</h1>
-                <p>Top dự phòng: {", ".join(ranked[3:6])}</p>
-            </div>
-            """, unsafe_allow_html=True)
+        if len(all_digits) >= 10:
+            ranked, scores = get_titan_score(all_digits)
+            p1 = ranked[:3]
             
-            st.write("📊 **Bảng điểm Score chi tiết:**")
-            st.bar_chart(pd.Series(full_scores))
-
-        with col2:
-            st.markdown("<div class='ai-box'>", unsafe_allow_html=True)
-            st.subheader("🧠 PHÂN TÍCH TỪ GEMINI AI")
-            with st.spinner('AI đang đọc vị nhà cái...'):
-                ai_advice = ask_gemini(st.session_state.dataset, p1, patterns)
-                st.write(ai_advice)
-            st.markdown("</div>", unsafe_allow_html=True)
+            c1, c2 = st.columns([1, 1])
             
-            # Lưu lịch sử dự đoán
-            if "history" not in st.session_state: st.session_state.history = []
-            st.session_state.history.append({"time": datetime.now().strftime("%H:%M:%S"), "predict": p1})
-
+            with c1:
+                st.markdown(f"""
+                <div style='background: #1a1a1a; padding: 20px; border-radius: 15px; border: 2px solid red; text-align: center;'>
+                    <h2 style='color: white;'>🎯 KẾT QUẢ TITAN</h2>
+                    <h1 style='color: yellow; font-size: 60px;'>{" - ".join(p1)}</h1>
+                    <p style='color: #aaa;'>Dự phòng: {", ".join(ranked[3:6])}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                st.bar_chart(pd.Series(scores))
+            
+            with c2:
+                st.markdown("<div style='background: #001a1a; padding: 20px; border-radius: 15px; border: 2px solid #00ffcc;'>", unsafe_allow_html=True)
+                st.subheader("🧠 CHUYÊN GIA AI PHÁN")
+                with st.spinner("Đang "soi" nhà cái..."):
+                    advice = ask_gemini_smart(st.session_state.dataset, p1)
+                    st.write(advice)
+                st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.warning("Anh nhập thêm ít nhất 5-10 kỳ nữa để AI làm việc nhé!")
     else:
-        st.warning("Cần thêm ít nhất 20 con số dữ liệu để AI phân tích chuẩn xác.")
+        st.error("Không tìm thấy số hợp lệ. Anh copy đúng định dạng kết quả nhé.")
 
-# ================= HISTORY =================
 st.divider()
-st.subheader("📜 Nhật ký soi cầu")
-if "history" in st.session_state:
-    for h in st.session_state.history[-5:]:
-        st.write(f"🕒 {h['time']} -> TITAN chốt: **{h['predict']}**")
+st.caption(f"Dữ liệu đang lưu trữ: {len(st.session_state.dataset)} kỳ quay.")
