@@ -202,14 +202,7 @@ class LotteryAIAnalyzer:
         
         return candidates[:3]
 
-# =============== GIAO DIỆN STREAMLIT TỐI ƯU ===============
-st.set_page_config(
-    page_title="AI 3-TINH ELITE PRO v1.1", 
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-
-# CSS TỐI ƯU - KÍCH THƯỚC NHỎ GỌN, FOCUS VÀO KẾT QUẢ
+# =============== CSS TOÀN CỤC ===============
 st.markdown("""
     <style>
     /* Reset cơ bản */
@@ -455,12 +448,19 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# HEADER GỌN NHẸ
+# =============== GIAO DIỆN CHÍNH ===============
+st.set_page_config(
+    page_title="AI 3-TINH ELITE PRO v1.2", 
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# HEADER GỌN NHẸ - SỬ DỤNG st.markdown() đúng cách
 st.markdown("""
-    <div class='compact-header'>
-        <h1 class='main-title'>🎯 AI 3-TINH ELITE PRO</h1>
-        <p class='subtitle'>Hệ thống AI loại 3 số rủi ro - Dự đoán chính xác 3 số may mắn</p>
-    </div>
+<div class='compact-header'>
+    <h1 class='main-title'>🎯 AI 3-TINH ELITE PRO</h1>
+    <p class='subtitle'>Hệ thống AI loại 3 số rủi ro - Dự đoán chính xác 3 số may mắn</p>
+</div>
 """, unsafe_allow_html=True)
 
 # Khởi tạo analyzer
@@ -474,7 +474,7 @@ analyzer = init_analyzer()
 tab1, tab2, tab3 = st.tabs(["🎯 Dự Đoán", "📊 Phân Tích", "⚙️ Cài Đặt"])
 
 with tab1:
-    # Input area - NHỎ GỌN
+    # Input area
     st.markdown("### 📥 Nhập dữ liệu")
     data_input = st.text_area(
         "Dán chuỗi số từ bàn cược:",
@@ -520,37 +520,40 @@ with tab1:
                 
                 progress_bar.progress(100)
                 
-                # HIỂN THỊ KẾT QUẢ - NHỎ GỌN, VỪA NHÌN
+                # HIỂN THỊ KẾT QUẢ - SỬ DỤNG st.markdown() với unsafe_allow_html=True
                 st.markdown(f"""
-                    <div class='compact-result'>
-                        <div class='result-title'>
-                            <span>🎯 DÀN 3 TINH CHIẾN THUẬT</span>
-                        </div>
-                        
-                        <div class='prediction-numbers'>
-                            <div class='number-circle'>{top_three[0]}</div>
-                            <div class='number-circle'>{top_three[1]}</div>
-                            <div class='number-circle'>{top_three[2]}</div>
-                        </div>
-                        
-                        <div style='margin: 20px 0;'>
-                            <div class='info-box eliminated-info'>
-                                <div class='info-title'>
-                                    <span style='color: #ef4444;'>🚫 ĐÃ LOẠI 3 SỐ RỦI RO</span>
-                                </div>
-                                <div class='info-numbers'>{", ".join(eliminated)}</div>
-                                <small style='color: #94a3b8;'>Nhà cái có thể đang "giam" các số này</small>
-                            </div>
-                            
-                            <div class='info-box safe-info'>
-                                <div class='info-title'>
-                                    <span style='color: #10b981;'>✅ DÀN 7 SỐ AN TOÀN</span>
-                                </div>
-                                <div class='info-numbers'>{", ".join(remaining)}</div>
-                                <small style='color: #94a3b8;'>Chọn 7 số của bạn từ dàn này</small>
-                            </div>
-                        </div>
+                <div class='compact-result'>
+                    <div class='result-title'>
+                        <span>🎯 DÀN 3 TINH CHIẾN THUẬT</span>
                     </div>
+                    
+                    <div class='prediction-numbers'>
+                        <div class='number-circle'>{top_three[0]}</div>
+                        <div class='number-circle'>{top_three[1]}</div>
+                        <div class='number-circle'>{top_three[2]}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Thông tin loại số và dàn an toàn
+                st.markdown(f"""
+                <div style='margin: 20px 0;'>
+                    <div class='info-box eliminated-info'>
+                        <div class='info-title'>
+                            <span style='color: #ef4444;'>🚫 ĐÃ LOẠI 3 SỐ RỦI RO</span>
+                        </div>
+                        <div class='info-numbers'>{", ".join(eliminated)}</div>
+                        <small style='color: #94a3b8;'>Nhà cái có thể đang "giam" các số này</small>
+                    </div>
+                    
+                    <div class='info-box safe-info'>
+                        <div class='info-title'>
+                            <span style='color: #10b981;'>✅ DÀN 7 SỐ AN TOÀN</span>
+                        </div>
+                        <div class='info-numbers'>{", ".join(remaining)}</div>
+                        <small style='color: #94a3b8;'>Chọn 7 số của bạn từ dàn này</small>
+                    </div>
+                </div>
                 """, unsafe_allow_html=True)
                 
                 # Phân tích chi tiết (ẩn mặc định)
@@ -561,7 +564,9 @@ with tab1:
                         st.markdown("##### 🔥 Số nóng")
                         hot_nums = analyzer._find_hot_numbers(list(filter(str.isdigit, data_input))[-20:])
                         if hot_nums:
-                            st.success(", ".join(hot_nums))
+                            # Hiển thị số nóng với định dạng đẹp
+                            hot_html = f"<div style='font-size: 1.2rem; font-weight: bold; color: #ef4444;'>{', '.join(hot_nums)}</div>"
+                            st.markdown(hot_html, unsafe_allow_html=True)
                         else:
                             st.info("Không có")
                     
@@ -569,14 +574,17 @@ with tab1:
                         st.markdown("##### ❄️ Số lạnh")
                         cold_nums = analyzer._find_cold_numbers(list(filter(str.isdigit, data_input)), 20)
                         if cold_nums:
-                            st.warning(", ".join(cold_nums))
+                            # Hiển thị số lạnh với định dạng đẹp
+                            cold_html = f"<div style='font-size: 1.2rem; font-weight: bold; color: #3b82f6;'>{', '.join(cold_nums)}</div>"
+                            st.markdown(cold_html, unsafe_allow_html=True)
                         else:
                             st.info("Không có")
                     
                     with col_c:
                         st.markdown("##### 🕐 Pattern giờ")
                         hour_nums = analyzer._analyze_by_hour()
-                        st.info(", ".join(hour_nums))
+                        hour_html = f"<div style='font-size: 1.2rem; font-weight: bold; color: #10b981;'>{', '.join(hour_nums)}</div>"
+                        st.markdown(hour_html, unsafe_allow_html=True)
                     
                     if gemini_analysis:
                         st.markdown("##### 🧠 Phân tích từ Gemini AI")
@@ -584,23 +592,27 @@ with tab1:
                 
                 # Chiến thuật ngắn gọn
                 st.markdown("""
-                    <div style='background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #3b82f6; margin-top: 15px;'>
-                        <h4 style='color: #3b82f6; margin-bottom: 10px;'>💡 Chiến thuật áp dụng:</h4>
-                        <ol style='margin: 0; padding-left: 20px; color: #cbd5e1;'>
-                            <li>Chọn <b>7 số</b> từ dàn an toàn</li>
-                            <li>Tập trung vào <b>3 số AI báo</b></li>
-                            <li>Tránh xa <b>3 số bị loại</b></li>
-                            <li>Quản lý vốn thông minh</li>
-                        </ol>
-                    </div>
+                <div style='background: rgba(59, 130, 246, 0.1); padding: 15px; border-radius: 10px; border-left: 4px solid #3b82f6; margin-top: 15px;'>
+                    <h4 style='color: #3b82f6; margin-bottom: 10px;'>💡 Chiến thuật áp dụng:</h4>
+                    <ol style='margin: 0; padding-left: 20px; color: #cbd5e1;'>
+                        <li>Chọn <b>7 số</b> từ dàn an toàn</li>
+                        <li>Tập trung vào <b>3 số AI báo</b></li>
+                        <li>Tránh xa <b>3 số bị loại</b></li>
+                        <li>Quản lý vốn thông minh</li>
+                    </ol>
+                </div>
                 """, unsafe_allow_html=True)
 
 with tab2:
     st.markdown("### 📈 Phân tích nâng cao")
     
-    # Biểu đồ tần suất đơn giản
-    if 'data_input' in st.session_state and st.session_state.data_input:
-        nums = list(filter(str.isdigit, st.session_state.data_input))
+    # Kiểm tra xem có dữ liệu input không
+    data_for_analysis = ""
+    if "data_input" in st.session_state:
+        data_for_analysis = st.session_state.data_input
+    
+    if data_for_analysis and len(data_for_analysis.strip()) >= 10:
+        nums = list(filter(str.isdigit, data_for_analysis))
         if nums:
             counts = collections.Counter(nums[-30:]) if len(nums) >= 30 else collections.Counter(nums)
             
@@ -619,6 +631,8 @@ with tab2:
                 st.markdown("##### Thống kê hiệu suất")
                 st.metric("Độ chính xác 3 số", "76.4%", "3.2%")
                 st.metric("Số lần loại đúng", "89.1%", "1.8%")
+    else:
+        st.info("📝 Nhập dữ liệu ở tab Dự Đoán để xem phân tích chi tiết")
     
     # Lịch sử ngắn gọn
     st.markdown("##### 📝 Lịch sử gần đây")
@@ -663,10 +677,24 @@ with tab3:
         if st.button("📊 Xuất báo cáo", use_container_width=True):
             st.info("Chức năng đang phát triển...")
 
-# FOOTER NHỎ
+# FOOTER
 st.markdown("""
-    <div class='compact-footer'>
-        <p>🛡️ <b>AI 3-TINH ELITE PRO v1.1</b> | Đối kháng AI nhà cái | © 2024</p>
-        <p><small>⚠️ Sử dụng có trách nhiệm. Kết quả không đảm bảo 100%.</small></p>
-    </div>
+<div class='compact-footer'>
+    <p>🛡️ <b>AI 3-TINH ELITE PRO v1.2</b> | Đối kháng AI nhà cái | © 2024</p>
+    <p><small>⚠️ Sử dụng có trách nhiệm. Kết quả không đảm bảo 100%.</small></p>
+</div>
+""", unsafe_allow_html=True)
+
+# Thêm JavaScript để xử lý một số hiệu ứng
+st.markdown("""
+<script>
+// Tự động làm mới sau khi nhập số (optional)
+document.addEventListener('DOMContentLoaded', function() {
+    // Thêm hiệu ứng cho các số
+    const numbers = document.querySelectorAll('.number-circle');
+    numbers.forEach((num, index) => {
+        num.style.animationDelay = (index * 0.2) + 's';
+    });
+});
+</script>
 """, unsafe_allow_html=True)
