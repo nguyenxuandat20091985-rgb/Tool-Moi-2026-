@@ -3,15 +3,13 @@ import collections
 import requests
 import time
 import re
-import json
 
-st.set_page_config(page_title="AI 3-TINH ELITE v86 HYBRID",layout="centered")
+st.set_page_config(page_title="AI 3-TINH ELITE v86.1",layout="centered")
 
-# ================= CONFIG =================
-GEMINI_API_KEY=st.secrets.get("GEMINI_API_KEY","")
-
-if "live_digits" not in st.session_state:
-    st.session_state.live_digits=""
+# ================= SESSION =================
+for key in ["manual","paste","url","live_digits"]:
+    if key not in st.session_state:
+        st.session_state[key]=""
 
 # ================= UI =================
 st.markdown("""
@@ -23,30 +21,35 @@ st.markdown("""
 </style>
 """,unsafe_allow_html=True)
 
-st.title("🧠 AI 3-TINH ELITE v86 HYBRID ENGINE")
+st.title("🧠 AI 3-TINH ELITE v86.1 FIX INPUT")
 
-# ================= INPUT MODE =================
-mode=st.radio("Nguồn dữ liệu",[
+# ================= INPUT TABS =================
+tab1,tab2,tab3=st.tabs([
 "✍️ Nhập số tay",
 "📋 Paste HTML/Text",
 "🌐 URL Feed"
 ])
 
-manual=""
-paste=""
-url=""
+with tab1:
+    st.session_state.manual=st.text_area(
+    "Nhập chuỗi số:",
+    value=st.session_state.manual,
+    height=120)
 
-if mode=="✍️ Nhập số tay":
-    manual=st.text_area("Nhập chuỗi số:",height=120)
+with tab2:
+    st.session_state.paste=st.text_area(
+    "Dán HTML / JSON:",
+    value=st.session_state.paste,
+    height=120)
 
-if mode=="📋 Paste HTML/Text":
-    paste=st.text_area("Dán HTML / JSON:",height=120)
+with tab3:
+    st.session_state.url=st.text_input(
+    "Link Feed",
+    value=st.session_state.url)
 
-if mode=="🌐 URL Feed":
-    url=st.text_input("Link Feed")
     auto=st.checkbox("⚡ Auto refresh 5s")
 
-# ================= PARSER =================
+# ================= TOOL =================
 def extract_digits(text):
     return "".join(re.findall(r'\d',text))
 
@@ -57,31 +60,6 @@ def fetch_url(url):
         return extract_digits(r.text)
     except:
         return ""
-
-# ================= GEMINI =================
-def gemini_ai(data):
-
-    if not GEMINI_API_KEY:
-        return []
-
-    try:
-        headers={"Content-Type":"application/json"}
-        body={
-        "contents":[
-        {"parts":[
-        {"text":f"choose 3 digits from 0-9 based on this data {data} return only numbers"}
-        ]}
-        ]}
-        r=requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
-        headers=headers,json=body)
-
-        txt=r.json()["candidates"][0]["content"]["parts"][0]["text"]
-        digits=[c for c in txt if c.isdigit()]
-        return digits[:3]
-
-    except:
-        return []
 
 # ================= AI CORE =================
 def analyze(raw):
@@ -97,33 +75,25 @@ def analyze(raw):
     eliminated=sorted(scores,key=scores.get,reverse=True)[:3]
     remaining=[str(i) for i in range(10) if str(i) not in eliminated]
 
-    local=sorted(remaining,key=lambda x:freq.get(x,0),reverse=True)[:3]
-    gemini=gemini_ai(raw[-50:])
-
-    if gemini:
-        vote=collections.Counter(local+gemini)
-        final=[n for n,_ in vote.most_common(3)]
-    else:
-        final=local
+    final=sorted(remaining,key=lambda x:freq.get(x,0),reverse=True)[:3]
 
     return eliminated,remaining,final
 
 # ================= RUN =================
-if st.button("🚀 CHẠY AI v86",use_container_width=True):
+if st.button("🚀 CHẠY AI",use_container_width=True):
 
     digits=""
 
-    if mode=="✍️ Nhập số tay":
-        digits=extract_digits(manual)
+    if st.session_state.manual:
+        digits+=extract_digits(st.session_state.manual)
 
-    if mode=="📋 Paste HTML/Text":
-        digits=extract_digits(paste)
+    if st.session_state.paste:
+        digits+=extract_digits(st.session_state.paste)
 
-    if mode=="🌐 URL Feed":
-        digits=fetch_url(url)
+    if st.session_state.url:
+        digits+=fetch_url(st.session_state.url)
 
-    if digits:
-        st.session_state.live_digits+=digits
+    st.session_state.live_digits+=digits
 
     raw=st.session_state.live_digits
 
@@ -145,8 +115,8 @@ if st.button("🚀 CHẠY AI v86",use_container_width=True):
         """,unsafe_allow_html=True)
 
 # ================= AUTO =================
-if mode=="🌐 URL Feed" and 'auto' in locals() and auto:
+if "auto" in locals() and auto and st.session_state.url:
     time.sleep(5)
     st.rerun()
 
-st.info("🔥 v86: Hybrid Feed + Manual Input + URL + Gemini AI")
+st.info("🔥 v86.1 FIX: Tabs Input + Session Buffer + No Reset")
