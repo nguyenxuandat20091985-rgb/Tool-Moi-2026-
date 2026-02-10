@@ -5,11 +5,7 @@ import time
 from datetime import datetime
 from collections import Counter
 
-# ================= CONFIG =================
-st.set_page_config(
-    page_title="AI TITAN CORE FINAL",
-    layout="wide"
-)
+st.set_page_config(page_title="AI TITAN CORE FINAL",layout="wide")
 
 # ================= SESSION =================
 for key in ["history","heatmap","timeline","dataset"]:
@@ -22,10 +18,7 @@ if isinstance(st.session_state.heatmap,list):
 # ================= UI =================
 st.title("☠️ AI TITAN CORE – FINAL ALL IN ONE")
 
-mode=st.radio(
-    "Nguồn dữ liệu",
-    ["Nhập tay","Paste HTML/Text","URL Auto Feed"]
-)
+mode=st.radio("Nguồn dữ liệu",["Nhập tay","Paste HTML/Text","URL Auto Feed"])
 
 manual=""
 paste=""
@@ -65,50 +58,29 @@ def update_heatmap(nums):
         for d in n:
             st.session_state.heatmap[d]=st.session_state.heatmap.get(d,0)+1
 
-def analyze_patterns(nums):
-    patterns=[]
-    last=nums[-15:]
-
-    for i in range(len(last)-1):
-        a=last[i]
-        b=last[i+1]
-
-        if a==b:
-            patterns.append("bệt")
-        elif a[::-1]==b:
-            patterns.append("đảo")
-        elif a[-1]==b[-1]:
-            patterns.append("lặp đuôi")
-        else:
-            patterns.append("nhảy")
-
-    return Counter(patterns)
-
-def titan_engine(nums):
-
-    if not nums:
-        return "Không có dữ liệu"
+def titan_predict(nums):
 
     digits=[]
     for n in nums:
         digits+=list(n)
 
-    freq=Counter(digits).most_common(5)
+    freq=Counter(digits)
+    recent=digits[-30:]
+    momentum=Counter(recent)
 
-    recent=nums[-20:]
-    recent_digits=[]
-    for n in recent:
-        recent_digits+=list(n)
+    score={str(i):0 for i in range(10)}
 
-    momentum=Counter(recent_digits).most_common(3)
+    for d in score:
+        score[d]+=momentum.get(d,0)*2
+        score[d]+=freq.get(d,0)
 
-    patterns=analyze_patterns(nums)
+        # anti nóng giả
+        if freq.get(d,0)/max(len(digits),1)>0.25:
+            score[d]-=2
 
-    return {
-        "freq":freq,
-        "momentum":momentum,
-        "patterns":patterns
-    }
+    ranked=sorted(score,key=score.get,reverse=True)
+
+    return ranked[:3],ranked[-3:]
 
 # ================= INPUT =================
 nums=[]
@@ -125,19 +97,23 @@ elif mode=="URL Auto Feed":
         nums=auto_parse(html)
 
 # ================= RUN =================
+predict=[]
+loai=[]
+
 if st.button("🚀 CHẠY TITAN ENGINE"):
 
     st.session_state.dataset+=nums
 
     update_heatmap(nums)
 
-    result=titan_engine(st.session_state.dataset)
+    if st.session_state.dataset:
+        predict,loai=titan_predict(st.session_state.dataset)
 
     st.session_state.timeline.append(nums[-5:])
 
     st.session_state.history.append({
         "time":datetime.now().strftime("%H:%M:%S"),
-        "result":result,
+        "predict":predict,
         "count":len(st.session_state.dataset)
     })
 
@@ -145,6 +121,22 @@ if st.button("🚀 CHẠY TITAN ENGINE"):
 if poll>0:
     time.sleep(poll)
     st.rerun()
+
+# ================= RESULT =================
+if predict:
+    st.markdown(f"""
+    <div style='border:2px solid #00ffcc;
+    padding:20px;
+    border-radius:15px;
+    text-align:center;
+    background:#111'>
+    <h2>🎯 DỰ ĐOÁN TITAN</h2>
+    <h1 style='color:yellow;font-size:60px'>
+    {" - ".join(predict)}
+    </h1>
+    <p>🚫 LOẠI: {", ".join(loai)}</p>
+    </div>
+    """,unsafe_allow_html=True)
 
 # ================= DASHBOARD =================
 st.divider()
