@@ -1,43 +1,46 @@
 import streamlit as st
 import requests
 import re
-import time
-from datetime import datetime
+import json
+import math
 from collections import Counter
+from datetime import datetime
+from pathlib import Path
 
-st.set_page_config(page_title="AI TITAN CORE FINAL",layout="wide")
+st.set_page_config(page_title="TITAN v999 FINAL CORE",layout="wide")
 
-# ================= SESSION =================
-for key in ["history","heatmap","timeline","dataset"]:
-    if key not in st.session_state:
-        st.session_state[key]=[]
+DATA_FILE="titan_v999_dataset.json"
+WEIGHT_FILE="titan_v999_weights.json"
 
-if isinstance(st.session_state.heatmap,list):
-    st.session_state.heatmap={}
+# ================= LOAD =================
+def load_json(file,default):
+    if Path(file).exists():
+        with open(file,"r") as f:
+            return json.load(f)
+    return default
 
-# ================= UI =================
-st.title("☠️ AI TITAN CORE – FINAL ALL IN ONE")
+def save_json(file,data):
+    with open(file,"w") as f:
+        json.dump(data,f)
 
-mode=st.radio("Nguồn dữ liệu",["Nhập tay","Paste HTML/Text","URL Auto Feed"])
+if "dataset" not in st.session_state:
+    st.session_state.dataset=load_json(DATA_FILE,[])
 
-manual=""
-paste=""
-url=""
+if "weights" not in st.session_state:
+    st.session_state.weights=load_json(WEIGHT_FILE,{
+        "freq":1.0,
+        "recent":1.2,
+        "gap":1.1,
+        "entropy":0.8,
+        "momentum":1.3
+    })
 
-if mode=="Nhập tay":
-    manual=st.text_area("Nhập chuỗi số")
+if "history" not in st.session_state:
+    st.session_state.history=[]
 
-elif mode=="Paste HTML/Text":
-    paste=st.text_area("Paste HTML/Text")
-
-elif mode=="URL Auto Feed":
-    url=st.text_input("Nhập URL")
-
-poll=st.slider("Auto Refresh (giây)",0,30,0)
-
-# ================= FUNCTIONS =================
+# ================= UTIL =================
 def extract_numbers(text):
-    return re.findall(r"\d+",text)
+    return re.findall(r"\d{1,5}",text)
 
 def fetch_url(url):
     try:
@@ -47,42 +50,136 @@ def fetch_url(url):
     except:
         return ""
 
-def auto_parse(html):
-    nums=re.findall(r">\s*(\d{1,5})\s*<",html)
-    if nums:
-        return nums
-    return extract_numbers(html)
+def flatten(dataset):
+    d=[]
+    for n in dataset:
+        d+=list(n)
+    return d
 
-def update_heatmap(nums):
-    for n in nums:
-        for d in n:
-            st.session_state.heatmap[d]=st.session_state.heatmap.get(d,0)+1
+def entropy(seq):
+    if not seq:return 0
+    c=Counter(seq)
+    total=len(seq)
+    e=0
+    for v in c.values():
+        p=v/total
+        e-=p*math.log2(p)
+    return e
 
-def titan_predict(nums):
+# ================= MODELS =================
+def model_freq(d):
+    c=Counter(d)
+    return {i:c.get(str(i),0) for i in range(10)}
 
-    digits=[]
-    for n in nums:
-        digits+=list(n)
+def model_recent(d):
+    c=Counter(d[-40:])
+    return {i:c.get(str(i),0)*2 for i in range(10)}
 
-    freq=Counter(digits)
-    recent=digits[-30:]
-    momentum=Counter(recent)
+def model_gap(d):
+    last={}
+    for i,x in enumerate(d):
+        last[x]=i
+    total=len(d)
+    s={}
+    for i in range(10):
+        k=str(i)
+        if k in last:
+            s[i]=(total-last[k])/3
+        else:
+            s[i]=5
+    return s
 
-    score={str(i):0 for i in range(10)}
+def model_momentum(d):
+    c=Counter(d[-20:])
+    return {i:c.get(str(i),0)*3 for i in range(10)}
 
-    for d in score:
-        score[d]+=momentum.get(d,0)*2
-        score[d]+=freq.get(d,0)
+def model_entropy(d):
+    e=entropy(d[-60:])
+    return {i:e for i in range(10)}
 
-        # anti nóng giả
-        if freq.get(d,0)/max(len(digits),1)>0.25:
-            score[d]-=2
+# ================= ENGINE =================
+def titan_engine(dataset,weights):
+
+    d=flatten(dataset)
+    if len(d)<100:
+        return [],[],{},0
+
+    m1=model_freq(d)
+    m2=model_recent(d)
+    m3=model_gap(d)
+    m4=model_entropy(d)
+    m5=model_momentum(d)
+
+    score={i:0 for i in range(10)}
+
+    for i in range(10):
+        score[i]+=m1[i]*weights["freq"]
+        score[i]+=m2[i]*weights["recent"]
+        score[i]+=m3[i]*weights["gap"]
+        score[i]+=m4[i]*weights["entropy"]
+        score[i]+=m5[i]*weights["momentum"]
 
     ranked=sorted(score,key=score.get,reverse=True)
 
-    return ranked[:3],ranked[-3:]
+    predict=[str(x) for x in ranked[:3]]
+    eliminated=[str(x) for x in ranked[-3:]]
 
-# ================= INPUT =================
+    reliability=backtest(dataset)
+
+    return predict,eliminated,score,reliability
+
+# ================= BACKTEST =================
+def backtest(dataset):
+
+    if len(dataset)<200:
+        return 0
+
+    hit=0
+    total=0
+
+    for i in range(150,len(dataset)):
+        sub=dataset[:i]
+        d=flatten(sub)
+        c=Counter(d)
+        ranked=[k for k,v in c.most_common(3)]
+
+        if dataset[i][0] in ranked:
+            hit+=1
+        total+=1
+
+    if total==0:
+        return 0
+
+    return round(hit/total*100,2)
+
+# ================= ADAPTIVE =================
+def adaptive_learn(real):
+
+    for d in real:
+        st.session_state.weights["recent"]*=1.02
+        st.session_state.weights["momentum"]*=1.01
+        st.session_state.weights["freq"]*=0.99
+
+    save_json(WEIGHT_FILE,st.session_state.weights)
+
+# ================= UI =================
+st.title("☠️ TITAN v999 FINAL CORE")
+
+mode=st.radio("Nguồn dữ liệu",["Nhập tay","Paste HTML/Text","URL"])
+
+manual=""
+paste=""
+url=""
+
+if mode=="Nhập tay":
+    manual=st.text_area("Nhập mỗi kỳ 1 dòng")
+
+elif mode=="Paste HTML/Text":
+    paste=st.text_area("Paste dữ liệu")
+
+elif mode=="URL":
+    url=st.text_input("URL")
+
 nums=[]
 
 if mode=="Nhập tay":
@@ -91,66 +188,57 @@ if mode=="Nhập tay":
 elif mode=="Paste HTML/Text":
     nums=extract_numbers(paste)
 
-elif mode=="URL Auto Feed":
-    if url:
-        html=fetch_url(url)
-        nums=auto_parse(html)
+elif mode=="URL" and url:
+    html=fetch_url(url)
+    nums=extract_numbers(html)
 
-# ================= RUN =================
 predict=[]
-loai=[]
+eliminated=[]
+score={}
+reliability=0
 
-if st.button("🚀 CHẠY TITAN ENGINE"):
+if st.button("🚀 CHẠY TITAN v999"):
 
-    st.session_state.dataset+=nums
+    new=[n for n in nums if n not in st.session_state.dataset]
 
-    update_heatmap(nums)
+    if new:
+        st.session_state.dataset+=new
+        save_json(DATA_FILE,st.session_state.dataset)
 
     if st.session_state.dataset:
-        predict,loai=titan_predict(st.session_state.dataset)
-
-    st.session_state.timeline.append(nums[-5:])
+        predict,eliminated,score,reliability=titan_engine(
+            st.session_state.dataset,
+            st.session_state.weights
+        )
 
     st.session_state.history.append({
         "time":datetime.now().strftime("%H:%M:%S"),
         "predict":predict,
-        "count":len(st.session_state.dataset)
+        "reliability":reliability,
+        "size":len(st.session_state.dataset)
     })
 
-# ================= AUTO =================
-if poll>0:
-    time.sleep(poll)
-    st.rerun()
-
-# ================= RESULT =================
+# ================= OUTPUT =================
 if predict:
     st.markdown(f"""
-    <div style='border:2px solid #00ffcc;
-    padding:20px;
-    border-radius:15px;
-    text-align:center;
-    background:#111'>
-    <h2>🎯 DỰ ĐOÁN TITAN</h2>
-    <h1 style='color:yellow;font-size:60px'>
+    <div style='border:2px solid #00ffcc;padding:20px;
+    border-radius:15px;background:#111;text-align:center'>
+    <h2>🎯 TITAN FINAL PREDICT</h2>
+    <h1 style='color:yellow;font-size:65px'>
     {" - ".join(predict)}
     </h1>
-    <p>🚫 LOẠI: {", ".join(loai)}</p>
+    <h3>🚫 Loại: {", ".join(eliminated)}</h3>
+    <h3>Backtest reliability: {reliability}%</h3>
     </div>
     """,unsafe_allow_html=True)
 
-# ================= DASHBOARD =================
 st.divider()
-
-st.subheader("🔥 Heatmap")
-st.write(st.session_state.heatmap)
-
-st.subheader("🧠 Timeline gần")
-for t in st.session_state.timeline[-10:]:
-    st.write(t)
-
-st.subheader("📊 Dashboard AI")
-for item in reversed(st.session_state.history[-10:]):
-    st.write(item)
+st.subheader("📊 Score")
+st.write(score)
 
 st.subheader("📂 Dataset size")
 st.write(len(st.session_state.dataset))
+
+st.subheader("🧠 History")
+for h in st.session_state.history[-10:]:
+    st.write(h)
