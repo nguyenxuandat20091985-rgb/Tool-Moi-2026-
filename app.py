@@ -3,63 +3,67 @@ import collections
 import requests
 import time
 import re
+import json
+import websocket
+import threading
 
-st.set_page_config(page_title="AI 3-TINH ELITE v86.1",layout="centered")
+st.set_page_config(page_title="AI 3-TINH ELITE v90 REALTIME",layout="centered")
 
 # ================= SESSION =================
-for key in ["manual","paste","url","live_digits"]:
+for key in ["manual","paste","url","socket","live"]:
     if key not in st.session_state:
         st.session_state[key]=""
 
 # ================= UI =================
-st.markdown("""
-<style>
-.stApp{background:#0b0f13;color:#e0e0e0}
-.result{border:2px solid #00ffcc;border-radius:15px;padding:20px;background:#161b22;text-align:center;margin-top:20px}
-.big{font-size:60px;color:#ffff00;font-weight:bold}
-.bigbox{display:flex;justify-content:center;gap:15px}
-</style>
-""",unsafe_allow_html=True)
+st.title("🔥 AI 3-TINH ELITE v90 REALTIME ENGINE")
 
-st.title("🧠 AI 3-TINH ELITE v86.1 FIX INPUT")
-
-# ================= INPUT TABS =================
-tab1,tab2,tab3=st.tabs([
-"✍️ Nhập số tay",
+tab1,tab2,tab3,tab4=st.tabs([
+"✍️ Nhập tay",
 "📋 Paste HTML/Text",
-"🌐 URL Feed"
+"🌐 API JSON",
+"⚡ WebSocket"
 ])
 
 with tab1:
-    st.session_state.manual=st.text_area(
-    "Nhập chuỗi số:",
-    value=st.session_state.manual,
-    height=120)
+    st.session_state.manual=st.text_area("Nhập số:",value=st.session_state.manual)
 
 with tab2:
-    st.session_state.paste=st.text_area(
-    "Dán HTML / JSON:",
-    value=st.session_state.paste,
-    height=120)
+    st.session_state.paste=st.text_area("Dán HTML:",value=st.session_state.paste)
 
 with tab3:
-    st.session_state.url=st.text_input(
-    "Link Feed",
-    value=st.session_state.url)
+    st.session_state.url=st.text_input("Link JSON API:",value=st.session_state.url)
+    auto=st.checkbox("Auto refresh 5s")
 
-    auto=st.checkbox("⚡ Auto refresh 5s")
+with tab4:
+    st.session_state.socket=st.text_input("Link WebSocket (wss://...)",
+    value=st.session_state.socket)
 
-# ================= TOOL =================
+# ================= PARSER =================
 def extract_digits(text):
-    return "".join(re.findall(r'\d',text))
+    return "".join(re.findall(r'\d',str(text)))
 
-def fetch_url(url):
+# ================= FETCH JSON =================
+def fetch_json(url):
     try:
-        headers={"User-Agent":"Mozilla/5.0"}
-        r=requests.get(url,headers=headers,timeout=8)
-        return extract_digits(r.text)
+        r=requests.get(url,timeout=10,headers={"User-Agent":"Mozilla/5.0"})
+        data=r.json()
+        return extract_digits(json.dumps(data))
     except:
         return ""
+
+# ================= SOCKET =================
+def socket_worker(url):
+    def on_message(ws,msg):
+        st.session_state.live+=extract_digits(msg)
+    def on_error(ws,e):pass
+    def on_close(ws,a,b):pass
+    def on_open(ws):pass
+
+    ws=websocket.WebSocketApp(url,
+        on_message=on_message,
+        on_error=on_error,
+        on_close=on_close)
+    ws.run_forever()
 
 # ================= AI CORE =================
 def analyze(raw):
@@ -74,49 +78,50 @@ def analyze(raw):
 
     eliminated=sorted(scores,key=scores.get,reverse=True)[:3]
     remaining=[str(i) for i in range(10) if str(i) not in eliminated]
-
     final=sorted(remaining,key=lambda x:freq.get(x,0),reverse=True)[:3]
 
     return eliminated,remaining,final
 
-# ================= RUN =================
-if st.button("🚀 CHẠY AI",use_container_width=True):
+# ================= RUN SOCKET =================
+if st.button("🔌 START SOCKET"):
+    if st.session_state.socket.startswith("ws"):
+        threading.Thread(target=socket_worker,
+        args=(st.session_state.socket,),
+        daemon=True).start()
+        st.success("Socket started")
 
-    digits=""
+# ================= RUN AI =================
+if st.button("🚀 CHẠY AI v90",use_container_width=True):
 
-    if st.session_state.manual:
-        digits+=extract_digits(st.session_state.manual)
+    raw=""
 
-    if st.session_state.paste:
-        digits+=extract_digits(st.session_state.paste)
+    raw+=extract_digits(st.session_state.manual)
+    raw+=extract_digits(st.session_state.paste)
 
     if st.session_state.url:
-        digits+=fetch_url(st.session_state.url)
+        raw+=fetch_json(st.session_state.url)
 
-    st.session_state.live_digits+=digits
-
-    raw=st.session_state.live_digits
+    raw+=st.session_state.live
 
     if len(raw)<10:
         st.warning("Chưa đủ dữ liệu")
     else:
-
         eliminated,remaining,tinh3=analyze(raw)
 
-        big_html="".join([f"<div class='big'>{n}</div>" for n in tinh3])
+        big="".join([f"<h1 style='color:yellow'>{n}</h1>" for n in tinh3])
 
         st.markdown(f"""
-        <div class='result'>
-        <p>🎯 DÀN 3 TINH</p>
-        <div class='bigbox'>{big_html}</div>
+        <div style='border:2px solid #00ffcc;padding:20px;border-radius:15px'>
+        <h3>🎯 DÀN 3 TINH</h3>
+        {big}
         <p>🚫 Loại: {", ".join(eliminated)}</p>
         <p>✅ 7 số: {", ".join(remaining)}</p>
         </div>
         """,unsafe_allow_html=True)
 
 # ================= AUTO =================
-if "auto" in locals() and auto and st.session_state.url:
+if "auto" in locals() and auto:
     time.sleep(5)
     st.rerun()
 
-st.info("🔥 v86.1 FIX: Tabs Input + Session Buffer + No Reset")
+st.info("🔥 v90 Engine: JSON API + WebSocket + Hybrid Feed + Realtime Buffer")
