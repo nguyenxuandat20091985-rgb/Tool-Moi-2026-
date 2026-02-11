@@ -2,16 +2,11 @@ import streamlit as st
 import re
 import json
 import pandas as pd
-import google.generativeai as genai
 from collections import Counter
 from pathlib import Path
 
 # ================= CONFIG =================
-st.set_page_config(page_title="TITAN v1700 THE KILLER", layout="wide")
-API_KEY = "AIzaSyBRo51DqVoC7BSv3ipUrY8GaEVfi0cVQxc"
-genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
-
+st.set_page_config(page_title="TITAN v1800 PRECISION", layout="wide")
 DATA_FILE = "titan_dataset.json"
 
 def load_data():
@@ -26,64 +21,79 @@ def save_data(data):
 
 if "dataset" not in st.session_state: st.session_state.dataset = load_data()
 
-# ================= THUẬT TOÁN V1700 (CHỈ SOI NHỊP SỐNG) =================
-def analyze_v1700(dataset):
-    # CHỈ LẤY 100 KỲ GẦN NHẤT ĐỂ SOI - ĐÂY LÀ CHÌA KHÓA ỔN ĐỊNH
-    recent_context = dataset[-100:]
-    recent_str = "".join(recent_context)
+# ================= THUẬT TOÁN ĐIỀU CHỈNH ĐỘ NHẠY =================
+def analyze_v1800(dataset):
+    # CHỈ SOI 50 KỲ GẦN NHẤT ĐỂ TRÁNH NHIỄU DỮ LIỆU CŨ
+    recent_50 = dataset[-50:]
+    recent_str = "".join(recent_50)
     
-    # 1. Tính tần suất trong khung 100 kỳ (Trend ngắn hạn)
-    freq_100 = Counter(recent_str)
+    # 1. Tần suất 50 kỳ
+    freq_50 = Counter(recent_str)
     
-    # 2. Tính độ nhạy cực kỳ (10 kỳ gần nhất)
-    last_10 = dataset[-10:]
-    freq_last_10 = Counter("".join(last_10))
+    # 2. Soi nhịp cực ngắn (5 kỳ cuối) để bắt bệt thực sự
+    last_5 = dataset[-5:]
     
-    # 3. Nhận diện bệt chuẩn (Xuất hiện >= 4 lần trong 10 kỳ)
-    streaks = [str(i) for i in range(10) if freq_last_10.get(str(i), 0) >= 4]
-
     score = {str(i): 0 for i in range(10)}
-    for i in score:
-        # Trọng số nhịp trend (100 kỳ)
-        score[i] += freq_100.get(i, 0) * 2
-        # Trọng số bùng nổ (10 kỳ gần nhất) - Ưu tiên cực cao
-        score[i] += freq_last_10.get(i, 0) * 20
-        # Điểm thưởng bệt
-        if i in streaks: score[i] += 150
-            
-    ranked = sorted(score, key=score.get, reverse=True)
-    return ranked, score, streaks
+    real_streaks = []
 
-# ================= GIAO DIỆN =================
-st.markdown("<h1 style='text-align: center; color: #ff0055;'>🔥 TITAN v1700 THE KILLER</h1>", unsafe_allow_html=True)
+    for i in range(10):
+        s_digit = str(i)
+        # Đếm số kỳ xuất hiện trong 5 kỳ gần nhất
+        count_in_5 = sum(1 for k in last_5 if s_digit in k)
+        
+        # CHỈ TÍNH LÀ BỆT NẾU XUẤT HIỆN TỪ 4/5 KỲ (Cực kỳ khắt khe)
+        if count_in_5 >= 4:
+            real_streaks.append(s_digit)
+            score[s_digit] += 200 # Điểm thưởng bệt cực cao
+        
+        # Điểm tần suất nền
+        score[s_digit] += freq_50.get(s_digit, 0) * 10
+        
+        # Thưởng điểm cho nhịp rơi (xuất hiện 2 kỳ liên tiếp cuối cùng)
+        if len(dataset) >= 2:
+            if s_digit in dataset[-1] and s_digit in dataset[-2]:
+                score[s_digit] += 50
+
+    ranked = sorted(score, key=score.get, reverse=True)
+    return ranked, score, real_streaks
+
+# ================= GIAO DIỆN CHUẨN =================
+st.markdown("<h1 style='text-align: center; color: #00ffcc;'>🎯 TITAN v1800 PRECISION</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
     st.header("📥 CẬP NHẬT KỲ MỚI")
-    raw = st.text_area("Dán kết quả Ku:", height=200)
-    if st.button("🚀 CHỐT HẠ", use_container_width=True):
+    raw = st.text_area("Dán kết quả Ku:", height=200, placeholder="Dán dãy số vừa nổ...")
+    if st.button("🚀 CHỐT SỐ NGAY", use_container_width=True):
         if raw:
             new = re.findall(r"\d{1,5}", raw)
             st.session_state.dataset = save_data(st.session_state.dataset + new)
             st.rerun()
+    if st.button("Reset Dữ Liệu"):
+        save_data([])
+        st.session_state.dataset = []
+        st.rerun()
 
-if len(st.session_state.dataset) >= 10:
-    ranked, scores, streaks = analyze_v1600_pro(st.session_state.dataset) if 'analyze_v1600_pro' in globals() else analyze_v1700(st.session_state.dataset)
-    # Ghi đè để dùng v1700
-    ranked, scores, streaks = analyze_v1700(st.session_state.dataset)
+if len(st.session_state.dataset) >= 5:
+    ranked, scores, streaks = analyze_v1800(st.session_state.dataset)
     p1 = ranked[:3]
 
+    # Hiển thị bộ số chốt
     st.markdown(f"""
-    <div style='background: #000; padding: 20px; border-radius: 15px; border: 4px solid #ff0055; text-align: center;'>
-        <h2 style='color: white;'>🎯 TAY TIẾP THEO</h2>
-        <h1 style='color: #00ff00; font-size: 90px; margin: 10px;'>{" - ".join(p1)}</h1>
-        <p style='color: #fff;'>Dòng tiền đề xuất: <b>1-2-4-8-16</b> hoặc <b>Đều tay</b></p>
+    <div style='background: #111; padding: 25px; border-radius: 20px; border: 4px solid #00ffcc; text-align: center;'>
+        <h2 style='color: white; margin: 0;'>🎯 TAY TIẾP THEO</h2>
+        <h1 style='color: yellow; font-size: 100px; margin: 15px 0;'>{" - ".join(p1)}</h1>
+        <p style='color: #00ffcc;'>Tỉ lệ nổ ưu tiên: <b>{p1[0]}</b></p>
     </div>
     """, unsafe_allow_html=True)
 
-    st.subheader("📊 Nhịp cầu thực tế (100 kỳ gần nhất)")
+    # Biểu đồ phân tích nhịp
+    st.subheader("📊 Phân tích nhịp cầu (50 kỳ)")
     st.bar_chart(pd.Series(scores))
     
+    # Cảnh báo bệt chỉ hiện khi thực sự rõ ràng
     if streaks:
-        st.warning(f"⚠️ CẢNH BÁO BỆT: Các số {', '.join(streaks)} đang nổ rất dày!")
+        st.error(f"🔥 CẢNH BÁO BỆT THỰC SỰ: Số {', '.join(streaks)} đang vào dây!")
+    else:
+        st.success("✅ Nhịp cầu đang ổn định, không có dấu hiệu bệt ảo.")
 else:
-    st.info("Anh dán thêm vài kỳ để em bắt đầu bắt nhịp nhé!")
+    st.info("Anh dán thêm kỳ vừa nổ để em bắt đầu tính toán chính xác.")
