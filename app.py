@@ -2,123 +2,123 @@ import streamlit as st
 import re
 import json
 import pandas as pd
+import numpy as np
 from collections import Counter
 from pathlib import Path
 
-# ================= CONFIG GIAO DIỆN CAO CẤP =================
-st.set_page_config(page_title="TITAN V2000 ULTIMATE", layout="wide", initial_sidebar_state="collapsed")
+# ================= CONFIG HỆ THỐNG QUÂN SỰ =================
+st.set_page_config(page_title="TITAN V3000 ULTIMATE", layout="wide")
+DATA_FILE = "dataset_5d_ultimate.json"
 
-# CSS để biến Streamlit thành app chuyên nghiệp
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    div.stButton > button:first-child {
-        background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
-        color: black; font-weight: bold; border: none; border-radius: 10px; height: 3em; width: 100%;
+    .reportview-container { background: #0a0a0a; }
+    .stMetric { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 15px; }
+    .prediction-box {
+        background: linear-gradient(135deg, #1f1f1f 0%, #000 100%);
+        border: 2px solid #ffd700; border-radius: 20px; padding: 30px; text-align: center;
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
     }
-    .stTextArea textarea {
-        background-color: #1b1e23; color: #ffd700; border: 1px solid #444; border-radius: 10px;
-    }
-    .metric-card {
-        background: #1b1e23; border: 1px solid #333; border-radius: 15px; padding: 15px; text-align: center;
-    }
-    .number-display {
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 80px; font-weight: 900; color: #ffd700;
-        text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-        margin: 20px 0;
-    }
-    .status-bar {
-        padding: 10px; border-radius: 50px; font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 20px;
-    }
+    .status-alert { padding: 10px; border-radius: 5px; font-weight: bold; margin-bottom: 15px; }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-DATA_FILE = "titan_dataset.json"
-
-def load_data():
+def load_db():
     if Path(DATA_FILE).exists():
-        with open(DATA_FILE, "r") as f: return list(dict.fromkeys(json.load(f)))
+        with open(DATA_FILE, "r") as f: return json.load(f)
     return []
 
-def save_data(data):
-    clean = list(dict.fromkeys(data))
-    with open(DATA_FILE, "w") as f: json.dump(clean, f)
-    return clean
+def save_db(data):
+    with open(DATA_FILE, "w") as f: json.dump(data[-5000:], f)
 
-if "dataset" not in st.session_state: st.session_state.dataset = load_data()
+if "db" not in st.session_state: st.session_state.db = load_db()
 
-# ================= CORE LOGIC (V1800 PRECISION) =================
-def analyze_v2000(dataset):
-    recent_50 = dataset[-50:]
-    recent_str = "".join(recent_50)
-    freq_50 = Counter(recent_str)
-    last_5 = dataset[-5:]
+# ================= THUẬT TOÁN ĐỐI ĐẦU AI (AI COUNTER) =================
+def military_grade_analysis(db):
+    if len(db) < 20: return None
     
-    score = {str(i): 0 for i in range(10)}
-    real_streaks = []
+    # 1. Chuyển đổi dữ liệu sang số liệu tính toán
+    matrix = np.array([[int(d) for d in list(ky)] for ky in db])
+    totals = np.sum(matrix, axis=1)
+    
+    # 2. Tính Entropy (Độ loạn của cầu)
+    # Nếu Entropy cao -> Cầu loạn, AI nhà cái đang quét mạnh -> Khuyên nghỉ
+    counts = np.unique(totals[-20:], return_counts=True)[1]
+    probs = counts / counts.sum()
+    entropy = -np.sum(probs * np.log2(probs))
+    
+    # 3. Thuật toán Mean Reversion (Hồi quy trung bình)
+    avg_short = np.mean(totals[-10:])
+    avg_long = np.mean(totals[-50:]) if len(db) >= 50 else 22.5
+    
+    # 4. Dự đoán đa tầng
+    # Dự đoán Tổng 5 Banh
+    pred_tx = "TÀI" if avg_short < 22.5 else "XỈU" # Đánh ngược nhịp ngắn để bắt hồi quy
+    pred_cl = "CHẴN" if int(avg_short) % 2 != 0 else "LẺ"
+    
+    # Dự đoán Baccarat 5D (Logic: Bắt bệt nhịp mạnh)
+    con_val = (matrix[:, 2] + matrix[:, 4]) % 10
+    cai_val = (matrix[:, 1] + matrix[:, 3]) % 10
+    con_streak = sum(1 for i in range(-3, 0) if con_val[i] > cai_val[i])
+    bac_res = "CON (PLAYER)" if con_streak >= 2 else "CÁI (BANKER)"
 
-    for i in range(10):
-        s_digit = str(i)
-        count_in_5 = sum(1 for k in last_5 if s_digit in k)
-        if count_in_5 >= 4:
-            real_streaks.append(s_digit)
-            score[s_digit] += 300 
-        score[s_digit] += freq_50.get(s_digit, 0) * 10
-        if len(dataset) >= 2 and s_digit in dataset[-1] and s_digit in dataset[-2]:
-            score[s_digit] += 70
+    # 5. Công thức Kelly (Quản lý vốn)
+    # Giả định tỉ lệ thắng là 55%, tỉ lệ ăn 1:1
+    kelly_percent = "10-15%" if entropy < 2.5 else "2-5%"
+    
+    return {
+        "tx": pred_tx, "cl": pred_cl, "bac": bac_res,
+        "entropy": entropy, "kelly": kelly_percent,
+        "history": totals[-30:].tolist(),
+        "is_safe": entropy < 3.0
+    }
 
-    ranked = sorted(score, key=score.get, reverse=True)
-    return ranked, score, real_streaks
+# ================= GIAO DIỆN CHIẾN ĐẤU =================
+st.markdown("<h1 style='text-align: center; color: #ffd700;'>🛰️ TITAN V3000 ULTIMATE CORE</h1>", unsafe_allow_html=True)
 
-# ================= GIAO DIỆN CHÍNH =================
-st.markdown("<h3 style='text-align: center; color: #888;'>PREMIUM PREDICTION TOOL</h3>", unsafe_allow_html=True)
-st.markdown("<h1 style='text-align: center; color: #ffd700; margin-bottom: 30px;'>TITAN V2000 ULTIMATE</h1>", unsafe_allow_html=True)
+c_input, c_output = st.columns([1, 2])
 
-# Bố cục 2 cột
-col_left, col_right = st.columns([1, 2])
-
-with col_left:
-    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-    raw_input = st.text_area("NHẬP KỲ MỚI", height=150, placeholder="Dán kết quả tại đây...")
-    if st.button("🚀 PHÂN TÍCH"):
-        if raw_input:
-            new_nums = re.findall(r"\d{1,5}", raw_input)
-            st.session_state.dataset = save_data(st.session_state.dataset + new_nums)
+with c_input:
+    st.subheader("📡 TRẠM THU PHÁT DỮ LIỆU")
+    raw = st.text_area("Nhập mã 5D (5 con số):", height=250, placeholder="Dán kết quả tại đây...")
+    if st.button("⚡ QUÉT SÓNG AI", use_container_width=True):
+        if raw:
+            extracted = re.findall(r"\d{5}", raw)
+            st.session_state.db.extend(extracted)
+            save_db(st.session_state.db)
             st.rerun()
     
-    if st.button("🧹 LÀM SẠCH"):
-        st.session_state.dataset = []
-        save_data([])
+    if st.button("🗑️ RESET SYSTEM"):
+        save_db([])
+        st.session_state.db = []
         st.rerun()
-    st.markdown(f"<p style='color: #666; font-size: 12px; margin-top: 10px;'>DATABASE: {len(st.session_state.dataset)} KỲ</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
-with col_right:
-    if len(st.session_state.dataset) >= 5:
-        ranked, scores, streaks = analyze_v2000(st.session_state.dataset)
-        p1 = ranked[:3]
+with c_output:
+    if len(st.session_state.db) >= 20:
+        res = military_grade_analysis(st.session_state.db)
         
-        # Trạng thái cầu
-        if streaks:
-            st.markdown(f"<div class='status-bar' style='background: rgba(255, 0, 0, 0.2); color: #ff4b4b; border: 1px solid #ff4b4b;'>⚠️ CẢNH BÁO BỆT: {', '.join(streaks)}</div>", unsafe_allow_html=True)
+        # Cảnh báo độ loạn của cầu
+        if res["is_safe"]:
+            st.markdown("<div class='status-alert' style='background: rgba(0,255,0,0.1); color: #00ffcc;'>✅ SÓNG ỔN ĐỊNH - VÀO LỆNH AN TOÀN</div>", unsafe_allow_html=True)
         else:
-            st.markdown("<div class='status-bar' style='background: rgba(0, 255, 0, 0.1); color: #00ffcc; border: 1px solid #00ffcc;'>✅ NHỊP CẦU ĐANG ỔN ĐỊNH</div>", unsafe_allow_html=True)
+            st.markdown("<div class='status-alert' style='background: rgba(255,0,0,0.1); color: #ff4b4b;'>⚠️ SÓNG NHIỄU CAO - ĐI VỐN CỰC NHỎ HOẶC NGHỈ</div>", unsafe_allow_html=True)
 
-        # Hiển thị số chốt chính
         st.markdown(f"""
-            <div style='background: linear-gradient(180deg, #1b1e23 0%, #0e1117 100%); border: 2px solid #ffd700; border-radius: 20px; padding: 20px; text-align: center;'>
-                <p style='color: #ffd700; letter-spacing: 5px; font-weight: bold;'>🎯 DỰ ĐOÁN TAY TIẾP</p>
-                <div class='number-display'>{"-".join(p1)}</div>
-                <p style='color: #888;'>Ưu tiên: <span style='color: #00ffcc; font-size: 24px; font-weight: bold;'>{p1[0]}</span></p>
-            </div>
+        <div class='prediction-box'>
+            <p style='color: #888; letter-spacing: 3px;'>DỰ BÁO TỔNG 5 BANH</p>
+            <h1 style='color: #ffd700; font-size: 60px; margin: 10px;'>{res['tx']} - {res['cl']}</h1>
+            <p style='color: #00ffcc;'>Lệnh Baccarat: <b>{res['bac']}</b></p>
+            <hr style='border-color: #333;'>
+            <p style='color: #fff;'>CHIẾN THUẬT VỐN KELLY: <span style='color: #ffd700; font-size: 20px;'>{res['kelly']}</span></p>
+        </div>
         """, unsafe_allow_html=True)
 
-        # Biểu đồ sức mạnh (Gọn lại)
-        with st.expander("📊 BIỂU ĐỒ SỨC MẠNH", expanded=True):
-            chart_data = pd.DataFrame({'Điểm': scores.values()}, index=scores.keys())
-            st.bar_chart(chart_data, height=200)
+        st.markdown("---")
+        st.subheader("📈 BIỂU ĐỒ ĐƯỜNG ĐI CỦA TỔNG 5")
+        st.line_chart(res['history'])
+        
+        st.write(f"📊 **Chỉ số Entropy (Độ loạn):** {res['entropy']:.2f}")
     else:
-        st.info("Vui lòng nạp thêm kết quả để kích hoạt hệ thống phân tích.")
+        st.info("Hệ thống đang thu thập tín hiệu. Anh cần nạp tối thiểu 20 kỳ để AI bắt đầu phân tích đối ứng.")
 
-st.markdown("<p style='text-align: center; color: #444; margin-top: 50px;'>© 2026 TITAN CORE SYSTEM - V2000 PRO</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #444; margin-top: 30px;'>CẢNH BÁO: KHÔNG ĐÁNH TẤT TAY. TUÂN THỦ CÔNG THỨC KELLY.</p>", unsafe_allow_html=True)
