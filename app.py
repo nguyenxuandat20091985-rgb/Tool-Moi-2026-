@@ -3,37 +3,29 @@ import re
 import json
 import pandas as pd
 import numpy as np
-import google.generativeai as genai
 from collections import Counter
 from pathlib import Path
 
-# ================= CONFIG SIÊU GỌN (NANO UI) =================
-st.set_page_config(page_title="TITAN v5000 NANO", layout="wide", initial_sidebar_state="collapsed")
+# ================= CONFIG SIÊU GỌN - CHUYÊN SÂU =================
+st.set_page_config(page_title="TITAN v6000 GHOST", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { min-width: 200px; max-width: 200px; }
-    .main { background-color: #050505; color: #ffd700; font-size: 13px; }
-    .stButton > button { 
-        background: linear-gradient(135deg, #ff0055 0%, #8b0000 100%); 
-        color: white; border-radius: 5px; height: 2.5em; font-size: 12px;
+    .main { background-color: #050505; color: #00ff00; }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
+    .stTabs [data-baseweb="tab"] {
+        height: 40px; background-color: #111; border-radius: 5px; color: #888;
     }
+    .stTabs [aria-selected="true"] { background-color: #ff0055; color: white; }
     .nano-card {
-        background: #111; border: 1px solid #444; border-radius: 10px; padding: 10px; text-align: center;
+        background: #000; border: 1px solid #ff0055; border-radius: 8px; padding: 12px; text-align: center;
     }
-    .big-num { font-size: 45px; font-weight: 900; color: #00ff00; text-shadow: 0 0 10px #00ff00; }
-    .small-text { font-size: 11px; color: #888; }
+    .big-num { font-size: 50px; font-weight: 900; color: #ff0055; text-shadow: 0 0 15px rgba(255, 0, 85, 0.5); }
+    .bot-status { font-size: 11px; font-family: monospace; color: #00ffcc; }
     </style>
 """, unsafe_allow_html=True)
 
-# Kết nối AI (Giữ nguyên theo yêu cầu không bớt)
-API_KEY = "AIzaSyBRo51DqVoC7BSv3ipUrY8GaEVfi0cVQxc"
-try:
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except: pass
-
-DATA_FILE = "titan_nano_db.json"
+DATA_FILE = "titan_v6_db.json"
 
 def load_db():
     if Path(DATA_FILE).exists():
@@ -41,76 +33,93 @@ def load_db():
     return []
 
 def save_db(data):
-    with open(DATA_FILE, "w") as f: json.dump(data[-3000:], f)
+    # Lưu tối đa 5000 kỳ để máy học nhịp sâu
+    with open(DATA_FILE, "w") as f: json.dump(data[-5000:], f)
 
 if "db" not in st.session_state: st.session_state.db = load_db()
 
-# ================= TỔNG HỢP PHƯƠNG PHÁP BẮT CẦU =================
-def master_logic(db):
-    if len(db) < 15: return None
+# ================= BỘ NÃO v6000 GHOST PROTOCOL =================
+def ghost_brain(db):
+    if len(db) < 30: return None
+    
+    # 1. Xử lý ma trận dữ liệu
     matrix = np.array([[int(d) for d in list(ky)] for ky in db])
     
-    # 1. Bắt Số (Frequency + Streak)
-    recent_str = "".join(db[-60:])
-    freq = Counter(recent_str)
-    score = {str(i): freq.get(str(i), 0) * 10 for i in range(10)}
-    for i in range(10):
-        if str(i) in db[-1] and str(i) in db[-2]: score[str(i)] += 100
+    # 2. Thuật toán Ma trận Trận thế (Pattern Matching)
+    # Tìm 2 kỳ gần nhất để so khớp lịch sử
+    last_pattern = "".join(db[-2:])
+    matches = []
+    for i in range(len(db)-3):
+        if "".join(db[i:i+2]) == last_pattern:
+            matches.append(db[i+2])
+    
+    # 3. Tính toán nhịp Tổng 5 (Markov Chain)
+    totals = np.sum(matrix, axis=1)
+    diffs = np.diff(totals[-20:]) # Sự biến thiên giữa các kỳ
+    next_diff_est = np.mean(diffs)
+    est_total = totals[-1] + next_diff_est
+    
+    t5_tx = "TÀI" if est_total > 22.5 else "XỈU"
+    t5_cl = "CHẴN" if int(est_total) % 2 == 0 else "LẺ"
+
+    # 4. Bắt số rời (Deep Frequency)
+    # Lọc ra các số có "độ rơi" ổn định nhất
+    score = {str(i): 0 for i in range(10)}
+    if matches: # Nếu tìm thấy mẫu giống trong quá khứ
+        match_counts = Counter("".join(matches))
+        for k, v in match_counts.items(): score[k] += v * 50
+    
+    # Cộng điểm xu hướng 20 kỳ gần nhất
+    recent_freq = Counter("".join(db[-20:]))
+    for k, v in recent_freq.items(): score[k] += v * 5
+    
     p1 = sorted(score, key=score.get, reverse=True)[:3]
 
-    # 2. Bắt Tổng 5 (Probability Distribution)
-    totals = np.sum(matrix, axis=1)
-    avg_15 = np.mean(totals[-15:])
-    t5_tx = "TÀI" if avg_15 < 22.5 else "XỈU" # Hồi quy về 22.5
-    t5_cl = "LẺ" if int(np.median(totals[-10:])) % 2 != 0 else "CHẴN"
+    # 5. Hệ số tin cậy (Confidence)
+    confidence = 50 + (len(matches) * 10) if matches else 45
+    confidence = min(confidence, 98)
 
-    # 3. Bắt Baccarat (Dynamic Winning Rate)
-    con = (matrix[:, 2] + matrix[:, 4]) % 10
-    cai = (matrix[:, 1] + matrix[:, 3]) % 10
-    bac = "CON (P)" if sum(con[-5:] > cai[-5:]) >= 3 else "CÁI (B)"
+    return {"p1": p1, "t5": f"{t5_tx}-{t5_cl}", "conf": confidence, "hist": totals[-20:].tolist()}
 
-    # 4. Đo độ nhiễu (Entropy)
-    counts = np.unique(totals[-20:], return_counts=True)[1]
-    probs = counts / counts.sum()
-    ent = -np.sum(probs * np.log2(probs))
+# ================= GIAO DIỆN NANO MASTER v6 =================
+st.markdown("<h5 style='text-align: center; color: #ff0055; margin:0;'>🛰️ TITAN v6000 GHOST</h5>", unsafe_allow_html=True)
 
-    return {"p1": p1, "t5": f"{t5_tx}-{t5_cl}", "bac": bac, "ent": ent, "hist": totals[-20:].tolist()}
+tab_play, tab_input = st.tabs(["🎯 SOI CẦU", "📥 NẠP DATA"])
 
-# ================= GIAO DIỆN NANO MASTER =================
-st.markdown("<h4 style='text-align: center; color: #ff0055; margin:0;'>🛰️ TITAN v5000 NANO</h4>", unsafe_allow_html=True)
-
-# Tối ưu hóa không gian bằng Tabs
-tab1, tab2, tab3 = st.tabs(["🎯 CHỐT", "📊 NHỊP", "📥 NHẬP"])
-
-with tab3:
-    raw = st.text_area("Dán mã 5D:", height=100, label_visibility="collapsed")
-    if st.button("🚀 NẠP"):
+with tab_input:
+    raw = st.text_area("Dán mã 5D:", height=100, label_visibility="collapsed", placeholder="Dán dãy số mở thưởng...")
+    c1, c2 = st.columns(2)
+    if c1.button("🚀 NẠP"):
         if raw:
             st.session_state.db.extend(re.findall(r"\d{5}", raw))
             save_db(st.session_state.db)
             st.rerun()
-    if st.button("🧹 XÓA"):
+    if c2.button("🧹 XÓA"):
         st.session_state.db = []; save_db([]); st.rerun()
+    st.markdown(f"<p class='bot-status'>DATABASE: {len(st.session_state.db)} KỲ</p>", unsafe_allow_html=True)
 
-if len(st.session_state.db) >= 15:
-    res = master_logic(st.session_state.db)
+if len(st.session_state.db) >= 30:
+    res = ghost_brain(st.session_state.db)
     
-    with tab1:
-        # Hiển thị siêu gọn
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown(f"<div class='nano-card'><p class='small-text'>SỐ CHỐT</p><p class='big-num'>{''.join(res['p1'])}</p></div>", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"<div class='nano-card'><p class='small-text'>TỔNG 5 / BAC</p><p style='color:#ffd700; font-size:18px; font-weight:bold;'>{res['t5']}<br>{res['bac']}</p></div>", unsafe_allow_html=True)
+    with tab_play:
+        # Khu vực số chốt - Ép cực gọn
+        st.markdown(f"""
+            <div class='nano-card'>
+                <p style='color: #888; font-size: 10px; margin:0;'>DỰ ĐOÁN TAY TIẾP</p>
+                <p class='big-num'>{''.join(res['p1'])}</p>
+                <div style='display: flex; justify-content: space-around; border-top: 1px solid #222; padding-top: 5px;'>
+                    <span style='color: #00ffcc; font-size: 12px;'>TỔNG 5: <b>{res['t5']}</b></span>
+                    <span style='color: #ffd700; font-size: 12px;'>TỰ TIN: <b>{res['conf']}%</b></span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
         
-        # Cảnh báo an toàn
-        status_color = "#00ffcc" if res['ent'] < 2.9 else "#ff4b4b"
-        st.markdown(f"<p style='text-align:center; color:{status_color}; font-size:12px;'>🛡️ SÓNG: {'ỔN ĐỊNH' if res['ent'] < 2.9 else 'LOẠN - NGHỈ'}</p>", unsafe_allow_html=True)
-
-    with tab2:
-        st.line_chart(res['hist'], height=150)
-        st.write(f"Độ loạn Entropy: {res['ent']:.2f}")
+        # Biểu đồ nhịp nén
+        st.line_chart(res['hist'], height=120)
+        
+        if res['conf'] < 60:
+            st.warning("⚠️ Cầu đang nhiễu, nên chờ nhịp mới.")
 else:
-    st.info("Cần 15 kỳ.")
+    st.info("Cần nạp 30 kỳ để AI học nhịp cầu.")
 
-st.markdown("<p class='small-text' style='text-align:center;'>© 2026 TITAN NANO</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align:center; color:#333; font-size:10px;'>GHOST PROTOCOL ACTIVATED</p>", unsafe_allow_html=True)
