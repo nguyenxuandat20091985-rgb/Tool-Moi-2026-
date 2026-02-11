@@ -7,24 +7,16 @@ from collections import Counter
 from pathlib import Path
 
 # ================= CONFIG =================
-st.set_page_config(page_title="TITAN v1600 PRO STABLE", layout="wide")
-
+st.set_page_config(page_title="TITAN v1700 THE KILLER", layout="wide")
 API_KEY = "AIzaSyBRo51DqVoC7BSv3ipUrY8GaEVfi0cVQxc"
-try:
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except:
-    st.error("API Error")
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 DATA_FILE = "titan_dataset.json"
 
-# ================= DATA CORE =================
 def load_data():
     if Path(DATA_FILE).exists():
-        try:
-            with open(DATA_FILE, "r") as f:
-                return list(dict.fromkeys(json.load(f)))
-        except: return []
+        with open(DATA_FILE, "r") as f: return list(dict.fromkeys(json.load(f)))
     return []
 
 def save_data(data):
@@ -32,69 +24,66 @@ def save_data(data):
     with open(DATA_FILE, "w") as f: json.dump(clean, f)
     return clean
 
-if "dataset" not in st.session_state:
-    st.session_state.dataset = load_data()
+if "dataset" not in st.session_state: st.session_state.dataset = load_data()
 
-# ================= THUẬT TOÁN CÂN BẰNG (STABLE) =================
-def analyze_v1600_pro(dataset):
-    # Lấy dữ liệu nền (toàn bộ 4152 kỳ)
-    all_digits = "".join(dataset)
-    freq_total = Counter(all_digits)
+# ================= THUẬT TOÁN V1700 (CHỈ SOI NHỊP SỐNG) =================
+def analyze_v1700(dataset):
+    # CHỈ LẤY 100 KỲ GẦN NHẤT ĐỂ SOI - ĐÂY LÀ CHÌA KHÓA ỔN ĐỊNH
+    recent_context = dataset[-100:]
+    recent_str = "".join(recent_context)
     
-    # Lấy dữ liệu nhịp (50 kỳ gần nhất)
-    recent_50 = dataset[-50:]
-    freq_recent = Counter("".join(recent_50))
+    # 1. Tính tần suất trong khung 100 kỳ (Trend ngắn hạn)
+    freq_100 = Counter(recent_str)
     
-    # Kiểm tra bệt thực sự (Phải xuất hiện 3/5 kỳ cuối mới gọi là bệt)
-    last_5 = dataset[-5:]
-    real_streaks = [str(i) for i in range(10) if sum(1 for k in last_5 if str(i) in k) >= 3]
+    # 2. Tính độ nhạy cực kỳ (10 kỳ gần nhất)
+    last_10 = dataset[-10:]
+    freq_last_10 = Counter("".join(last_10))
+    
+    # 3. Nhận diện bệt chuẩn (Xuất hiện >= 4 lần trong 10 kỳ)
+    streaks = [str(i) for i in range(10) if freq_last_10.get(str(i), 0) >= 4]
 
     score = {str(i): 0 for i in range(10)}
     for i in score:
-        # 1. Điểm nền tảng (Lấy từ 4152 kỳ - Giúp ổn định)
-        score[i] += freq_total.get(i, 0) * 0.5
-        
-        # 2. Điểm xu hướng (Lấy từ 50 kỳ - Giúp nhảy số)
-        score[i] += freq_recent.get(i, 0) * 15.0
-        
-        # 3. Điểm bệt (Chỉ cộng khi bệt thực sự rõ nét)
-        if i in real_streaks:
-            score[i] += 100 
+        # Trọng số nhịp trend (100 kỳ)
+        score[i] += freq_100.get(i, 0) * 2
+        # Trọng số bùng nổ (10 kỳ gần nhất) - Ưu tiên cực cao
+        score[i] += freq_last_10.get(i, 0) * 20
+        # Điểm thưởng bệt
+        if i in streaks: score[i] += 150
             
     ranked = sorted(score, key=score.get, reverse=True)
-    return ranked, score, real_streaks
+    return ranked, score, streaks
 
 # ================= GIAO DIỆN =================
-st.markdown("<h1 style='text-align: center; color: #00ffcc;'>🛡️ TITAN v1600 PRO</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #ff0055;'>🔥 TITAN v1700 THE KILLER</h1>", unsafe_allow_html=True)
 
 with st.sidebar:
-    st.header("📥 DỮ LIỆU")
-    raw = st.text_area("Dán kỳ mới:", height=200)
-    if st.button("🚀 PHÂN TÍCH CHUẨN", use_container_width=True):
+    st.header("📥 CẬP NHẬT KỲ MỚI")
+    raw = st.text_area("Dán kết quả Ku:", height=200)
+    if st.button("🚀 CHỐT HẠ", use_container_width=True):
         if raw:
             new = re.findall(r"\d{1,5}", raw)
             st.session_state.dataset = save_data(st.session_state.dataset + new)
             st.rerun()
 
-if len(st.session_state.dataset) > 10:
-    ranked, scores, streaks = analyze_v1600_pro(st.session_state.dataset)
+if len(st.session_state.dataset) >= 10:
+    ranked, scores, streaks = analyze_v1600_pro(st.session_state.dataset) if 'analyze_v1600_pro' in globals() else analyze_v1700(st.session_state.dataset)
+    # Ghi đè để dùng v1700
+    ranked, scores, streaks = analyze_v1700(st.session_state.dataset)
     p1 = ranked[:3]
 
-    # Dashboard chỉ số
-    c1, c2, c3 = st.columns(3)
-    c1.metric("TRẠNG THÁI", "ỔN ĐỊNH" if not streaks else "CẦU BỆT")
-    c2.metric("SỐ KẾT", ", ".join(p1))
-    c3.metric("TỔNG DỮ LIỆU", len(st.session_state.dataset))
-
-    # KẾT QUẢ DỰ ĐOÁN
     st.markdown(f"""
-    <div style='background: #000; padding: 25px; border-radius: 20px; border: 3px solid #ff4b4b; text-align: center;'>
-        <h2 style='color: white; margin:0;'>🎯 DỰ ĐOÁN TAY TIẾP</h2>
-        <h1 style='color: yellow; font-size: 85px; margin: 10px 0;'>{" - ".join(p1)}</h1>
-        <p style='color: #00ffcc;'>Dự phòng: {", ".join(ranked[3:6])}</p>
+    <div style='background: #000; padding: 20px; border-radius: 15px; border: 4px solid #ff0055; text-align: center;'>
+        <h2 style='color: white;'>🎯 TAY TIẾP THEO</h2>
+        <h1 style='color: #00ff00; font-size: 90px; margin: 10px;'>{" - ".join(p1)}</h1>
+        <p style='color: #fff;'>Dòng tiền đề xuất: <b>1-2-4-8-16</b> hoặc <b>Đều tay</b></p>
     </div>
     """, unsafe_allow_html=True)
 
+    st.subheader("📊 Nhịp cầu thực tế (100 kỳ gần nhất)")
     st.bar_chart(pd.Series(scores))
+    
+    if streaks:
+        st.warning(f"⚠️ CẢNH BÁO BỆT: Các số {', '.join(streaks)} đang nổ rất dày!")
 else:
-    st.warning("Cần thêm dữ liệu.")
+    st.info("Anh dán thêm vài kỳ để em bắt đầu bắt nhịp nhé!")
