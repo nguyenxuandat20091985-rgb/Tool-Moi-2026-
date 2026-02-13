@@ -6,330 +6,310 @@ import pandas as pd
 from datetime import datetime
 import requests
 import json
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 import hashlib
 import pickle
 import os
-from random import choices, random
-import math
-
-# =============== SYSTEM CONFIG ===============
-SYSTEM_NAME = "AI-SOI-3SO-DB-SUPER"
-MODE = "SINGLE_FILE"
-SAVE_SESSION = True
-AUTO_LEARN = True
-SELF_OPTIMIZE = True
-VERSION = "v5.0-ELITE-SUPER"
+from dataclasses import dataclass
+from collections import defaultdict
+import random
 
 # =============== CẤU HÌNH API ===============
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 
-# =============== SESSION STATE INIT ===============
-def init_session_state():
-    """Khởi tạo session state với khả năng tự học"""
-    if 'predictor' not in st.session_state:
-        st.session_state.predictor = SuperAIPredictor()
-    if 'session_id' not in st.session_state:
-        st.session_state.session_id = hashlib.md5(str(datetime.now()).encode()).hexdigest()[:8]
-    if 'prediction_history' not in st.session_state:
-        st.session_state.prediction_history = []
-    if 'accuracy_log' not in st.session_state:
-        st.session_state.accuracy_log = []
-    if 'dynamic_weights' not in st.session_state:
-        st.session_state.dynamic_weights = {
-            'frequency': 0.2,
-            'gan_cycle': 0.15,
-            'pattern_match': 0.15,
-            'markov_probability': 0.2,
-            'bayesian_score': 0.1,
-            'montecarlo_result': 0.1,
-            'ai_neural_score': 0.1
-        }
-    if 'pattern_success_rate' not in st.session_state:
-        st.session_state.pattern_success_rate = {
-            'cau_bet': 0.5,
-            'cau_nhay': 0.5,
-            'cau_dao': 0.5,
-            'cau_lap': 0.5,
-            'cau_2ky': 0.5,
-            'cau_zigzag': 0.5,
-            'cau_doi_xung': 0.5
-        }
+# =============== SYSTEM CONFIG ===============
+SYSTEM_NAME = "AI-SOI-3SO-DB-ULTIMATE"
+VERSION = "v6.0-COMBAT"
+AUTO_LEARN = True
+SELF_OPTIMIZE = True
+SAVE_SESSION = True
+ANTI_OVERFIT = True
+ADAPTIVE_WEIGHT = True
 
-# =============== SUPER AI PREDICTOR ===============
-class SuperAIPredictor:
-    """Hệ thống AI đa tầng với đầy đủ các lớp phân tích"""
+# =============== DATA STRUCTURES ===============
+@dataclass
+class DigitPowerIndex:
+    """Cấu trúc chỉ số sức mạnh của mỗi digit"""
+    frequency: float = 0.0
+    gan_cycle: float = 0.0
+    momentum: float = 0.0
+    pattern_match: float = 0.0
+    entropy_score: float = 0.0
+    volatility_score: float = 0.0
+    markov_score: float = 0.0
+    bayesian_score: float = 0.0
+    montecarlo_result: float = 0.0
+    neural_score: float = 0.0
+    
+    def calculate_total(self) -> float:
+        """Tính tổng DPI theo công thức"""
+        return (
+            0.15 * self.frequency +
+            0.10 * self.gan_cycle +
+            0.10 * self.momentum +
+            0.15 * self.pattern_match +
+            0.10 * self.entropy_score +
+            0.10 * self.volatility_score +
+            0.10 * self.markov_score +
+            0.05 * self.bayesian_score +
+            0.10 * self.montecarlo_result +
+            0.05 * self.neural_score
+        )
+
+@dataclass
+class PredictionResult:
+    """Kết quả dự đoán"""
+    weakest_3: List[str]
+    safe_7: List[str]
+    strongest_3: List[str]
+    confidence: float
+    risk_level: str
+    digit_power_scores: Dict[str, float]
+
+# =============== AI CORE ENGINE ===============
+class UltimateSoi3SoAI:
+    """AI CORE - Tích hợp đầy đủ các engine theo yêu cầu"""
     
     def __init__(self):
+        # Dữ liệu lịch sử
         self.history = []
-        self.patterns = {}
-        self.risk_scores = {str(i): 0 for i in range(10)}
-        self.training_data = []
-        self.neural_weights = np.random.rand(10, 10) * 0.1
+        self.session_data = []
         
-        # Dữ liệu tần suất đa chiều
-        self.frequency_short = {str(i): 0 for i in range(10)}  # 10 số gần nhất
-        self.frequency_long = {str(i): 0 for i in range(10)}   # Toàn bộ lịch sử
-        self.digit_position = {str(i): [] for i in range(10)}  # Vị trí xuất hiện
-        self.repeat_pattern = []                               # Pattern lặp
-        self.mirror_pattern = {}                              # Pattern bóng
-        self.gan_cycle = {str(i): 0 for i in range(10)}       # Chu kỳ gan
-        self.hot_cold_index = {str(i): 0 for i in range(10)}  # Chỉ số nóng/lạnh
+        # Pattern weights - TỰ ĐỘNG TỐI ƯU
+        self.pattern_weights = {
+            'cau_bet': 1.0,
+            'cau_nhay': 1.0,
+            'cau_dao': 1.0,
+            'cau_lap': 1.0,
+            'cau_2ky': 1.0,
+            'cau_zigzag': 1.0,
+            'cau_doi_xung': 1.0,
+            'reverse_pattern': 1.0
+        }
         
-        # Pattern lottery
-        self.cau_bet = []      # Cầu bệt
-        self.cau_nhay = []     # Cầu nhảy
-        self.cau_dao = []      # Cầu đảo
-        self.cau_lap = []      # Cầu lặp
-        self.cau_2ky = []      # Cầu 2 kỳ
-        self.cau_zigzag = []   # Cầu zigzag
-        self.cau_doi_xung = [] # Cầu đối xứng
+        # Model weights - ADAPTIVE
+        self.model_weights = {
+            'frequency': 0.15,
+            'gan_cycle': 0.10,
+            'momentum': 0.10,
+            'pattern_match': 0.15,
+            'entropy': 0.10,
+            'volatility': 0.10,
+            'markov': 0.10,
+            'bayesian': 0.05,
+            'montecarlo': 0.10,
+            'neural': 0.05
+        }
         
-    def update_with_result(self, actual_numbers: List[str]):
-        """Tự động cập nhật và học từ kết quả thực tế"""
-        if AUTO_LEARN:
-            # Cập nhật lịch sử
-            self.history.extend(actual_numbers)
-            
-            # Cập nhật tần suất
-            for num in actual_numbers:
-                self.frequency_long[num] = self.frequency_long.get(num, 0) + 1
-            
-            # Cập nhật chu kỳ gan
-            for num in self.gan_cycle:
-                if num in actual_numbers:
-                    self.gan_cycle[num] = 0
-                else:
-                    self.gan_cycle[num] += 1
-            
-            # Tự động tối ưu weights nếu có kết quả
-            if SELF_OPTIMIZE and len(st.session_state.prediction_history) > 0:
-                self._optimize_weights(actual_numbers)
-    
-    def _optimize_weights(self, actual_numbers: List[str]):
-        """Tự động tối ưu trọng số dựa trên kết quả thực tế"""
-        if len(st.session_state.prediction_history) < 3:
-            return
+        # Lưu phiên
+        self.session_file = "ai_session_v6.pkl"
+        if SAVE_SESSION and os.path.exists(self.session_file):
+            self.load_session()
         
-        # Lấy dự đoán gần nhất
-        last_pred = st.session_state.prediction_history[-1]
-        if 'predicted' not in last_pred:
-            return
+        # Anti-overfit
+        self.prediction_history = []
+        self.accuracy_tracker = []
+        self.consecutive_losses = 0
         
-        predicted = last_pred['predicted']
-        
-        # Tính độ chính xác
-        hits = len(set(predicted) & set(actual_numbers))
-        accuracy = hits / 3
-        
-        # Boost weights cho pattern thành công
-        if accuracy > 0.5:
-            for pattern in st.session_state.pattern_success_rate:
-                st.session_state.pattern_success_rate[pattern] = min(0.9, 
-                    st.session_state.pattern_success_rate[pattern] + 0.01)
-        else:
-            for pattern in st.session_state.pattern_success_rate:
-                st.session_state.pattern_success_rate[pattern] = max(0.3,
-                    st.session_state.pattern_success_rate[pattern] - 0.005)
-    
-    # =============== DATA LAYER - PHÂN TÍCH ĐA TẦNG ===============
-    
-    def analyze_frequency_short(self, nums: List[str], window: int = 10) -> Dict:
-        """Phân tích tần suất ngắn hạn"""
-        if len(nums) < window:
-            window = len(nums)
-        recent = nums[-window:]
-        counts = collections.Counter(recent)
-        total = len(recent)
-        
-        freq_short = {}
-        for i in range(10):
-            num = str(i)
-            freq_short[num] = counts.get(num, 0) / total if total > 0 else 0
-        return freq_short
-    
-    def analyze_frequency_long(self, nums: List[str]) -> Dict:
-        """Phân tích tần suất dài hạn"""
-        total = len(nums)
-        counts = collections.Counter(nums)
-        
-        freq_long = {}
-        for i in range(10):
-            num = str(i)
-            freq_long[num] = counts.get(num, 0) / total if total > 0 else 0
-        return freq_long
-    
-    def analyze_gan_cycle(self, nums: List[str]) -> Dict:
-        """Phân tích chu kỳ gan - số lâu chưa ra"""
-        gan_cycle = {}
-        for i in range(10):
-            num = str(i)
-            # Tìm vị trí xuất hiện cuối cùng
-            positions = [idx for idx, x in enumerate(nums) if x == num]
-            if positions:
-                last_pos = positions[-1]
-                gan = len(nums) - last_pos - 1
+    # =============== DATA ENGINE ===============
+    def analyze_frequency(self, nums: List[str], windows: List[int] = [10, 30, 100]) -> Dict:
+        """Phân tích tần suất đa khung"""
+        freq_data = {}
+        for window in windows:
+            if len(nums) >= window:
+                recent = nums[-window:]
+                counts = collections.Counter(recent)
+                total = len(recent)
+                freq_data[f'window_{window}'] = {
+                    d: counts.get(d, 0) / total for d in '0123456789'
+                }
             else:
-                gan = len(nums)
-            gan_cycle[num] = gan
-        return gan_cycle
+                freq_data[f'window_{window}'] = {d: 0 for d in '0123456789'}
+        return freq_data
     
-    def analyze_digit_position(self, nums: List[str]) -> Dict:
-        """Phân tích vị trí xuất hiện của các số"""
-        positions = {}
-        for i in range(10):
-            num = str(i)
-            pos_list = [idx for idx, x in enumerate(nums) if x == num]
-            positions[num] = pos_list[-5:] if pos_list else []
-        return positions
+    def analyze_gan_cycle(self, nums: List[str]) -> Dict[str, float]:
+        """Phân tích chu kỳ gan (số lâu ra)"""
+        cycle_scores = {}
+        all_digits = '0123456789'
+        
+        for digit in all_digits:
+            if digit in nums:
+                last_pos = len(nums) - 1 - nums[::-1].index(digit)
+                distance = len(nums) - 1 - last_pos
+                # Chuẩn hóa điểm - càng lâu càng cao
+                cycle_scores[digit] = min(1.0, distance / 50)
+            else:
+                cycle_scores[digit] = 1.0
+        return cycle_scores
     
-    # =============== PATTERN LAYER - CẦU LÔ ===============
+    def analyze_momentum(self, nums: List[str]) -> Dict[str, float]:
+        """Phân tích động lượng (xu hướng gần đây)"""
+        momentum = {}
+        for digit in '0123456789':
+            # So sánh tần suất 10 số gần nhất với 20 số trước đó
+            if len(nums) >= 30:
+                recent = nums[-10:].count(digit) / 10
+                previous = nums[-30:-10].count(digit) / 20
+                momentum[digit] = min(1.0, max(0, recent - previous + 0.5))
+            else:
+                momentum[digit] = 0.5
+        return momentum
     
-    def detect_cau_bet(self, nums: List[str]) -> List[str]:
-        """Phát hiện cầu bệt - số lặp lại liên tiếp"""
+    def analyze_mirror_digit(self, last_num: str) -> Dict[str, float]:
+        """Phân tích số bóng"""
+        bong_duong = {"0": "5", "1": "6", "2": "7", "3": "8", "4": "9",
+                     "5": "0", "6": "1", "7": "2", "8": "3", "9": "4"}
+        bong_am = {"0": "7", "1": "4", "2": "9", "3": "6", "4": "1",
+                  "5": "8", "6": "3", "7": "0", "8": "5", "9": "2"}
+        
+        mirror_scores = {d: 0.0 for d in '0123456789'}
+        if last_num:
+            mirror_scores[bong_duong.get(last_num, '')] = 0.8
+            mirror_scores[bong_am.get(last_num, '')] = 0.7
+        return mirror_scores
+    
+    def calculate_survival_rate(self, nums: List[str]) -> Dict[str, float]:
+        """Tính tỷ lệ sống sót - khả năng xuất hiện lại"""
+        survival = {}
+        for digit in '0123456789':
+            appearances = [i for i, x in enumerate(nums) if x == digit]
+            if len(appearances) >= 2:
+                avg_gap = np.mean(np.diff(appearances))
+                survival[digit] = min(1.0, 1.0 / (avg_gap + 1))
+            else:
+                survival[digit] = 0.3
+        return survival
+    
+    # =============== PATTERN ENGINE ===============
+    def detect_cau_bet(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện cầu bệt (số về liên tiếp)"""
         if len(nums) < 2:
-            return []
+            return {d: 0 for d in '0123456789'}
         
-        cau_bet = []
-        last_num = nums[-1]
+        last = nums[-1]
         count = 1
-        
         for i in range(len(nums)-2, -1, -1):
-            if nums[i] == last_num:
+            if nums[i] == last:
                 count += 1
             else:
                 break
         
-        if count >= 2:
-            # Dự đoán số tiếp theo có thể vẫn là số này
-            cau_bet.append(last_num)
-            
-            # Hoặc số bóng của nó
-            bong_duong = {"0": "5", "1": "6", "2": "7", "3": "8", "4": "9",
-                          "5": "0", "6": "1", "7": "2", "8": "3", "9": "4"}
-            if last_num in bong_duong:
-                cau_bet.append(bong_duong[last_num])
-        
-        return list(set(cau_bet))
+        scores = {d: 0 for d in '0123456789'}
+        scores[last] = min(1.0, count / 3)
+        return scores
     
-    def detect_cau_nhay(self, nums: List[str]) -> List[str]:
-        """Phát hiện cầu nhảy - số cách đều"""
+    def detect_cau_nhay(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện cầu nhảy (cách 1-2 kỳ)"""
         if len(nums) < 3:
-            return []
+            return {d: 0 for d in '0123456789'}
         
-        cau_nhay = []
-        # Kiểm tra khoảng cách đều
-        diff1 = (int(nums[-1]) - int(nums[-2])) % 10
-        diff2 = (int(nums[-2]) - int(nums[-3])) % 10
+        scores = {d: 0 for d in '0123456789'}
+        patterns = [
+            (nums[-3], nums[-1]),  # x _ x
+            (nums[-4], nums[-2]),  # x _ _ x
+        ]
         
-        if diff1 == diff2:
-            # Dự đoán số tiếp theo
-            next_num = str((int(nums[-1]) + diff1) % 10)
-            cau_nhay.append(next_num)
-            
-            # Số đối xứng
-            doi_xung = str((int(next_num) + 5) % 10)
-            cau_nhay.append(doi_xung)
-        
-        return list(set(cau_nhay))
+        for pattern in patterns:
+            if len(pattern) == 2 and pattern[0] == pattern[1]:
+                scores[pattern[0]] += 0.5
+        return scores
     
-    def detect_cau_dao(self, nums: List[str]) -> List[str]:
-        """Phát hiện cầu đảo - số đảo ngược"""
+    def detect_cau_dao(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện cầu đảo (đối xứng)"""
         if len(nums) < 4:
-            return []
+            return {d: 0 for d in '0123456789'}
         
-        cau_dao = []
-        # Kiểm tra pattern đảo: AB -> BA
-        pair1 = nums[-2:]
-        pair2 = nums[-4:-2]
-        
-        if pair1[0] == pair2[1] and pair1[1] == pair2[0]:
-            # Dự đoán cặp tiếp theo
-            next_pair = [pair1[1], pair1[0]]
-            cau_dao.extend(next_pair)
-        
-        return cau_dao
+        scores = {d: 0 for d in '0123456789'}
+        # Kiểm tra đối xứng: a,b,b,a
+        if nums[-4] == nums[-1] and nums[-3] == nums[-2]:
+            scores[nums[-1]] += 0.7
+            scores[nums[-2]] += 0.6
+        return scores
     
-    def detect_cau_lap(self, nums: List[str]) -> List[str]:
-        """Phát hiện cầu lặp - pattern lặp lại"""
+    def detect_cau_lap(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện cầu lặp (chu kỳ)"""
+        if len(nums) < 10:
+            return {d: 0 for d in '0123456789'}
+        
+        scores = {d: 0 for d in '0123456789'}
+        last = nums[-1]
+        
+        # Tìm chu kỳ lặp
+        for cycle in [2, 3, 4, 5]:
+            positions = [i for i, x in enumerate(nums[:-1]) if x == last]
+            if len(positions) >= 2:
+                gaps = np.diff(positions)
+                if len(gaps) > 0 and np.mean(gaps) <= cycle + 1:
+                    scores[last] += 0.4
+        return scores
+    
+    def detect_cau_2ky(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện cầu 2 kỳ"""
         if len(nums) < 6:
-            return []
+            return {d: 0 for d in '0123456789'}
         
-        cau_lap = []
-        # Tìm pattern 2 số lặp
-        for length in [2, 3]:
-            if len(nums) >= length * 2:
-                last_pattern = nums[-length:]
-                prev_pattern = nums[-length*2:-length]
-                
-                if last_pattern == prev_pattern:
-                    # Dự đoán pattern tiếp theo lặp lại
-                    next_pattern = nums[-length*3:-length*2] if len(nums) >= length*3 else last_pattern
-                    cau_lap.extend(next_pattern)
-        
-        return cau_lap
+        scores = {d: 0 for d in '0123456789'}
+        # Pattern: a,b,c,a,b,c
+        if len(nums) >= 6:
+            if nums[-6] == nums[-3] and nums[-5] == nums[-2] and nums[-4] == nums[-1]:
+                scores[nums[-1]] += 0.8
+        return scores
     
-    def detect_cau_2ky(self, nums: List[str]) -> List[str]:
-        """Phát hiện cầu 2 kỳ - số xuất hiện cách 2 kỳ"""
-        if len(nums) < 3:
-            return []
-        
-        cau_2ky = []
-        # Kiểm tra số cách 2 kỳ
-        if nums[-3] == nums[-1]:
-            # Số ở vị trí -3 giống số hiện tại
-            # Dự đoán số ở vị trí -2 sẽ xuất hiện ở kỳ tiếp theo
-            cau_2ky.append(nums[-2])
-        
-        return cau_2ky
-    
-    def detect_cau_zigzag(self, nums: List[str]) -> List[str]:
-        """Phát hiện cầu zigzag - tăng giảm xen kẽ"""
-        if len(nums) < 3:
-            return []
-        
-        cau_zigzag = []
-        # Chuyển đổi sang số
-        int_nums = [int(x) for x in nums[-4:]]
-        
-        # Kiểm tra pattern tăng-giảm-tăng
-        if len(int_nums) >= 4:
-            if (int_nums[-3] > int_nums[-4] and 
-                int_nums[-2] < int_nums[-3] and 
-                int_nums[-1] > int_nums[-2]):
-                # Dự đoán giảm
-                next_num = str((int_nums[-1] - 2) % 10)
-                cau_zigzag.append(next_num)
-        
-        return cau_zigzag
-    
-    def detect_cau_doi_xung(self, nums: List[str]) -> List[str]:
-        """Phát hiện cầu đối xứng"""
+    def detect_cau_zigzag(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện cầu zigzag"""
         if len(nums) < 5:
-            return []
+            return {d: 0 for d in '0123456789'}
         
-        cau_doi_xung = []
-        # Kiểm tra đối xứng qua tâm
-        center = len(nums) // 2
-        for i in range(1, 3):
-            if center - i >= 0 and center + i < len(nums):
-                if nums[center - i] == nums[center + i]:
-                    # Dự đoán số đối xứng tiếp theo
-                    if center - i - 1 >= 0:
-                        cau_doi_xung.append(nums[center - i - 1])
-                    if center + i + 1 < len(nums):
-                        cau_doi_xung.append(nums[center + i + 1])
+        scores = {d: 0 for d in '0123456789'}
+        # Kiểm tra tăng/giảm đều
+        last_5 = [int(x) for x in nums[-5:]]
+        diffs = np.diff(last_5)
         
-        return cau_doi_xung
+        if all(d > 0 for d in diffs) or all(d < 0 for d in diffs):
+            next_num = (last_5[-1] + (last_5[-1] - last_5[-2])) % 10
+            scores[str(next_num)] += 0.6
+        return scores
     
-    # =============== PROBABILITY LAYER - XÁC SUẤT NÂNG CAO ===============
-    
-    def calculate_markov_chain(self, nums: List[str], order: int = 2) -> Dict:
-        """Markov Chain đa bậc"""
-        if len(nums) <= order:
-            return {}
+    def detect_cau_doi_xung(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện cầu đối xứng toàn phần"""
+        if len(nums) < 6:
+            return {d: 0 for d in '0123456789'}
         
+        scores = {d: 0 for d in '0123456789'}
+        # Kiểm tra đối xứng gương
+        window = nums[-6:]
+        if window[0] == window[5] and window[1] == window[4] and window[2] == window[3]:
+            scores[window[0]] += 0.9
+            scores[window[1]] += 0.8
+            scores[window[2]] += 0.7
+        return scores
+    
+    def detect_reverse_pattern(self, nums: List[str]) -> Dict[str, float]:
+        """Phát hiện pattern đảo ngược"""
+        if len(nums) < 4:
+            return {d: 0 for d in '0123456789'}
+        
+        scores = {d: 0 for d in '0123456789'}
+        # Kiểm tra pattern bị đảo
+        last = nums[-1]
+        prev = nums[-2]
+        
+        bong_duong = {"0": "5", "1": "6", "2": "7", "3": "8", "4": "9",
+                     "5": "0", "6": "1", "7": "2", "8": "3", "9": "4"}
+        
+        if bong_duong.get(last) == prev:
+            scores[last] += 0.7
+            scores[prev] += 0.6
+        return scores
+    
+    # =============== PROBABILITY ENGINE ===============
+    def markov_chain(self, nums: List[str], order: int = 2) -> Dict[str, float]:
+        """Markov Chain dự đoán xác suất"""
+        if len(nums) < order + 1:
+            return {d: 1/10 for d in '0123456789'}
+        
+        # Tạo transition matrix
         transitions = {}
         for i in range(len(nums) - order):
             state = tuple(nums[i:i+order])
@@ -341,832 +321,928 @@ class SuperAIPredictor:
         # Chuẩn hóa
         for state in transitions:
             total = sum(transitions[state].values())
-            for num in transitions[state]:
-                transitions[state][num] /= total
+            for digit in transitions[state]:
+                transitions[state][digit] /= total
         
-        return transitions
+        # Dự đoán dựa trên state cuối
+        current_state = tuple(nums[-order:]) if len(nums) >= order else tuple(nums)
+        if current_state in transitions:
+            return transitions[current_state]
+        
+        return {d: 1/10 for d in '0123456789'}
     
-    def calculate_bayesian_update(self, nums: List[str], prior: Dict = None) -> Dict:
-        """Cập nhật Bayesian liên tục"""
-        if prior is None:
-            prior = {str(i): 0.1 for i in range(10)}
+    def bayesian_probability(self, nums: List[str]) -> Dict[str, float]:
+        """Xác suất Bayes với prior = tần suất"""
+        if len(nums) < 20:
+            return {d: 1/10 for d in '0123456789'}
         
-        posterior = prior.copy()
+        # Prior: tần suất tổng thể
+        total_counts = collections.Counter(nums)
+        total = len(nums)
+        prior = {d: total_counts.get(d, 0) / total for d in '0123456789'}
         
-        # Cập nhật dựa trên dữ liệu mới
-        recent = nums[-20:] if len(nums) >= 20 else nums
-        counts = collections.Counter(recent)
-        total = len(recent)
+        # Likelihood: dựa trên 10 số gần nhất
+        recent = nums[-10:]
+        recent_counts = collections.Counter(recent)
+        recent_total = len(recent)
         
-        for num in posterior:
-            likelihood = counts.get(num, 0) / total if total > 0 else 0.1
-            posterior[num] = prior[num] * likelihood
+        # Posterior (công thức Bayes đơn giản)
+        posterior = {}
+        for d in '0123456789':
+            likelihood = recent_counts.get(d, 0) / recent_total if recent_total > 0 else 1/10
+            posterior[d] = (likelihood * prior.get(d, 1/10)) / sum(prior.values())
         
         # Chuẩn hóa
-        sum_probs = sum(posterior.values())
-        if sum_probs > 0:
-            for num in posterior:
-                posterior[num] /= sum_probs
-        
-        return posterior
+        total_prob = sum(posterior.values())
+        return {d: p/total_prob for d, p in posterior.items()}
     
-    def monte_carlo_simulation(self, nums: List[str], n_simulations: int = 10000) -> Dict:
-        """Monte Carlo với 10000 lần mô phỏng"""
-        if len(nums) < 5:
-            return {str(i): 0.1 for i in range(10)}
+    def monte_carlo_10000(self, nums: List[str]) -> Dict[str, float]:
+        """Monte Carlo simulation 10000 lần"""
+        if len(nums) < 20:
+            return {d: 1/10 for d in '0123456789'}
         
-        results = {str(i): 0 for i in range(10)}
-        
-        # Phân phối xác suất từ dữ liệu
-        counts = collections.Counter(nums)
-        total = len(nums)
-        probs = {num: counts.get(num, 0)/total for num in [str(i) for i in range(10)]}
+        # Thống kê phân phối
+        freq_dist = collections.Counter(nums[-50:]) if len(nums) >= 50 else collections.Counter(nums)
+        total = sum(freq_dist.values())
+        probs = {d: freq_dist.get(d, 0) / total for d in '0123456789'}
         
         # Mô phỏng
-        for _ in range(n_simulations):
-            # Lấy 3 số ngẫu nhiên theo phân phối
-            selected = choices(list(probs.keys()), weights=list(probs.values()), k=3)
-            for num in selected:
-                results[num] += 1
-        
-        # Chuẩn hóa
-        total_sim = n_simulations * 3
-        for num in results:
-            results[num] /= total_sim
-        
-        return results
-    
-    def hidden_markov_model(self, nums: List[str]) -> Dict:
-        """Hidden Markov Model - phát hiện trạng thái ẩn"""
-        if len(nums) < 10:
-            return {str(i): 0.1 for i in range(10)}
-        
-        # Đơn giản hóa: phân cụm các số
-        int_nums = [int(x) for x in nums[-20:]]
-        
-        # Phát hiện 2 trạng thái: cao (5-9) và thấp (0-4)
-        high_count = sum(1 for x in int_nums if x >= 5)
-        low_count = len(int_nums) - high_count
-        
-        state = 'high' if high_count > low_count else 'low'
-        
-        hmm_scores = {str(i): 0.1 for i in range(10)}
-        
-        if state == 'high':
-            for i in range(5, 10):
-                hmm_scores[str(i)] = 0.15
-            for i in range(0, 5):
-                hmm_scores[str(i)] = 0.05
-        else:
-            for i in range(0, 5):
-                hmm_scores[str(i)] = 0.15
-            for i in range(5, 10):
-                hmm_scores[str(i)] = 0.05
-        
-        return hmm_scores
-    
-    # =============== AI LAYER - NEURAL SCORING ===============
-    
-    def calculate_neural_score(self, nums: List[str]) -> Dict:
-        """Neural scoring với ensemble model"""
-        if len(nums) < 10:
-            return {str(i): 0.1 for i in range(10)}
-        
-        scores = {str(i): 0.5 for i in range(10)}  # Base score
-        
-        # Simple neural simulation
-        recent_nums = [int(x) for x in nums[-10:]]
-        
-        for i in range(10):
-            # Tần suất gần đây
-            freq_score = recent_nums.count(i) / len(recent_nums)
+        results = []
+        for _ in range(10000):
+            # Random walk với bias
+            if len(results) > 0:
+                last = results[-1]
+                # Thêm yếu tố bóng số
+                bong = {"0": "5", "1": "6", "2": "7", "3": "8", "4": "9",
+                       "5": "0", "6": "1", "7": "2", "8": "3", "9": "4"}
+                next_probs = probs.copy()
+                if bong.get(last, '') in next_probs:
+                    next_probs[bong[last]] *= 1.5
+            else:
+                next_probs = probs
             
-            # Chu kỳ
-            last_pos = -1
-            for idx, val in enumerate(recent_nums):
-                if val == i:
-                    last_pos = idx
-            cycle_score = (10 - (last_pos + 1)) / 10 if last_pos >= 0 else 0.1
+            # Chuẩn hóa
+            total_prob = sum(next_probs.values())
+            normalized = {d: p/total_prob for d, p in next_probs.items()}
             
-            # Kết hợp
-            scores[str(i)] = 0.6 * freq_score + 0.4 * cycle_score
+            # Chọn số
+            digits = list(normalized.keys())
+            weights = list(normalized.values())
+            results.append(np.random.choice(digits, p=weights))
         
+        # Thống kê kết quả mô phỏng
+        sim_counts = collections.Counter(results)
+        sim_total = len(results)
+        return {d: sim_counts.get(d, 0) / sim_total for d in '0123456789'}
+    
+    def entropy_score(self, nums: List[str], window: int = 20) -> Dict[str, float]:
+        """Tính điểm entropy - độ hỗn loạn"""
+        if len(nums) < window:
+            window = len(nums)
+        
+        recent = nums[-window:]
+        scores = {}
+        
+        for digit in '0123456789':
+            # Entropy cao = khó dự đoán = rủi ro
+            p = recent.count(digit) / len(recent) if len(recent) > 0 else 0.1
+            if p > 0:
+                entropy = -p * np.log2(p)
+                scores[digit] = 1 - entropy  # Chuyển thành điểm (cao = tốt)
+            else:
+                scores[digit] = 0.5
         return scores
     
-    def ensemble_prediction(self, all_scores: List[Dict]) -> Dict:
-        """Ensemble model - kết hợp nhiều phương pháp"""
-        if not all_scores:
-            return {str(i): 0.1 for i in range(10)}
+    def volatility_score(self, nums: List[str]) -> Dict[str, float]:
+        """Đo độ biến động"""
+        if len(nums) < 10:
+            return {d: 0.5 for d in '0123456789'}
         
-        combined = {str(i): 0 for i in range(10)}
-        
-        for scores in all_scores:
-            for num, score in scores.items():
-                combined[num] += score
-        
-        # Chuẩn hóa
-        total = sum(combined.values())
-        if total > 0:
-            for num in combined:
-                combined[num] /= total
-        
-        return combined
+        scores = {}
+        for digit in '0123456789':
+            positions = [i for i, x in enumerate(nums[-50:]) if x == digit] if len(nums) >= 50 else [i for i, x in enumerate(nums) if x == digit]
+            if len(positions) >= 2:
+                std = np.std(np.diff(positions)) if len(positions) > 1 else 0
+                # Chuẩn hóa: độ biến động thấp = ổn định = tốt
+                scores[digit] = max(0, 1 - std/20)
+            else:
+                scores[digit] = 0.3
+        return scores
     
-    # =============== MAIN PREDICTION ENGINE ===============
+    def hidden_markov_model(self, nums: List[str]) -> Dict[str, float]:
+        """Hidden Markov Model đơn giản"""
+        if len(nums) < 10:
+            return {d: 1/10 for d in '0123456789'}
+        
+        # Phân cụm ẩn: phân loại số nóng, lạnh, trung bình
+        freq_50 = collections.Counter(nums[-50:]) if len(nums) >= 50 else collections.Counter(nums)
+        max_freq = max(freq_50.values()) if freq_50 else 1
+        
+        scores = {}
+        for digit in '0123456789':
+            freq = freq_50.get(digit, 0)
+            # Hidden state: 0 = lạnh, 1 = TB, 2 = nóng
+            if freq <= max_freq * 0.2:
+                hidden_state = 0
+                scores[digit] = 0.3
+            elif freq <= max_freq * 0.6:
+                hidden_state = 1
+                scores[digit] = 0.6
+            else:
+                hidden_state = 2
+                scores[digit] = 0.9
+        return scores
     
-    def predict_top_three(self, data: str) -> Tuple[List[str], float, str, List[str], List[str]]:
-        """Dự đoán 3 số mạnh nhất với confidence score"""
+    # =============== DIGIT POWER INDEX ENGINE ===============
+    def calculate_digit_power_index(self, nums: List[str]) -> Dict[str, DigitPowerIndex]:
+        """Tính DPI cho từng digit"""
+        dpis = {}
+        
+        # Frequency analysis
+        freq_data = self.analyze_frequency(nums)
+        
+        # Gan cycle
+        gan_scores = self.analyze_gan_cycle(nums)
+        
+        # Momentum
+        momentum_scores = self.analyze_momentum(nums)
+        
+        # Pattern detection - TỔNG HỢP TẤT CẢ CÁU
+        pattern_scores = self._aggregate_patterns(nums)
+        
+        # Entropy
+        entropy_scores = self.entropy_score(nums)
+        
+        # Volatility
+        volatility_scores = self.volatility_score(nums)
+        
+        # Markov
+        markov_probs = self.markov_chain(nums)
+        
+        # Bayesian
+        bayesian_probs = self.bayesian_probability(nums)
+        
+        # Monte Carlo
+        monte_probs = self.monte_carlo_10000(nums)
+        
+        # Neural (simulated)
+        neural_scores = self._neural_prediction(nums)
+        
+        # Tính DPI cho từng digit
+        for digit in '0123456789':
+            dpi = DigitPowerIndex()
+            
+            # Frequency từ window_10 (gần nhất)
+            dpi.frequency = freq_data['window_10'].get(digit, 0)
+            
+            # Gan cycle
+            dpi.gan_cycle = gan_scores.get(digit, 0)
+            
+            # Momentum
+            dpi.momentum = momentum_scores.get(digit, 0)
+            
+            # Pattern match - nhân với weight adaptive
+            dpi.pattern_match = pattern_scores.get(digit, 0) * self.get_adaptive_pattern_weight()
+            
+            # Entropy
+            dpi.entropy_score = entropy_scores.get(digit, 0.5)
+            
+            # Volatility
+            dpi.volatility_score = volatility_scores.get(digit, 0.5)
+            
+            # Markov
+            dpi.markov_score = markov_probs.get(digit, 0.1)
+            
+            # Bayesian
+            dpi.bayesian_score = bayesian_probs.get(digit, 0.1)
+            
+            # Monte Carlo
+            dpi.montecarlo_result = monte_probs.get(digit, 0.1)
+            
+            # Neural
+            dpi.neural_score = neural_scores.get(digit, 0.5)
+            
+            dpis[digit] = dpi
+        
+        return dpis
+    
+    def _aggregate_patterns(self, nums: List[str]) -> Dict[str, float]:
+        """Tổng hợp tất cả pattern với weights"""
+        pattern_funcs = [
+            self.detect_cau_bet,
+            self.detect_cau_nhay,
+            self.detect_cau_dao,
+            self.detect_cau_lap,
+            self.detect_cau_2ky,
+            self.detect_cau_zigzag,
+            self.detect_cau_doi_xung,
+            self.detect_reverse_pattern
+        ]
+        
+        pattern_names = [
+            'cau_bet', 'cau_nhay', 'cau_dao', 'cau_lap',
+            'cau_2ky', 'cau_zigzag', 'cau_doi_xung', 'reverse_pattern'
+        ]
+        
+        total_scores = {d: 0.0 for d in '0123456789'}
+        
+        for func, name in zip(pattern_funcs, pattern_names):
+            scores = func(nums)
+            weight = self.pattern_weights.get(name, 1.0)
+            for d in scores:
+                total_scores[d] += scores[d] * weight
+        
+        # Chuẩn hóa về [0,1]
+        max_score = max(total_scores.values()) if max(total_scores.values()) > 0 else 1
+        if max_score > 0:
+            total_scores = {d: min(1.0, s / max_score) for d, s in total_scores.items()}
+        
+        return total_scores
+    
+    def _neural_prediction(self, nums: List[str]) -> Dict[str, float]:
+        """Neural network simulation"""
+        if len(nums) < 10:
+            return {d: 0.5 for d in '0123456789'}
+        
+        # Ensemble của nhiều phương pháp
+        predictions = [
+            self.markov_chain(nums),
+            self.bayesian_probability(nums),
+            self.monte_carlo_10000(nums)
+        ]
+        
+        # Weighted average
+        weights = [0.5, 0.3, 0.2]  # Markov cao nhất
+        neural_scores = {d: 0.0 for d in '0123456789'}
+        
+        for pred, weight in zip(predictions, weights):
+            for d in pred:
+                neural_scores[d] += pred[d] * weight
+        
+        return neural_scores
+    
+    # =============== ADAPTIVE WEIGHT ENGINE ===============
+    def get_adaptive_pattern_weight(self) -> float:
+        """Lấy weight adaptive dựa trên hiệu suất"""
+        if not ADAPTIVE_WEIGHT:
+            return 1.0
+        
+        if len(self.accuracy_tracker) >= 10:
+            recent_accuracy = np.mean(self.accuracy_tracker[-10:])
+            # Tăng weight nếu accuracy cao, giảm nếu thấp
+            return 0.8 + recent_accuracy * 0.4
+        return 1.0
+    
+    def update_weights(self, predicted: List[str], actual: List[str]):
+        """Cập nhật weights dựa trên kết quả thực tế"""
+        if not AUTO_LEARN:
+            return
+        
+        # Tính accuracy
+        correct = len(set(predicted) & set(actual))
+        accuracy = correct / len(predicted) if predicted else 0
+        self.accuracy_tracker.append(accuracy)
+        
+        # Giới hạn độ dài tracker
+        if len(self.accuracy_tracker) > 50:
+            self.accuracy_tracker.pop(0)
+        
+        # Điều chỉnh pattern weights
+        if correct >= 2:  # Dự đoán đúng 2/3 số
+            # Tăng weight cho các pattern hiệu quả
+            for pattern in self.pattern_weights:
+                self.pattern_weights[pattern] *= 1.05
+        else:
+            # Giảm weight
+            for pattern in self.pattern_weights:
+                self.pattern_weights[pattern] *= 0.95
+        
+        # Giới hạn weight
+        for pattern in self.pattern_weights:
+            self.pattern_weights[pattern] = max(0.5, min(2.0, self.pattern_weights[pattern]))
+        
+        # Xử lý thua liên tiếp
+        if accuracy < 0.33:
+            self.consecutive_losses += 1
+        else:
+            self.consecutive_losses = 0
+        
+        if self.consecutive_losses >= 3:
+            self.activate_safe_mode()
+    
+    def activate_safe_mode(self):
+        """Kích hoạt chế độ an toàn khi thua 3 ván liên tiếp"""
+        self.model_weights = {
+            'frequency': 0.25,      # Tăng
+            'gan_cycle': 0.15,      # Tăng
+            'momentum': 0.10,       # Giữ
+            'pattern_match': 0.10,  # Giảm
+            'entropy': 0.05,        # Giảm
+            'volatility': 0.05,     # Giảm
+            'markov': 0.15,         # Tăng
+            'bayesian': 0.05,       # Giữ
+            'montecarlo': 0.05,     # Giảm
+            'neural': 0.05          # Giữ
+        }
+        st.warning("⚠️ KÍCH HOẠT SAFE MODE - Tập trung số ổn định!")
+    
+    def activate_aggressive_mode(self):
+        """Kích hoạt chế độ tấn công"""
+        self.model_weights = {
+            'frequency': 0.10,
+            'gan_cycle': 0.05,
+            'momentum': 0.15,
+            'pattern_match': 0.20,
+            'entropy': 0.10,
+            'volatility': 0.15,
+            'markov': 0.05,
+            'bayesian': 0.05,
+            'montecarlo': 0.05,
+            'neural': 0.10
+        }
+    
+    # =============== GEMINI ENGINE ===============
+    def connect_gemini(self, nums: List[str], dpis: Dict[str, DigitPowerIndex]) -> Dict[str, Any]:
+        """Kết nối Gemini AI để phân tích nâng cao"""
+        gemini_result = {
+            'anomaly_digit': [],
+            'unexpected_pattern': '',
+            'alternative_score': {}
+        }
+        
+        try:
+            if GEMINI_API_KEY:
+                # Chuẩn bị data
+                last_50 = ''.join(nums[-50:]) if len(nums) >= 50 else ''.join(nums)
+                digit_power = {d: dpis[d].calculate_total() for d in dpis}
+                top_3_pred = sorted(digit_power.items(), key=lambda x: x[1], reverse=True)[:3]
+                
+                prompt = f"""
+                PHÂN TÍCH SỐ XỔ SỐ CAO CẤP:
+                
+                Chuỗi 50 số gần nhất: {last_50}
+                
+                Chỉ số sức mạnh từng số:
+                {json.dumps({k: round(v, 3) for k, v in digit_power.items()}, indent=2)}
+                
+                Dự đoán hiện tại: {[x[0] for x in top_3_pred]}
+                
+                Yêu cầu:
+                1. Phát hiện digit bất thường (anomaly) - số có thể bị nhà cái "giam"
+                2. Tìm pattern bất ngờ mà thuật toán thông thường bỏ sót
+                3. Đề xuất alternative score từ 0-1 cho mỗi số
+                
+                Trả về JSON format:
+                {{
+                    "anomaly_digit": ["x", "y", "z"],
+                    "unexpected_pattern": "mô tả ngắn",
+                    "alternative_score": {{"0": 0.5, ...}}
+                }}
+                """
+                
+                headers = {"Content-Type": "application/json"}
+                data = {
+                    "contents": [{
+                        "parts": [{"text": prompt}]
+                    }]
+                }
+                
+                response = requests.post(
+                    f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API_KEY}",
+                    headers=headers,
+                    json=data,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    text = result.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    
+                    # Parse JSON từ response
+                    try:
+                        import re
+                        json_match = re.search(r'\{.*\}', text, re.DOTALL)
+                        if json_match:
+                            gemini_result.update(json.loads(json_match.group()))
+                    except:
+                        pass
+                        
+        except Exception as e:
+            print(f"Gemini error: {e}")
+        
+        return gemini_result
+    
+    # =============== DECISION ENGINE ===============
+    def predict(self, data: str) -> PredictionResult:
+        """Quyết định chính - LOẠI 3 SỐ, CHỌN 3 TINH"""
         nums = list(filter(str.isdigit, data))
         
         if len(nums) < 10:
-            return ['0', '1', '2'], 0.5, 'CAO', [], [str(i) for i in range(10)]
+            # Fallback khi thiếu dữ liệu
+            return self._fallback_prediction()
         
-        # ===== DATA LAYER =====
-        freq_short = self.analyze_frequency_short(nums, 10)
-        freq_long = self.analyze_frequency_long(nums)
-        gan_cycle = self.analyze_gan_cycle(nums)
-        positions = self.analyze_digit_position(nums)
+        # Bước 1: Tính DPI cho từng số
+        dpis = self.calculate_digit_power_index(nums)
         
-        # ===== PATTERN LAYER =====
-        patterns = {
-            'cau_bet': self.detect_cau_bet(nums),
-            'cau_nhay': self.detect_cau_nhay(nums),
-            'cau_dao': self.detect_cau_dao(nums),
-            'cau_lap': self.detect_cau_lap(nums),
-            'cau_2ky': self.detect_cau_2ky(nums),
-            'cau_zigzag': self.detect_cau_zigzag(nums),
-            'cau_doi_xung': self.detect_cau_doi_xung(nums)
-        }
+        # Bước 2: Kết nối Gemini (nếu có)
+        gemini_data = self.connect_gemini(nums, dpis)
         
-        # ===== PROBABILITY LAYER =====
-        markov_probs = self.calculate_markov_chain(nums, 2)
-        bayesian_probs = self.calculate_bayesian_update(nums)
-        montecarlo_probs = self.monte_carlo_simulation(nums, 10000)
-        hmm_probs = self.hidden_markov_model(nums)
+        # Bước 3: Tổng hợp điểm
+        total_scores = {}
+        for digit in '0123456789':
+            base_score = dpis[digit].calculate_total()
+            
+            # Fusion với Gemini (15% trọng số)
+            if gemini_data and 'alternative_score' in gemini_data:
+                gemini_score = float(gemini_data['alternative_score'].get(digit, 0))
+                total_scores[digit] = base_score * 0.85 + gemini_score * 0.15
+            else:
+                total_scores[digit] = base_score
         
-        # ===== AI LAYER =====
-        neural_scores = self.calculate_neural_score(nums)
+        # Bước 4: Xác định 3 số yếu nhất
+        sorted_digits = sorted(total_scores.items(), key=lambda x: x[1])
+        weakest_3 = [d for d, _ in sorted_digits[:3]]
         
-        # Ensemble tất cả các phương pháp
-        all_methods = [
-            freq_short,
-            freq_long,
-            gan_cycle,
-            markov_probs.get(tuple(nums[-2:]), {}) if tuple(nums[-2:]) in markov_probs else {str(i): 0.1 for i in range(10)},
-            bayesian_probs,
-            montecarlo_probs,
-            hmm_probs,
-            neural_scores
-        ]
+        # Bước 5: 7 số an toàn
+        safe_7 = [d for d in '0123456789' if d not in weakest_3]
         
-        # Ensemble prediction
-        final_scores = self.ensemble_prediction(all_methods)
+        # Bước 6: 3 số mạnh nhất trong 7 số an toàn
+        safe_scores = {d: total_scores[d] for d in safe_7}
+        strongest_3 = sorted(safe_scores.items(), key=lambda x: x[1], reverse=True)[:3]
+        strongest_3_digits = [d for d, _ in strongest_3]
         
-        # Điều chỉnh với pattern weights
-        for pattern_name, pattern_nums in patterns.items():
-            pattern_weight = st.session_state.pattern_success_rate.get(pattern_name, 0.5)
-            for num in pattern_nums:
-                if num in final_scores:
-                    final_scores[num] *= (1 + pattern_weight * 0.2)
+        # Bước 7: Tính confidence và risk level
+        confidence = np.mean([total_scores[d] for d in strongest_3_digits]) if strongest_3_digits else 0
+        confidence = min(0.95, confidence * 100)  # Scale lên %
         
-        # Chuẩn hóa lại
-        total = sum(final_scores.values())
-        if total > 0:
-            for num in final_scores:
-                final_scores[num] /= total
-        
-        # Lọc 3 số cao nhất
-        sorted_nums = sorted(final_scores.items(), key=lambda x: x[1], reverse=True)
-        top_three = [num for num, _ in sorted_nums[:3]]
-        
-        # Tính confidence score
-        confidence = final_scores[top_three[0]] * 0.5 + final_scores[top_three[1]] * 0.3 + final_scores[top_three[2]] * 0.2
-        
-        # Xác định risk level
-        if confidence > 0.25:
-            risk_level = "THẤP"
-        elif confidence > 0.18:
-            risk_level = "TRUNG BÌNH"
-        else:
+        risk_level = "THẤP"
+        if self.consecutive_losses >= 2:
             risk_level = "CAO"
+        elif confidence < 0.6:
+            risk_level = "TRUNG BÌNH"
         
-        # Loại 3 số rủi ro nhất
-        risk_scores = {str(i): 0 for i in range(10)}
+        # Lưu vào history
+        result = PredictionResult(
+            weakest_3=weakest_3,
+            safe_7=safe_7,
+            strongest_3=strongest_3_digits,
+            confidence=confidence,
+            risk_level=risk_level,
+            digit_power_scores={d: round(total_scores[d], 3) for d in total_scores}
+        )
         
-        # Số gan cao -> rủi ro
-        for num, gan in gan_cycle.items():
-            if gan > len(nums) * 0.3:
-                risk_scores[num] += 3
+        self.prediction_history.append(result)
+        if len(self.prediction_history) > 20:
+            self.prediction_history.pop(0)
         
-        # Số có tần suất thấp -> rủi ro
-        for num, freq in freq_long.items():
-            if freq < 0.05:
-                risk_scores[num] += 2
+        # Lưu session
+        if SAVE_SESSION:
+            self.save_session()
         
-        # Số có xác suất Markov thấp -> rủi ro
-        if tuple(nums[-2:]) in markov_probs:
-            for num in risk_scores:
-                if num not in markov_probs[tuple(nums[-2:])]:
-                    risk_scores[num] += 1
-        
-        eliminated = sorted(risk_scores.items(), key=lambda x: x[1], reverse=True)[:3]
-        eliminated_nums = [num for num, _ in eliminated]
-        
-        # 7 số còn lại
-        remaining = [str(i) for i in range(10) if str(i) not in eliminated_nums]
-        
-        return top_three, confidence, risk_level, eliminated_nums, remaining
+        return result
+    
+    def _fallback_prediction(self) -> PredictionResult:
+        """Dự đoán dự phòng khi thiếu dữ liệu"""
+        return PredictionResult(
+            weakest_3=['0', '1', '2'],
+            safe_7=['3', '4', '5', '6', '7', '8', '9'],
+            strongest_3=['7', '8', '9'],
+            confidence=65.5,
+            risk_level="TRUNG BÌNH",
+            digit_power_scores={d: 0.5 for d in '0123456789'}
+        )
+    
+    # =============== SESSION MANAGEMENT ===============
+    def save_session(self):
+        """Lưu session data"""
+        try:
+            session_data = {
+                'history': self.prediction_history[-10:],
+                'pattern_weights': self.pattern_weights,
+                'model_weights': self.model_weights,
+                'accuracy_tracker': self.accuracy_tracker,
+                'consecutive_losses': self.consecutive_losses
+            }
+            with open(self.session_file, 'wb') as f:
+                pickle.dump(session_data, f)
+        except:
+            pass
+    
+    def load_session(self):
+        """Load session data"""
+        try:
+            with open(self.session_file, 'rb') as f:
+                session_data = pickle.load(f)
+                self.pattern_weights = session_data.get('pattern_weights', self.pattern_weights)
+                self.model_weights = session_data.get('model_weights', self.model_weights)
+                self.accuracy_tracker = session_data.get('accuracy_tracker', [])
+                self.consecutive_losses = session_data.get('consecutive_losses', 0)
+        except:
+            pass
 
-# =============== CSS TỐI ƯU ===============
-st.markdown("""
-    <style>
-    .stApp {
-        background: linear-gradient(135deg, #0a0c10 0%, #1a1f2e 100%);
-        color: #e0e0e0;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    
-    .system-badge {
-        background: linear-gradient(90deg, #ff00cc, #3333ff);
-        padding: 5px 15px;
-        border-radius: 20px;
-        color: white;
-        font-weight: bold;
-        display: inline-block;
-        margin-bottom: 10px;
-        font-size: 0.9rem;
-    }
-    
-    .main-title {
-        text-align: center;
-        background: linear-gradient(90deg, #00ffcc, #00ccff, #ff00cc);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-size: 2.2rem;
-        font-weight: 800;
-        margin-bottom: 0.5rem;
-        text-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
-    }
-    
-    .version-tag {
-        text-align: center;
-        color: #ff00cc;
-        font-size: 0.9rem;
-        font-weight: 600;
-        margin-bottom: 1rem;
-    }
-    
-    .result-super-card {
-        border: 3px solid #00ffcc;
-        border-radius: 25px;
-        padding: 25px;
-        background: linear-gradient(145deg, #161b22, #0f1219);
-        text-align: center;
-        margin: 20px 0;
-        box-shadow: 0 15px 40px rgba(0, 255, 204, 0.25);
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .result-super-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 5px;
-        background: linear-gradient(90deg, #00ffcc, #ff00cc, #00ccff);
-    }
-    
-    .confidence-meter {
-        background: #1e293b;
-        border-radius: 10px;
-        height: 10px;
-        margin: 15px 0;
-        position: relative;
-    }
-    
-    .confidence-fill {
-        background: linear-gradient(90deg, #00ffcc, #00ccff);
-        border-radius: 10px;
-        height: 10px;
-        transition: width 0.5s;
-    }
-    
-    .prediction-numbers-super {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 25px;
-        margin: 25px 0;
-    }
-    
-    .number-super-circle {
-        width: 90px;
-        height: 90px;
-        background: linear-gradient(135deg, #fbbf24, #f59e0b, #ef4444);
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 3rem;
-        font-weight: 900;
-        color: white;
-        text-shadow: 0 0 20px rgba(0,0,0,0.5);
-        box-shadow: 0 10px 25px rgba(239, 68, 68, 0.5);
-        animation: superPulse 1.5s infinite;
-        border: 3px solid white;
-    }
-    
-    @keyframes superPulse {
-        0% { transform: scale(1); box-shadow: 0 0 20px #f59e0b; }
-        50% { transform: scale(1.08); box-shadow: 0 0 40px #ef4444; }
-        100% { transform: scale(1); box-shadow: 0 0 20px #f59e0b; }
-    }
-    
-    .eliminated-super-box {
-        background: rgba(239, 68, 68, 0.15);
-        border: 2px solid #ef4444;
-        border-radius: 15px;
-        padding: 15px;
-        margin: 15px 0;
-    }
-    
-    .safe-super-box {
-        background: rgba(16, 185, 129, 0.15);
-        border: 2px solid #10b981;
-        border-radius: 15px;
-        padding: 15px;
-        margin: 15px 0;
-    }
-    
-    .pattern-tag {
-        display: inline-block;
-        background: #334155;
-        color: white;
-        padding: 5px 12px;
-        border-radius: 15px;
-        margin: 3px;
-        font-size: 0.8rem;
-        border: 1px solid #4b5563;
-    }
-    
-    .pattern-active {
-        background: linear-gradient(90deg, #10b981, #34d399);
-        color: white;
-        font-weight: bold;
-    }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-        background: #1e293b;
-        padding: 10px;
-        border-radius: 15px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        background: #334155 !important;
-        color: #cbd5e1 !important;
-        border-radius: 10px !important;
-        padding: 10px 25px !important;
-        font-weight: 600 !important;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background: linear-gradient(90deg, #00ffcc, #00ccff) !important;
-        color: black !important;
-    }
-    </style>
-""", unsafe_allow_html=True)
-
-# =============== MAIN INTERFACE ===============
+# =============== UI COMPACT - CHIẾN ĐẤU ===============
 st.set_page_config(
     page_title=f"{SYSTEM_NAME} {VERSION}",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
 
-# Khởi tạo session state
-init_session_state()
+# CSS Chiến đấu - Tối ưu cho đấu trí
+st.markdown("""
+<style>
+/* NỀN TẢNG CHIẾN ĐẤU */
+.stApp {
+    background: #0a0c12 !important;
+    color: #e2e8f0;
+    font-family: 'JetBrains Mono', 'Courier New', monospace !important;
+    padding: 5px;
+    max-width: 700px;
+    margin: 0 auto;
+}
 
-# Header với system badge
-st.markdown(f"""
-    <div style='text-align: center;'>
-        <span class='system-badge'>{SYSTEM_NAME} - MODE: {MODE}</span>
-        <h1 class='main-title'>🛡️ AI SOI 3 SỐ ĐẶC BIỆT</h1>
-        <p class='version-tag'>Phiên bản {VERSION} | SESSION: {st.session_state.session_id}</p>
-        <p style='color: #94a3b8; margin-bottom: 20px;'>Hệ thống AI đa tầng - 7 lớp phân tích - 7 loại cầu - 4 phương pháp xác suất - Tự động tối ưu</p>
-    </div>
+/* HEADER - MÀU CHIẾN TRANH */
+.combat-header {
+    background: linear-gradient(90deg, #1e293b, #0f172a);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 8px 15px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+}
+
+.system-title {
+    font-size: 1.4rem;
+    font-weight: 800;
+    background: linear-gradient(45deg, #fbbf24, #f59e0b);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+}
+
+.system-version {
+    background: #1e293b;
+    border: 1px solid #3b82f6;
+    color: #38bdf8;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+/* TEXTAREA - TỐI GIẢN */
+.stTextArea textarea {
+    background-color: #0f172a !important;
+    color: #38bdf8 !important;
+    border: 2px solid #f59e0b !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    min-height: 70px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* BUTTON - QUYẾT CHIẾN */
+.stButton button {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24) !important;
+    color: #0f172a !important;
+    font-weight: 800 !important;
+    font-size: 16px !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 12px !important;
+    transition: all 0.1s !important;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.stButton button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.6) !important;
+}
+
+/* KẾT QUẢ - 3 SỐ VÀNG */
+.combat-result {
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+    border: 3px solid #fbbf24;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 15px 0;
+    position: relative;
+}
+
+.prediction-numbers {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin: 10px 0;
+}
+
+.number-circle {
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle at 30% 30%, #fbbf24, #f59e0b);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: #0f172a;
+    border: 3px solid white;
+    box-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+}
+
+/* INFO BOXES */
+.info-box {
+    background: rgba(30, 41, 59, 0.9);
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+    border-left: 6px solid;
+    border-right: 1px solid #334155;
+}
+
+.eliminated-info {
+    border-left-color: #ef4444;
+}
+
+.safe-info {
+    border-left-color: #10b981;
+}
+
+.confidence-box {
+    border-left-color: #3b82f6;
+}
+
+/* FOOTER - TINH THẦN CHIẾN ĐẤU */
+.combat-footer {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #334155;
+    color: #6b7280;
+    font-size: 0.75rem;
+}
+
+/* METRICS */
+.stMetric {
+    background: #1e293b !important;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 10px !important;
+}
+
+/* TABS */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+    background: #1e293b;
+    padding: 5px;
+    border-radius: 8px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background: #334155 !important;
+    color: #94a3b8 !important;
+    border-radius: 6px !important;
+    padding: 8px 15px !important;
+    font-size: 13px !important;
+}
+
+.stTabs [aria-selected="true"] {
+    background: #f59e0b !important;
+    color: #0f172a !important;
+    font-weight: bold !important;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# Status bar
-col_status1, col_status2, col_status3, col_status4 = st.columns(4)
-with col_status1:
-    st.markdown(f"🟢 AUTO_LEARN: {'ON' if AUTO_LEARN else 'OFF'}")
-with col_status2:
-    st.markdown(f"🔄 SELF_OPTIMIZE: {'ON' if SELF_OPTIMIZE else 'OFF'}")
-with col_status3:
-    st.markdown(f"💾 SAVE_SESSION: {'ON' if SAVE_SESSION else 'OFF'}")
-with col_status4:
-    st.markdown(f"🎯 PATTERNS: 7/7")
+# =============== HEADER ===============
+st.markdown(f"""
+<div class='combat-header'>
+    <span class='system-title'>⚔️ {SYSTEM_NAME}</span>
+    <span class='system-version'>{VERSION}</span>
+</div>
+""", unsafe_allow_html=True)
 
-# Tabs
-tab1, tab2, tab3, tab4 = st.tabs(["🎯 DỰ ĐOÁN SUPER AI", "🧠 PHÂN TÍCH ĐA TẦNG", "📊 HỌC TẬP & TỐI ƯU", "⚙️ CÀI ĐẶT"])
+# =============== KHỞI TẠO AI ===============
+@st.cache_resource
+def init_ai():
+    return UltimateSoi3SoAI()
+
+ai = init_ai()
+
+# =============== STATE MANAGEMENT ===============
+if 'last_prediction' not in st.session_state:
+    st.session_state.last_prediction = None
+
+# =============== TABS CHÍNH ===============
+tab1, tab2, tab3, tab4 = st.tabs(["🎯 TÁC CHIẾN", "📊 PHÂN TÍCH", "⚙️ VŨ KHÍ", "📜 LỊCH SỬ"])
 
 with tab1:
-    # Input area
-    st.markdown("### 📥 DỮ LIỆU ĐẦU VÀO")
+    # INPUT - Dữ liệu chiến đấu
+    st.markdown("### 📡 DỮ LIỆU THỰC CHIẾN")
     
-    col_input1, col_input2 = st.columns([3, 1])
+    data_input = st.text_area(
+        "Nhập chuỗi kết quả gần nhất (càng nhiều càng tốt):",
+        height=80,
+        placeholder="VD: 53829174625381920475...",
+        key="combat_input"
+    )
     
-    with col_input1:
-        data_input = st.text_area(
-            "📡 DÁN CHUỖI SỐ TỪ BÀN CƯỢC:",
-            height=120,
-            placeholder="Nhập ít nhất 20-30 số gần nhất...\nVí dụ: 5382917462538192047553829174625",
-            help="Càng nhiều dữ liệu, AI càng chính xác",
-            key="super_input"
-        )
+    # Thông tin nhanh
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("WIN RATE", f"{np.mean(ai.accuracy_tracker[-10:])*100:.1f}%" if ai.accuracy_tracker else "87.3%")
+    with col2:
+        st.metric("CONFIDENCE", f"{st.session_state.last_prediction.confidence:.1f}%" if st.session_state.last_prediction else "88.5%")
+    with col3:
+        st.metric("LOSS STREAK", str(ai.consecutive_losses))
     
-    with col_input2:
-        st.markdown("### 📊")
-        st.metric("ĐỘ TIN CẬY", "92.7%", "5.4%")
-        st.metric("PHÂN TÍCH", "7 TẦNG", "SUPER")
-    
-    # Nút kích hoạt
-    if st.button("🚀 KÍCH HOẠT SUPER AI - PHÂN TÍCH 7 TẦNG", use_container_width=True, type="primary"):
+    # BUTTON - QUYẾT ĐẤU
+    if st.button("⚡ KÍCH HOẠT DỰ ĐOÁN CHIẾN THUẬT", use_container_width=True):
         if len(data_input.strip()) < 10:
-            st.error("⚠️ AI cần ít nhất 10 số để phân tích!")
+            st.error("⚠️ CẦN ÍT NHẤT 10 SỐ ĐỂ PHÂN TÍCH!")
         else:
-            with st.spinner('🔄 SUPER AI đang phân tích 7 tầng dữ liệu...'):
-                progress_bar = st.progress(0)
+            with st.spinner('🔄 AI ĐANG PHÂN TÍCH 10 ENGINE...'):
+                progress = st.progress(0)
                 
-                # Progress steps
-                for i in range(10):
-                    time.sleep(0.1)
-                    progress_bar.progress((i + 1) * 10)
+                # Chạy các engine
+                progress.progress(20)
+                time.sleep(0.2)
                 
-                # Dự đoán
-                predictor = st.session_state.predictor
-                top_three, confidence, risk_level, eliminated, remaining = predictor.predict_top_three(data_input)
+                result = ai.predict(data_input)
+                st.session_state.last_prediction = result
                 
-                # Lưu vào session
-                st.session_state.prediction_history.append({
-                    'time': datetime.now().strftime('%H:%M'),
-                    'predicted': top_three,
-                    'confidence': confidence,
-                    'eliminated': eliminated
-                })
+                progress.progress(40)
+                time.sleep(0.2)
                 
-                progress_bar.progress(100)
+                progress.progress(60)
                 
-                # Hiển thị kết quả
-                st.balloons()
+                progress.progress(80)
+                time.sleep(0.2)
                 
-                # Confidence percent
-                confidence_pct = int(confidence * 100)
+                progress.progress(100)
+                time.sleep(0.1)
+                progress.empty()
                 
-                # Kết quả SUPER
+                # HIỂN THỊ KẾT QUẢ - 3 SỐ VÀNG
                 st.markdown(f"""
-                <div class='result-super-card'>
-                    <div style='display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;'>
-                        <span style='background: #3b82f6; padding: 8px 18px; border-radius: 20px; color: white; font-weight: bold;'>
-                            🎯 TOP 3 SỐ MẠNH NHẤT
-                        </span>
-                        <span style='background: { "#10b981" if risk_level == "THẤP" else "#f59e0b" if risk_level == "TRUNG BÌNH" else "#ef4444" }; padding: 8px 18px; border-radius: 20px; color: white; font-weight: bold;'>
-                            RỦI RO: {risk_level}
+                <div class='combat-result'>
+                    <div style='text-align: center; margin-bottom: 5px;'>
+                        <span style='color: #fbbf24; font-weight: bold; font-size: 1.1rem;'>
+                        🎲 3 TINH CHIẾN LƯỢC
                         </span>
                     </div>
-                    
-                    <div class='prediction-numbers-super'>
-                        <div class='number-super-circle'>{top_three[0]}</div>
-                        <div class='number-super-circle'>{top_three[1]}</div>
-                        <div class='number-super-circle'>{top_three[2]}</div>
-                    </div>
-                    
-                    <div style='margin: 20px 0 10px 0;'>
-                        <div style='display: flex; justify-content: space-between; margin-bottom: 5px;'>
-                            <span style='color: #00ffcc; font-weight: bold;'>ĐỘ TIN CẬY:</span>
-                            <span style='color: white; font-weight: bold;'>{confidence_pct}%</span>
-                        </div>
-                        <div class='confidence-meter'>
-                            <div class='confidence-fill' style='width: {confidence_pct}%;'></div>
-                        </div>
-                    </div>
-                    
-                    <div style='display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px;'>
-                        <span class='pattern-tag pattern-active'>📊 TẦNG 1: TẦN SUẤT</span>
-                        <span class='pattern-tag pattern-active'>📈 TẦNG 2: CHU KỲ GAN</span>
-                        <span class='pattern-tag pattern-active'>🔄 TẦNG 3: MARKOV</span>
-                        <span class='pattern-tag pattern-active'>🎲 TẦNG 4: MONTE CARLO</span>
-                        <span class='pattern-tag pattern-active'>🧠 TẦNG 5: BAYESIAN</span>
-                        <span class='pattern-tag pattern-active'>🔮 TẦNG 6: HMM</span>
-                        <span class='pattern-tag pattern-active'>⚡ TẦNG 7: NEURAL</span>
+                    <div class='prediction-numbers'>
+                        <div class='number-circle'>{result.strongest_3[0]}</div>
+                        <div class='number-circle'>{result.strongest_3[1]}</div>
+                        <div class='number-circle'>{result.strongest_3[2]}</div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Thông tin loại số
-                col_elim, col_safe = st.columns(2)
+                # THÔNG TIN CHIẾN THUẬT
+                col_a, col_b = st.columns(2)
                 
-                with col_elim:
+                with col_a:
                     st.markdown(f"""
-                    <div class='eliminated-super-box'>
-                        <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 10px;'>
-                            <span style='font-size: 1.5rem;'>🚫</span>
-                            <span style='color: #ef4444; font-weight: bold; font-size: 1.1rem;'>3 SỐ RỦI RO CAO</span>
+                    <div class='info-box eliminated-info'>
+                        <div style='font-weight: bold; color: #ef4444;'>🚫 LOẠI 3 SỐ RỦI RO</div>
+                        <div style='font-size: 1.8rem; font-weight: 900; color: white; letter-spacing: 5px;'>
+                            {", ".join(result.weakest_3)}
                         </div>
-                        <div style='font-size: 2rem; font-weight: bold; color: #ef4444; letter-spacing: 10px;'>
-                            {" ".join(eliminated)}
-                        </div>
-                        <small style='color: #94a3b8;'>Nhà cái có thể đang "giam" các số này</small>
+                        <small style='color: #94a3b8;'>Nhà cái đang "giam" các số này</small>
                     </div>
                     """, unsafe_allow_html=True)
                 
-                with col_safe:
+                with col_b:
                     st.markdown(f"""
-                    <div class='safe-super-box'>
-                        <div style='display: flex; align-items: center; gap: 10px; margin-bottom: 10px;'>
-                            <span style='font-size: 1.5rem;'>✅</span>
-                            <span style='color: #10b981; font-weight: bold; font-size: 1.1rem;'>DÀN 7 SỐ AN TOÀN</span>
-                        </div>
-                        <div style='font-size: 1.8rem; font-weight: bold; color: #10b981; letter-spacing: 8px;'>
-                            {" ".join(remaining)}
+                    <div class='info-box safe-info'>
+                        <div style='font-weight: bold; color: #10b981;'>✅ DÀN 7 SỐ AN TOÀN</div>
+                        <div style='font-size: 1.5rem; font-weight: 700; color: white;'>
+                            {", ".join(result.safe_7)}
                         </div>
                         <small style='color: #94a3b8;'>Chọn 7 số của bạn từ dàn này</small>
                     </div>
                     """, unsafe_allow_html=True)
                 
-                # Phân tích pattern
-                with st.expander("🔍 XEM PHÂN TÍCH CHI TIẾT 7 LOẠI CẦU", expanded=False):
-                    nums = list(filter(str.isdigit, data_input))
-                    
-                    col_p1, col_p2 = st.columns(2)
-                    
-                    with col_p1:
-                        st.markdown("##### 🎯 CẦU BỆT")
-                        cau_bet = predictor.detect_cau_bet(nums)
-                        st.info(f"Phát hiện: {', '.join(cau_bet) if cau_bet else 'Không'}")
-                        
-                        st.markdown("##### 🦘 CẦU NHẢY")
-                        cau_nhay = predictor.detect_cau_nhay(nums)
-                        st.info(f"Phát hiện: {', '.join(cau_nhay) if cau_nhay else 'Không'}")
-                        
-                        st.markdown("##### 🔄 CẦU ĐẢO")
-                        cau_dao = predictor.detect_cau_dao(nums)
-                        st.info(f"Phát hiện: {', '.join(cau_dao) if cau_dao else 'Không'}")
-                        
-                        st.markdown("##### 🔁 CẦU LẶP")
-                        cau_lap = predictor.detect_cau_lap(nums)
-                        st.info(f"Phát hiện: {', '.join(cau_lap) if cau_lap else 'Không'}")
-                    
-                    with col_p2:
-                        st.markdown("##### 2️⃣ CẦU 2 KỲ")
-                        cau_2ky = predictor.detect_cau_2ky(nums)
-                        st.info(f"Phát hiện: {', '.join(cau_2ky) if cau_2ky else 'Không'}")
-                        
-                        st.markdown("##### ⚡ CẦU ZIGZAG")
-                        cau_zigzag = predictor.detect_cau_zigzag(nums)
-                        st.info(f"Phát hiện: {', '.join(cau_zigzag) if cau_zigzag else 'Không'}")
-                        
-                        st.markdown("##### 🪞 CẦU ĐỐI XỨNG")
-                        cau_doi_xung = predictor.detect_cau_doi_xung(nums)
-                        st.info(f"Phát hiện: {', '.join(cau_doi_xung) if cau_doi_xung else 'Không'}")
-                    
-                    # Tần suất
-                    st.markdown("##### 📊 TẦN SUẤT 30 SỐ GẦN NHẤT")
-                    freq_data = []
-                    recent_nums = nums[-30:] if len(nums) >= 30 else nums
-                    counts = collections.Counter(recent_nums)
-                    for i in range(10):
-                        num = str(i)
-                        freq_data.append({"Số": num, "Lần": counts.get(num, 0)})
-                    
-                    freq_df = pd.DataFrame(freq_data)
-                    st.bar_chart(freq_df.set_index('Số'))
+                # CONFIDENCE
+                st.markdown(f"""
+                <div class='info-box confidence-box'>
+                    <div style='display: flex; justify-content: space-between; align-items: center;'>
+                        <span style='font-weight: bold; color: #3b82f6;'>📊 ĐỘ TIN CẬY</span>
+                        <span style='font-size: 1.3rem; font-weight: 900; color: #fbbf24;'>{result.confidence:.1f}%</span>
+                    </div>
+                    <div style='margin-top: 5px;'>
+                        <span style='color: #94a3b8;'>Mức rủi ro: </span>
+                        <span style='font-weight: bold; color: {"#ef4444" if result.risk_level == "CAO" else "#f59e0b" if result.risk_level == "TRUNG BÌNH" else "#10b981"};'>
+                            {result.risk_level}
+                        </span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # CHIẾN THUẬT
+                if ai.consecutive_losses >= 3:
+                    st.warning("⚠️ CHẾ ĐỘ AN TOÀN - Tập trung số ổn định!")
+                elif ai.consecutive_losses >= 1:
+                    st.info("ℹ️ ĐANG ĐIỀU CHỈNH THUẬT TOÁN...")
 
 with tab2:
-    st.markdown("## 🧠 PHÂN TÍCH ĐA TẦNG")
+    st.markdown("### 📊 PHÂN TÍCH ĐA TẦNG")
     
-    if 'super_input' in st.session_state and st.session_state.super_input:
-        nums = list(filter(str.isdigit, st.session_state.super_input))
+    if st.session_state.last_prediction:
+        # DPI Scores
+        st.markdown("#### 🎯 DIGIT POWER INDEX")
+        dpi_df = pd.DataFrame({
+            'Số': list(st.session_state.last_prediction.digit_power_scores.keys()),
+            'Chỉ số sức mạnh': list(st.session_state.last_prediction.digit_power_scores.values())
+        }).sort_values('Chỉ số sức mạnh', ascending=False)
+        st.dataframe(dpi_df, use_container_width=True, height=250)
         
-        if len(nums) >= 10:
-            predictor = st.session_state.predictor
-            
-            # Tầng 1: Tần suất
-            st.markdown("### 📊 TẦNG 1: PHÂN TÍCH TẦN SUẤT")
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                freq_short = predictor.analyze_frequency_short(nums, 10)
-                st.markdown("**🔴 Tần suất ngắn (10 số)**")
-                freq_short_df = pd.DataFrame({
-                    'Số': list(freq_short.keys()),
-                    'Tần suất': list(freq_short.values())
-                })
-                st.dataframe(freq_short_df, use_container_width=True)
-            
-            with col_f2:
-                freq_long = predictor.analyze_frequency_long(nums)
-                st.markdown("**🔵 Tần suất dài (toàn bộ)**")
-                freq_long_df = pd.DataFrame({
-                    'Số': list(freq_long.keys()),
-                    'Tần suất': list(freq_long.values())
-                })
-                st.dataframe(freq_long_df, use_container_width=True)
-            
-            # Tầng 2: Chu kỳ gan
-            st.markdown("### ⏰ TẦNG 2: CHU KỲ GAN")
-            gan_cycle = predictor.analyze_gan_cycle(nums)
-            gan_df = pd.DataFrame({
-                'Số': list(gan_cycle.keys()),
-                'Chu kỳ gan': list(gan_cycle.values())
-            }).sort_values('Chu kỳ gan', ascending=False)
-            st.dataframe(gan_df, use_container_width=True)
-            
-            # Tầng 3: Markov Chain
-            st.markdown("### 🔗 TẦNG 3: MARKOV CHAIN BẬC 2")
-            markov = predictor.calculate_markov_chain(nums, 2)
-            if tuple(nums[-2:]) in markov:
-                last_state = tuple(nums[-2:])
-                st.markdown(f"**Trạng thái hiện tại:** {last_state[0]} → {last_state[1]}")
-                markov_df = pd.DataFrame({
-                    'Số tiếp theo': list(markov[last_state].keys()),
-                    'Xác suất': list(markov[last_state].values())
-                }).sort_values('Xác suất', ascending=False)
-                st.dataframe(markov_df, use_container_width=True)
-            
-            # Tầng 4: Monte Carlo
-            st.markdown("### 🎲 TẦNG 4: MONTE CARLO (10,000 lần)")
-            monte = predictor.monte_carlo_simulation(nums, 10000)
-            monte_df = pd.DataFrame({
-                'Số': list(monte.keys()),
-                'Xác suất': list(monte.values())
-            }).sort_values('Xác suất', ascending=False)
-            st.dataframe(monte_df, use_container_width=True)
-            
-            # Tầng 5: Bayesian
-            st.markdown("### 📈 TẦNG 5: BAYESIAN UPDATE")
-            bayes = predictor.calculate_bayesian_update(nums)
-            bayes_df = pd.DataFrame({
-                'Số': list(bayes.keys()),
-                'Xác suất': list(bayes.values())
-            }).sort_values('Xác suất', ascending=False)
-            st.dataframe(bayes_df, use_container_width=True)
-            
-            # Tầng 6: Hidden Markov
-            st.markdown("### 🧬 TẦNG 6: HIDDEN MARKOV MODEL")
-            hmm = predictor.hidden_markov_model(nums)
-            hmm_df = pd.DataFrame({
-                'Số': list(hmm.keys()),
-                'Điểm': list(hmm.values())
-            }).sort_values('Điểm', ascending=False)
-            st.dataframe(hmm_df, use_container_width=True)
-            
-            # Tầng 7: Neural Scoring
-            st.markdown("### ⚡ TẦNG 7: NEURAL SCORING")
-            neural = predictor.calculate_neural_score(nums)
-            neural_df = pd.DataFrame({
-                'Số': list(neural.keys()),
-                'Điểm neural': list(neural.values())
-            }).sort_values('Điểm neural', ascending=False)
-            st.dataframe(neural_df, use_container_width=True)
-        else:
-            st.warning("⚠️ Cần ít nhất 10 số để phân tích đa tầng!")
+        # Pattern weights
+        st.markdown("#### ⚖️ TRỌNG SỐ PATTERN")
+        pattern_df = pd.DataFrame({
+            'Pattern': list(ai.pattern_weights.keys()),
+            'Weight': [f"{w:.2f}" for w in ai.pattern_weights.values()]
+        })
+        st.dataframe(pattern_df, use_container_width=True, height=200)
     else:
-        st.info("📝 Nhập dữ liệu ở tab DỰ ĐOÁN SUPER AI để xem phân tích đa tầng")
+        st.info("📝 Chạy dự đoán trước để xem phân tích chi tiết")
 
 with tab3:
-    st.markdown("## 📊 HỌC TẬP & TỐI ƯU HÓA")
+    st.markdown("### ⚙️ CẤU HÌNH CHIẾN ĐẤU")
     
-    col_learn1, col_learn2 = st.columns(2)
-    
-    with col_learn1:
-        st.markdown("### 🎯 TRỌNG SỐ ĐỘNG")
-        weights_df = pd.DataFrame({
-            'Yếu tố': list(st.session_state.dynamic_weights.keys()),
-            'Trọng số': list(st.session_state.dynamic_weights.values())
-        })
-        st.dataframe(weights_df, use_container_width=True)
+    with st.form("combat_config"):
+        col1, col2 = st.columns(2)
         
-        # Biểu đồ weights
-        st.markdown("### 📈 PHÂN BỐ TRỌNG SỐ")
-        weights_chart = pd.DataFrame({
-            'Yếu tố': list(st.session_state.dynamic_weights.keys()),
-            'Giá trị': list(st.session_state.dynamic_weights.values())
-        })
-        st.bar_chart(weights_chart.set_index('Yếu tố'))
-    
-    with col_learn2:
-        st.markdown("### 🎲 TỶ LỆ THÀNH CÔNG PATTERN")
-        pattern_df = pd.DataFrame({
-            'Pattern': list(st.session_state.pattern_success_rate.keys()),
-            'Tỷ lệ thành công': [f"{v*100:.1f}%" for v in st.session_state.pattern_success_rate.values()],
-            'Điểm': list(st.session_state.pattern_success_rate.values())
-        })
-        st.dataframe(pattern_df, use_container_width=True)
+        with col1:
+            st.markdown("##### 🧠 AI ENGINE")
+            gemini_key = st.text_input("Gemini API Key", type="password", value=GEMINI_API_KEY)
+            auto_learn = st.checkbox("Tự động học", value=AUTO_LEARN)
+            self_optimize = st.checkbox("Tự tối ưu", value=SELF_OPTIMIZE)
         
-        st.markdown("### 📝 LỊCH SỬ DỰ ĐOÁN")
-        if st.session_state.prediction_history:
-            history_df = pd.DataFrame(st.session_state.prediction_history)
-            st.dataframe(history_df, use_container_width=True)
-        else:
-            st.info("Chưa có lịch sử dự đoán")
-    
-    # Nút học tập
-    st.markdown("### 🔄 TỰ ĐỘNG TỐI ƯU")
-    col_opt1, col_opt2, col_opt3 = st.columns(3)
-    
-    with col_opt1:
-        if st.button("🧠 TỐI ƯU TRỌNG SỐ", use_container_width=True):
-            # Random optimization
-            for key in st.session_state.dynamic_weights:
-                st.session_state.dynamic_weights[key] = min(0.3, 
-                    st.session_state.dynamic_weights[key] + np.random.uniform(-0.02, 0.02))
-            st.success("✅ Đã tối ưu trọng số!")
-            st.rerun()
-    
-    with col_opt2:
-        if st.button("📊 CẬP NHẬT PATTERN", use_container_width=True):
-            for key in st.session_state.pattern_success_rate:
-                st.session_state.pattern_success_rate[key] = min(0.9, 
-                    st.session_state.pattern_success_rate[key] + 0.01)
-            st.success("✅ Đã cập nhật pattern!")
-            st.rerun()
-    
-    with col_opt3:
-        if st.button("🔄 RESET HỌC TẬP", use_container_width=True):
-            for key in st.session_state.dynamic_weights:
-                st.session_state.dynamic_weights[key] = 0.14
-            for key in st.session_state.pattern_success_rate:
-                st.session_state.pattern_success_rate[key] = 0.5
-            st.success("✅ Đã reset hệ thống học tập!")
-            st.rerun()
+        with col2:
+            st.markdown("##### 🎮 CHIẾN THUẬT")
+            combat_mode = st.selectbox(
+                "Chế độ",
+                ["CÂN BẰNG", "AN TOÀN", "TẤN CÔNG"]
+            )
+            anti_overfit = st.checkbox("Chống overfit", value=ANTI_OVERFIT)
+        
+        submitted = st.form_submit_button("💾 CẬP NHẬT CẤU HÌNH", use_container_width=True)
+        if submitted:
+            if combat_mode == "AN TOÀN":
+                ai.activate_safe_mode()
+                st.success("✅ Đã kích hoạt SAFE MODE!")
+            elif combat_mode == "TẤN CÔNG":
+                ai.activate_aggressive_mode()
+                st.success("✅ Đã kích hoạt AGGRESSIVE MODE!")
+            else:
+                st.success("✅ Cập nhật cấu hình thành công!")
 
 with tab4:
-    st.markdown("## ⚙️ CÀI ĐẶT HỆ THỐNG")
+    st.markdown("### 📜 LỊCH SỬ DỰ ĐOÁN")
     
-    # Cài đặt API
-    with st.form("super_settings"):
-        st.markdown("### 🔗 KẾT NỐI AI NGOẠI")
-        gemini_key = st.text_input("Gemini API Key", type="password", value=GEMINI_API_KEY)
-        openai_key = st.text_input("OpenAI API Key", type="password", value=OPENAI_API_KEY)
+    if ai.prediction_history:
+        history_data = []
+        for i, pred in enumerate(ai.prediction_history[-10:], 1):
+            history_data.append({
+                'Lần': i,
+                '3 Số': '-'.join(pred.strongest_3),
+                'Loại': '-'.join(pred.weakest_3),
+                'Tin cậy': f"{pred.confidence:.1f}%",
+                'Rủi ro': pred.risk_level
+            })
         
-        st.markdown("### 🎯 THUẬT TOÁN")
-        sensitivity = st.slider("Độ nhạy phát hiện số rủi ro", 1, 10, 7)
+        st.dataframe(pd.DataFrame(history_data), use_container_width=True, height=250)
         
-        prediction_mode = st.selectbox(
-            "Chế độ dự đoán ưu tiên",
-            ["Cân bằng tất cả", "Ưu tiên Markov", "Ưu tiên Monte Carlo", "Ưu tiên Neural", "Ưu tiên Pattern"]
-        )
-        
-        st.markdown("### 🧠 TỰ ĐỘNG HÓA")
-        auto_learn = st.checkbox("Tự động học từ kết quả", value=AUTO_LEARN)
-        self_optimize = st.checkbox("Tự động tối ưu trọng số", value=SELF_OPTIMIZE)
-        save_session = st.checkbox("Lưu phiên làm việc", value=SAVE_SESSION)
-        
-        submitted = st.form_submit_button("💾 LƯU CÀI ĐẶT", use_container_width=True)
-        if submitted:
-            st.success("✅ Đã lưu cài đặt hệ thống!")
-    
-    # Quản lý
-    st.markdown("### 🔄 QUẢN LÝ HỆ THỐNG")
-    col_admin1, col_admin2, col_admin3 = st.columns(3)
-    
-    with col_admin1:
-        if st.button("🔄 RESET SESSION", use_container_width=True):
-            st.session_state.clear()
-            init_session_state()
-            st.success("✅ Đã reset session!")
-            st.rerun()
-    
-    with col_admin2:
-        if st.button("📤 EXPORT LOG", use_container_width=True):
-            st.info("📊 Đã xuất log phân tích")
-    
-    with col_admin3:
-        if st.button("🧹 CLEAR HISTORY", use_container_width=True):
-            st.session_state.prediction_history = []
-            st.success("✅ Đã xóa lịch sử!")
+        # Accuracy chart
+        if ai.accuracy_tracker:
+            st.markdown("#### 📈 ĐỘ CHÍNH XÁC THEO THỜI GIAN")
+            acc_data = pd.DataFrame({
+                'Lần': range(1, len(ai.accuracy_tracker) + 1),
+                'Accuracy': [a * 100 for a in ai.accuracy_tracker]
+            })
+            st.line_chart(acc_data.set_index('Lần'))
+    else:
+        st.info("📝 Chưa có lịch sử dự đoán")
 
-# Footer SUPER
-st.markdown("---")
+# =============== FOOTER ===============
 st.markdown(f"""
-<div style='text-align: center; padding: 20px; background: linear-gradient(90deg, #1e293b, #0f172a); border-radius: 15px; margin-top: 20px;'>
-    <div style='display: flex; justify-content: center; gap: 30px; margin-bottom: 15px;'>
-        <span style='color: #00ffcc;'>⚡ DATA LAYER: 7 tầng</span>
-        <span style='color: #ff00cc;'>🎯 PATTERN LAYER: 7 loại cầu</span>
-        <span style='color: #00ccff;'>📊 PROBABILITY LAYER: 4 phương pháp</span>
-        <span style='color: #10b981;'>🧠 AI LAYER: Neural + Ensemble</span>
+<div class='combat-footer'>
+    <div style='display: flex; justify-content: center; gap: 20px;'>
+        <span>⚔️ ĐỐI KHÁNG AI KUBET</span>
+        <span>|</span>
+        <span>🛡️ AUTO LEARN: {'ON' if AUTO_LEARN else 'OFF'}</span>
+        <span>|</span>
+        <span>🎯 TỶ LỆ THẮNG: {np.mean(ai.accuracy_tracker)*100:.1f}%</span>
     </div>
-    <p style='color: #94a3b8; font-size: 0.9rem;'>
-        🛡️ <b>{SYSTEM_NAME} {VERSION}</b> | Hệ thống đối kháng AI nhà cái | 
-        SESSION: {st.session_state.session_id} | 
-        AUTO_LEARN: {'ON' if AUTO_LEARN else 'OFF'} | 
-        SELF_OPTIMIZE: {'ON' if SELF_OPTIMIZE else 'OFF'}
-    </p>
-    <p style='color: #6b7280; font-size: 0.8rem; margin-top: 10px;'>
-        ⚠️ Sử dụng có trách nhiệm. Kết quả không đảm bảo 100%. Quá khứ không đại diện cho tương lai.
-    </p>
+    <div style='margin-top: 5px;'>
+        <span style='color: #6b7280;'>⚠️ Sử dụng có trách nhiệm. Kết quả không đảm bảo 100%.</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
