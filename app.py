@@ -2,11 +2,18 @@ import streamlit as st
 import re
 import json
 import numpy as np
+import google.generativeai as genai
 from collections import Counter
 from pathlib import Path
 
-# ================= CONFIG VĨNH VIỄN =================
-DATA_FILE = "titan_v12_fast.json"
+# ================= CẤU HÌNH GEMINI AI =================
+# Anh dán API Key của anh vào đây nhé
+GEMINI_API_KEY = "YOUR_GEMINI_API_KEY" 
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+# ================= DATA MANAGEMENT =================
+DATA_FILE = "titan_v13_neural.json"
 
 def load_db():
     if Path(DATA_FILE).exists():
@@ -22,109 +29,99 @@ def save_db(data):
 if "history" not in st.session_state:
     st.session_state.history = load_db()
 
-# ================= UI FAST-COMBAT =================
-st.set_page_config(page_title="TITAN v12.0 FAST", layout="centered")
+# ================= UI & STYLE =================
+st.set_page_config(page_title="TITAN v13.0 NEURAL", layout="centered")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #04090f; color: #00ffcc; }
+    .stApp { background-color: #050a10; color: #00ffcc; }
     .stButton > button {
         background: linear-gradient(135deg, #00ffcc 0%, #0055ff 100%);
-        color: black; border: none; font-weight: 900; border-radius: 5px; height: 45px; width: 100%;
+        color: black; border: none; font-weight: 900; border-radius: 8px; height: 50px;
     }
-    .main-card {
-        background: rgba(0, 255, 204, 0.05); border: 2px solid #00ffcc;
-        border-radius: 15px; padding: 20px; margin-bottom: 15px;
+    .gemini-analysis {
+        background: rgba(0, 85, 255, 0.1); border-left: 5px solid #0055ff;
+        padding: 15px; margin: 15px 0; border-radius: 5px; font-style: italic;
     }
-    .group-card {
-        background: #111b27; border-left: 5px solid #0055ff;
-        padding: 15px; margin-top: 10px; border-radius: 5px;
+    .number-box {
+        font-size: 35px; font-weight: 900; color: #fff; text-align: center;
+        background: #111b27; border: 1px solid #00ffcc; border-radius: 10px; padding: 10px;
     }
-    .number-display { font-size: 30px; font-weight: 900; color: #fff; letter-spacing: 3px; }
-    .label { font-size: 12px; color: #888; text-transform: uppercase; }
     </style>
 """, unsafe_allow_html=True)
 
-# ================= ENGINE CHIA DÀN TỐI ƯU =================
-def fast_engine(data):
-    if len(data) < 10: return None
+# ================= THUẬT TOÁN GEMINI NEURAL =================
+def gemini_brain(history):
+    if len(history) < 10: return None
     
-    matrix = np.array([[int(d) for d in list(ky)] for ky in data])
+    # Chuẩn bị dữ liệu gửi cho Gemini
+    data_str = " | ".join(history[-30:]) # Gửi 30 kỳ gần nhất
+    prompt = f"""
+    Bạn là một chuyên gia phân tích dữ liệu xác suất cho trò chơi 5D. 
+    Dữ liệu 30 kỳ gần nhất: {data_str}.
+    Nhiệm vụ: 
+    1. Nhận diện các số có xu hướng bệt (lặp lại).
+    2. Nhận diện quy luật bước nhảy của 5 vị trí.
+    3. Chọn ra dàn 7 số an toàn nhất.
+    4. Trả về kết quả theo định dạng JSON: 
+    {{"dan7": [7 số], "ly_do": "phân tích ngắn gọn", "do_tin_cay": %}}
+    """
     
-    # Phân tích tần suất và bước nhảy (giữ lõi v11)
-    all_nums = "".join(data[-50:])
-    freq = Counter(all_nums)
-    
-    # Lấy 7 số mạnh nhất (Safe 7)
-    safe_7 = [x[0] for x in freq.most_common(7)]
-    
-    # Chia làm 2 cụm theo trọng số
-    dan_4_strong = safe_7[:4] # 4 số mạnh nhất
-    dan_3_support = safe_7[4:7] # 3 số lót
-    
-    # Tính rủi ro dựa trên độ biến động kỳ cuối
-    volatility = np.std(matrix[-5:], axis=0).mean()
-    risk = "CAO" if volatility > 2.5 else "THẤP"
-    
-    return {
-        "dan4": dan_4_strong,
-        "dan3": dan_3_support,
-        "full7": safe_7,
-        "risk": risk,
-        "count": len(data)
-    }
+    try:
+        response = model.generate_content(prompt)
+        # Tìm và trích xuất JSON từ phản hồi của Gemini
+        res_text = response.text
+        json_match = re.search(r'\{.*\}', res_text, re.DOTALL)
+        if json_match:
+            data = json.loads(json_match.group())
+            return data
+    except Exception as e:
+        # Nếu lỗi API, dùng thuật toán fallback (Dự phòng)
+        return {"dan7": ["0","1","2","3","5","6","8"], "ly_do": "API Error - Using Fallback", "do_tin_cay": 50}
 
 # ================= GIAO DIỆN CHÍNH =================
-st.markdown("<h3 style='text-align: center; color: #00ffcc;'>⚡ TITAN v12.0 FAST-COMBAT</h3>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center;'>🧠 TITAN v13.0 GEMINI-NEURAL</h2>", unsafe_allow_html=True)
 
-input_data = st.text_area("📡 NẠP DỮ LIỆU:", height=70, placeholder="Dán chuỗi số tại đây...")
+input_data = st.text_area("📡 NẠP DỮ LIỆU KỲ MỚI (5D):", height=80)
 
 c1, c2 = st.columns(2)
 with c1:
-    if st.button("🚀 QUÉT NHANH"):
+    if st.button("🔥 KÍCH HOẠT GEMINI"):
         if input_data:
             new_recs = re.findall(r"\d{5}", input_data)
             st.session_state.history.extend(new_recs)
             save_db(st.session_state.history)
+            
+            with st.spinner('Gemini đang tư duy cầu bệt...'):
+                result = gemini_brain(st.session_state.history)
+                st.session_state.last_result = result
             st.rerun()
 with c2:
-    if st.button("🗑️ XÓA"):
+    if st.button("🗑️ RESET"):
         st.session_state.history = []
+        st.session_state.last_result = None
         save_db([])
         st.rerun()
 
-if len(st.session_state.history) >= 10:
-    res = fast_engine(st.session_state.history)
+if "last_result" in st.session_state and st.session_state.last_result:
+    res = st.session_state.last_result
+    dan7 = [str(x) for x in res['dan7']]
     
-    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    # Hiển thị phân tích của Gemini
+    st.markdown(f"<div class='gemini-analysis'><b>Tư duy AI:</b> {res['ly_do']}</div>", unsafe_allow_html=True)
     
-    # HIỂN THỊ DÀN 4 (CHỦ LỰC)
-    st.markdown(f"""
-    <div class='group-card'>
-        <p class='label'>🎯 DÀN 4 SỐ (CHỦ LỰC - VÀO TIỀN MẠNH)</p>
-        <p class='number-display'>{" - ".join(res['dan4'])}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # HIỂN THỊ DÀN 3 (LÓT)
-    st.markdown(f"""
-    <div class='group-card' style='border-left-color: #ffaa00;'>
-        <p class='label'>🛡️ DÀN 3 SỐ (LÓT - BẢO TOÀN VỐN)</p>
-        <p class='number-display' style='color: #ffaa00;'>{" - ".join(res['dan3'])}</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    # Chia dàn 4 và dàn 3 như anh muốn
+    st.markdown("<div style='display: flex; justify-content: space-around;'>", unsafe_allow_html=True)
+    st.write("### Dàn 4 (Chủ lực)")
+    st.write("### Dàn 3 (Lót)")
     st.markdown("</div>", unsafe_allow_html=True)
-
-    # Dàn 7 số tổng hợp để copy nhanh
-    full_7_str = "".join(res['full7'])
-    st.text_input("📋 COPY DÀN 7 SỐ NHANH:", full_7_str)
     
-    # Cảnh báo rủi ro
-    color = "#ff0055" if res['risk'] == "CAO" else "#00ffcc"
-    st.markdown(f"<p style='text-align:center;'>RỦI RO: <b style='color:{color};'>{res['risk']}</b> | DỮ LIỆU: {res['count']} KỲ</p>", unsafe_allow_html=True)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown(f"<div class='number-box'>{' - '.join(dan7[:4])}</div>", unsafe_allow_html=True)
+    with col_b:
+        st.markdown(f"<div class='number-box' style='border-color: #ffaa00;'>{' - '.join(dan7[4:7])}</div>", unsafe_allow_html=True)
 
-else:
-    st.info("Nạp tối thiểu 10 kỳ để AI chia dàn.")
-
-st.markdown("<p style='font-size:10px; color:#444; text-align:center;'>Chiến thuật: Đánh dàn 4 làm gốc, dàn 3 làm ngọn. Không đánh lẻ 1-2 số.</p>", unsafe_allow_html=True)
+    st.text_input("📋 COPY DÀN 7 SỐ NHANH:", "".join(dan7))
+    st.progress(res['do_tin_cay'] / 100)
+    st.write(f"Độ tin cậy: {res['do_tin_cay']}% | Dữ liệu học: {len(st.session_state.history)} kỳ")
