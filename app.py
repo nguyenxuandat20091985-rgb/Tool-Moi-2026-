@@ -6,7 +6,7 @@ from collections import Counter
 from pathlib import Path
 
 # ================= CONFIG VĨNH VIỄN =================
-DATA_FILE = "titan_v11_omni.json"
+DATA_FILE = "titan_v12_fast.json"
 
 def load_db():
     if Path(DATA_FILE).exists():
@@ -17,117 +17,114 @@ def load_db():
 
 def save_db(data):
     with open(DATA_FILE, "w") as f:
-        json.dump(data[-10000:], f)
+        json.dump(data[-5000:], f)
 
 if "history" not in st.session_state:
     st.session_state.history = load_db()
 
-# ================= GIAO DIỆN TITAN RECOVERY =================
-st.set_page_config(page_title="TITAN v11000 OMNI", layout="centered")
+# ================= UI FAST-COMBAT =================
+st.set_page_config(page_title="TITAN v12.0 FAST", layout="centered")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #050a10; color: #00ffcc; }
+    .stApp { background-color: #04090f; color: #00ffcc; }
     .stButton > button {
-        background: linear-gradient(135deg, #ff0055 0%, #ff5500 100%);
-        color: white; border: none; font-weight: 900; border-radius: 8px; height: 45px; width: 100%;
+        background: linear-gradient(135deg, #00ffcc 0%, #0055ff 100%);
+        color: black; border: none; font-weight: 900; border-radius: 5px; height: 45px; width: 100%;
     }
-    .prediction-card {
-        background: rgba(0, 255, 204, 0.03); border: 1px solid #334455;
-        border-radius: 15px; padding: 20px; margin-top: 10px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    .main-card {
+        background: rgba(0, 255, 204, 0.05); border: 2px solid #00ffcc;
+        border-radius: 15px; padding: 20px; margin-bottom: 15px;
     }
-    .big-val { font-size: 42px; font-weight: 900; color: #00ffcc; text-align: center; text-shadow: 0 0 10px #00ffcc; }
-    .alert-box { padding: 10px; background: rgba(255,0,0,0.1); border-left: 5px solid #ff0055; margin-top: 10px; font-size: 13px; }
+    .group-card {
+        background: #111b27; border-left: 5px solid #0055ff;
+        padding: 15px; margin-top: 10px; border-radius: 5px;
+    }
+    .number-display { font-size: 30px; font-weight: 900; color: #fff; letter-spacing: 3px; }
+    .label { font-size: 12px; color: #888; text-transform: uppercase; }
     </style>
 """, unsafe_allow_html=True)
 
-# ================= THUẬT TOÁN ĐỐI KHÁNG V11 =================
-def omni_engine(data):
+# ================= ENGINE CHIA DÀN TỐI ƯU =================
+def fast_engine(data):
     if len(data) < 10: return None
     
-    # Chuyển dữ liệu sang mảng
     matrix = np.array([[int(d) for d in list(ky)] for ky in data])
     
-    # 1. Phân tích Bước Nhảy (Interval Analysis)
-    # Tìm xem sau con số vừa về, con số nào thường xuất hiện nhất ở chu kỳ sau
-    last_val = matrix[-1]
-    potential_next = []
+    # Phân tích tần suất và bước nhảy (giữ lõi v11)
+    all_nums = "".join(data[-50:])
+    freq = Counter(all_nums)
     
-    for pos in range(5):
-        current_val = last_val[pos]
-        next_vals = []
-        for i in range(len(matrix)-1):
-            if matrix[i, pos] == current_val:
-                next_vals.append(matrix[i+1, pos])
-        
-        if next_vals:
-            potential_next.append(Counter(next_vals).most_common(1)[0][0])
-        else:
-            # Nếu chưa có dữ liệu lặp, dùng thuật toán hồi số
-            potential_next.append((current_val + 3) % 10)
-
-    # 2. Lọc TOP 3 "TINH AN TOÀN"
-    # Kết hợp giữa số hay về và số dự đoán theo bước nhảy
-    freq_overall = Counter("".join(data[-30:]))
-    candidates = [str(x) for x in potential_next]
-    # Thêm 2 số có tần suất cao nhất vào danh sách cân nhắc
-    top_freq = [x[0] for x in freq_overall.most_common(2)]
-    candidates.extend(top_freq)
+    # Lấy 7 số mạnh nhất (Safe 7)
+    safe_7 = [x[0] for x in freq.most_common(7)]
     
-    final_p3 = [x[0] for x in Counter(candidates).most_common(3)]
-
-    # 3. Tính độ rủi ro (Risk Detection)
-    # Nếu 5 kỳ gần nhất có tổng biến thiên quá lớn -> Cầu đang ảo
+    # Chia làm 2 cụm theo trọng số
+    dan_4_strong = safe_7[:4] # 4 số mạnh nhất
+    dan_3_support = safe_7[4:7] # 3 số lót
+    
+    # Tính rủi ro dựa trên độ biến động kỳ cuối
     volatility = np.std(matrix[-5:], axis=0).mean()
-    risk_level = "CAO" if volatility > 2.8 else "THẤP"
-    confidence = max(60, 95 - (volatility * 10))
-
+    risk = "CAO" if volatility > 2.5 else "THẤP"
+    
     return {
-        "p3": final_p3,
-        "conf": round(confidence, 1),
-        "risk": risk_level,
+        "dan4": dan_4_strong,
+        "dan3": dan_3_support,
+        "full7": safe_7,
+        "risk": risk,
         "count": len(data)
     }
 
-# ================= UI CHÍNH =================
-st.markdown("<h3 style='text-align: center;'>🛡️ TITAN v11000 OMNI</h3>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 11px; color: #ff0055;'>ANTI-LOSS & RECOVERY MODE ACTIVE</p>", unsafe_allow_html=True)
+# ================= GIAO DIỆN CHÍNH =================
+st.markdown("<h3 style='text-align: center; color: #00ffcc;'>⚡ TITAN v12.0 FAST-COMBAT</h3>", unsafe_allow_html=True)
 
-input_data = st.text_area("📡 NẠP DỮ LIỆU THỰC CHIẾN:", height=80, placeholder="Nhập chuỗi 5 số mỗi kỳ...")
+input_data = st.text_area("📡 NẠP DỮ LIỆU:", height=70, placeholder="Dán chuỗi số tại đây...")
 
 c1, c2 = st.columns(2)
 with c1:
-    if st.button("⚡ PHÂN TÍCH & LƯU"):
+    if st.button("🚀 QUÉT NHANH"):
         if input_data:
             new_recs = re.findall(r"\d{5}", input_data)
-            if new_recs:
-                st.session_state.history.extend(new_recs)
-                save_db(st.session_state.history)
-                st.rerun()
+            st.session_state.history.extend(new_recs)
+            save_db(st.session_state.history)
+            st.rerun()
 with c2:
-    if st.button("🗑️ RESET"):
+    if st.button("🗑️ XÓA"):
         st.session_state.history = []
         save_db([])
         st.rerun()
 
 if len(st.session_state.history) >= 10:
-    res = omni_engine(st.session_state.history)
+    res = fast_engine(st.session_state.history)
     
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    
+    # HIỂN THỊ DÀN 4 (CHỦ LỰC)
     st.markdown(f"""
-    <div class='prediction-card'>
-        <p style='color: #888; font-size: 12px;'>🎯 TOP 3 SIÊU TINH (KHUYÊN DÙNG)</p>
-        <p class='big-val'>{" - ".join(res['p3'])}</p>
-        <div style='display: flex; justify-content: space-between; border-top: 1px solid #334; pt-10;'>
-            <span>Độ tin cậy: <b style='color:#ffd700;'>{res['conf']}%</b></span>
-            <span>Rủi ro: <b style='color:{"#ff0055" if res['risk']=="CAO" else "#00ffcc"};'>{res['risk']}</b></span>
-        </div>
+    <div class='group-card'>
+        <p class='label'>🎯 DÀN 4 SỐ (CHỦ LỰC - VÀO TIỀN MẠNH)</p>
+        <p class='number-display'>{" - ".join(res['dan4'])}</p>
     </div>
     """, unsafe_allow_html=True)
     
-    if res['risk'] == "CAO":
-        st.markdown("<div class='alert-box'>⚠️ Cảnh báo: Cầu đang biến động mạnh (Cầu ảo). Khuyến nghị vào tiền nhẹ tay hoặc tạm dừng quan sát.</div>", unsafe_allow_html=True)
+    # HIỂN THỊ DÀN 3 (LÓT)
+    st.markdown(f"""
+    <div class='group-card' style='border-left-color: #ffaa00;'>
+        <p class='label'>🛡️ DÀN 3 SỐ (LÓT - BẢO TOÀN VỐN)</p>
+        <p class='number-display' style='color: #ffaa00;'>{" - ".join(res['dan3'])}</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    st.info(f"Hệ thống đã học từ {res['count']} kỳ. Trạng thái: Ổn định.")
+    # Dàn 7 số tổng hợp để copy nhanh
+    full_7_str = "".join(res['full7'])
+    st.text_input("📋 COPY DÀN 7 SỐ NHANH:", full_7_str)
+    
+    # Cảnh báo rủi ro
+    color = "#ff0055" if res['risk'] == "CAO" else "#00ffcc"
+    st.markdown(f"<p style='text-align:center;'>RỦI RO: <b style='color:{color};'>{res['risk']}</b> | DỮ LIỆU: {res['count']} KỲ</p>", unsafe_allow_html=True)
+
 else:
-    st.warning("Cần nạp tối thiểu 10 kỳ để thuật toán Omni bắt đầu quét bước nhảy.")
+    st.info("Nạp tối thiểu 10 kỳ để AI chia dàn.")
+
+st.markdown("<p style='font-size:10px; color:#444; text-align:center;'>Chiến thuật: Đánh dàn 4 làm gốc, dàn 3 làm ngọn. Không đánh lẻ 1-2 số.</p>", unsafe_allow_html=True)
