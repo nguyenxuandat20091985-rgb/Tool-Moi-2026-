@@ -5,121 +5,96 @@ import json
 from collections import Counter
 
 # ================= CẤU HÌNH HỆ THỐNG =================
-# Key mới anh vừa gửi - Em đã lắp vào chuẩn xác
+# Key mới tinh anh vừa gửi
 API_KEY = "AIzaSyBRo51DqVoC7BSv3ipUrY8GaEVfi0cVQxc"
 
-def init_ai():
+def init_brain():
     try:
         genai.configure(api_key=API_KEY)
         return genai.GenerativeModel('gemini-1.5-flash')
     except:
         return None
 
-brain = init_ai()
+brain = init_brain()
 
-# ================= GIAO DIỆN LUXURY UI =================
-st.set_page_config(page_title="TITAN v16.0 GOLD", layout="wide")
+# ================= GIAO DIỆN DARK MODE LUXURY =================
+st.set_page_config(page_title="TITAN v16.0", layout="centered")
 
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap');
-    .stApp { background: radial-gradient(circle, #0f172a 0%, #020617 100%); color: #e2e8f0; }
-    
-    .gold-title {
-        font-family: 'Orbitron', sans-serif;
-        background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        text-align: center; font-size: 50px; font-weight: 900; margin-bottom: 10px;
-    }
-    
-    .glass-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(191, 149, 63, 0.3);
-        border-radius: 20px; padding: 25px;
-        backdrop-filter: blur(10px); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
-    }
-    
-    .num-display {
-        font-family: 'Orbitron', sans-serif;
-        font-size: 60px; font-weight: 900;
-        color: #fcf6ba; text-shadow: 0 0 20px rgba(191, 149, 63, 0.6);
-        text-align: center; letter-spacing: 5px;
-    }
-    
-    .status-tag {
-        background: #064e3b; color: #34d399;
-        padding: 5px 15px; border-radius: 50px;
-        font-size: 12px; font-weight: bold; text-align: center;
-    }
+    .stApp { background: radial-gradient(circle, #0a192f 0%, #02060c 100%); color: #e6f1ff; }
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; border: 1px solid #00ffcc; color: #00ffcc; display: inline-block; margin-bottom: 10px; }
+    .result-container { background: rgba(16, 33, 65, 0.7); border: 1px solid #1e3a8a; border-radius: 12px; padding: 15px; margin-top: 15px; }
+    .num-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px; }
+    .num-card { background: #112240; border-bottom: 3px solid #64ffda; padding: 10px; border-radius: 8px; text-align: center; }
+    .num-val { font-size: 32px; font-weight: 800; color: #64ffda; }
+    .num-label { font-size: 10px; color: #8892b0; text-transform: uppercase; }
+    .copy-box { background: #02060c; border: 1px dashed #64ffda; padding: 8px; color: #64ffda; text-align: center; font-family: monospace; border-radius: 5px; margin-top: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
-# Hiển thị trạng thái kết nối tinh tế
-st.markdown("<div style='display: flex; justify-content: center; margin-bottom: 20px;'>"
-            "<div class='status-tag'>● HỆ THỐNG NEURAL GOLD ĐANG TRỰC TUYẾN</div></div>", unsafe_allow_html=True)
+# Header nhỏ gọn
+st.markdown(f"<div style='text-align: center;'>", unsafe_allow_html=True)
+if brain:
+    st.markdown("<span class='status-badge'>● AI ACTIVE</span>", unsafe_allow_html=True)
+else:
+    st.markdown("<span class='status-badge' style='color:red; border-color:red;'>● AI ERROR</span>", unsafe_allow_html=True)
 
-st.markdown("<h1 class='gold-title'>TITAN v16.0 PRO</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #94a3b8; font-style: italic;'>Hệ thống dự đoán bệt 5D cấp độ quân đội</p>", unsafe_allow_html=True)
+st.markdown("<h2 style='margin:0; color:#64ffda;'>🧠 TITAN v16.0</h2>", unsafe_allow_html=True)
+st.markdown("<p style='font-size:12px; color:#8892b0;'>NEURAL ENGINE: SOI CẦU BỆT CHUYÊN SÂU</p>", unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
 # ================= XỬ LÝ DỮ LIỆU =================
-with st.container():
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    raw_data = st.text_area("📡 NHẬP DỮ LIỆU CẦU (Dán danh sách các kỳ gần đây):", height=150, placeholder="Ví dụ: \n51875\n78733\n66667...")
-    
-    col_btn1, col_btn2 = st.columns([1, 1])
-    with col_btn1:
-        analyze_btn = st.button("🔥 KÍCH HOẠT SIÊU MÁY TÍNH")
-    with col_btn2:
-        if st.button("🗑️ XÓA DỮ LIỆU"): st.rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+input_data = st.text_area("📡 Dán kỳ vừa về:", height=90, placeholder="Ví dụ: 78733\n66667...")
 
-if analyze_btn:
-    history = re.findall(r"\d{5}", raw_data)
+if st.button("🔥 PHÂN TÍCH NGAY"):
+    history = re.findall(r"\d{5}", input_data)
     
     if len(history) < 3:
-        st.warning("Anh ơi, dán thêm ít nhất 3 kỳ nữa để AI soi bệt chính xác nhé!")
+        st.warning("Dán thêm 3-5 kỳ đi anh!")
     else:
-        # Thuật toán đếm bệt cứng (Luôn chạy để dự phòng)
-        all_digits = "".join(history)
-        counter = Counter(all_digits)
-        top_numbers = [n for n, c in counter.most_common(7)]
-        
-        # Gọi Gemini tư duy sâu
-        prompt = f"""
-        Bạn là AI chuyên soi cầu bệt 5D. Dữ liệu: {history}.
-        Tìm 7 số có khả năng ra cao nhất dựa trên bệt và hồi số.
-        Trả về JSON: {{"chuluc": [4 số], "lot": [3 số], "tu_duy": ""}}
-        """
-        
-        try:
-            response = brain.generate_content(prompt)
-            res_json = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-            dan4, dan3, reasoning = res_json['chuluc'], res_json['lot'], res_json['tu_duy']
-            st.info(f"🧠 AI TƯ DUY: {reasoning}")
-        except:
-            # Nếu AI bận, tự động dùng thuật toán toán học Gold
-            dan4, dan3 = top_numbers[:4], top_numbers[4:7]
-            st.warning("⚠️ Đang dùng thuật toán toán học Gold (Phòng vờ AI bận)")
-
-        # HIỂN THỊ KẾT QUẢ ĐẸP MẮT
-        st.markdown("<br>", unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        
-        with c1:
-            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; color: #bf953f; font-weight: bold;'>🎯 DÀN CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
-            st.markdown(f"<div class='num-display'>{' '.join(map(str, dan4))}</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+        with st.spinner('AI đang tính luồng bệt...'):
+            # Prompt tối ưu nhất để tránh lỗi JSON
+            prompt = f"""
+            Lịch sử 5D: {history}. 
+            Phân tích:
+            1. Tìm các số đang bệt (lặp lại nhiều).
+            2. Chốt dàn 7 số (4 chính, 3 lót).
+            Trả về JSON duy nhất format: {{"main": [4 số], "sub": [3 số], "logic": "viết ngắn gọn 1 câu"}}
+            """
             
-        with c2:
-            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align: center; color: #94a3b8; font-weight: bold;'>🛡️ DÀN LÓT (BẢO TOÀN)</p>", unsafe_allow_html=True)
-            st.markdown(f"<div class='num-display' style='color: #94a3b8;'>{' '.join(map(str, dan3))}</div>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            try:
+                response = brain.generate_content(prompt)
+                res_text = response.text
+                data = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
+                
+                # Hiển thị UI kết quả
+                st.markdown("<div class='result-container'>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size:13px;'><b>💡 Chiến thuật:</b> {data['logic']}</p>", unsafe_allow_html=True)
+                
+                # Dàn chính (4 số)
+                st.markdown("<p style='font-size:12px; margin-bottom:5px;'>🎯 DÀN CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
+                cols = st.columns(4)
+                for i, n in enumerate(data['main']):
+                    cols[i].markdown(f"<div class='num-card'><div class='num-label'>TOP {i+1}</div><div class='num-val'>{n}</div></div>", unsafe_allow_html=True)
+                
+                # Dàn lót (3 số)
+                st.markdown("<p style='font-size:12px; margin-top:15px; margin-bottom:5px;'>🛡️ DÀN LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
+                cols2 = st.columns(3)
+                for i, n in enumerate(data['sub']):
+                    cols2[i].markdown(f"<div class='num-card' style='border-color:#ffcc00;'><div class='num-label'>LÓT {i+1}</div><div class='num-val' style='color:#ffcc00;'>{n}</div></div>", unsafe_allow_html=True)
+                
+                # Copy nhanh
+                full_7 = "".join(map(str, data['main'])) + "".join(map(str, data['sub']))
+                st.markdown(f"<div class='copy-box'>DÀN 7 SỐ: {full_7}</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+            except Exception as e:
+                # Thuật toán dự phòng nếu Key bị lag
+                all_nums = "".join(history)
+                counts = Counter(all_nums)
+                fallback = [n for n, c in counts.most_common(7)]
+                st.error("AI ĐANG BẬN - DÙNG TẦN SUẤT THỰC TẾ")
+                st.write(f"Dàn dự phòng: {' - '.join(fallback)}")
 
-        # Thanh copy nhanh
-        st.markdown("<br>", unsafe_allow_html=True)
-        final_7 = "".join(map(str, dan4)) + "".join(map(str, dan3))
-        st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", final_7)
-
-st.markdown("<p style='text-align: center; color: #475569; margin-top: 50px;'>© 2026 TITAN GOLD ENGINE - PREDICTOR PRO</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Hệ thống bảo mật bởi Neural Shield</p>", unsafe_allow_html=True)
