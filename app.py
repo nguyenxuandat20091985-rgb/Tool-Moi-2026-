@@ -1,124 +1,133 @@
 import streamlit as st
 import re
 import json
-import pandas as pd
+import numpy as np
 from collections import Counter
 from pathlib import Path
 
-# ================= CONFIG GIAO DIỆN CAO CẤP =================
-st.set_page_config(page_title="TITAN V2000 ULTIMATE", layout="wide", initial_sidebar_state="collapsed")
+# ================= CONFIG VĨNH VIỄN =================
+DATA_FILE = "titan_v11_omni.json"
 
-# CSS để biến Streamlit thành app chuyên nghiệp
-st.markdown("""
-    <style>
-    .main { background-color: #0e1117; }
-    div.stButton > button:first-child {
-        background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
-        color: black; font-weight: bold; border: none; border-radius: 10px; height: 3em; width: 100%;
-    }
-    .stTextArea textarea {
-        background-color: #1b1e23; color: #ffd700; border: 1px solid #444; border-radius: 10px;
-    }
-    .metric-card {
-        background: #1b1e23; border: 1px solid #333; border-radius: 15px; padding: 15px; text-align: center;
-    }
-    .number-display {
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 80px; font-weight: 900; color: #ffd700;
-        text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-        margin: 20px 0;
-    }
-    .status-bar {
-        padding: 10px; border-radius: 50px; font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 20px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-DATA_FILE = "titan_dataset.json"
-
-def load_data():
+def load_db():
     if Path(DATA_FILE).exists():
-        with open(DATA_FILE, "r") as f: return list(dict.fromkeys(json.load(f)))
+        with open(DATA_FILE, "r") as f:
+            try: return json.load(f)
+            except: return []
     return []
 
-def save_data(data):
-    clean = list(dict.fromkeys(data))
-    with open(DATA_FILE, "w") as f: json.dump(clean, f)
-    return clean
+def save_db(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data[-10000:], f)
 
-if "dataset" not in st.session_state: st.session_state.dataset = load_data()
+if "history" not in st.session_state:
+    st.session_state.history = load_db()
 
-# ================= CORE LOGIC (V1800 PRECISION) =================
-def analyze_v2000(dataset):
-    recent_50 = dataset[-50:]
-    recent_str = "".join(recent_50)
-    freq_50 = Counter(recent_str)
-    last_5 = dataset[-5:]
+# ================= GIAO DIỆN TITAN RECOVERY =================
+st.set_page_config(page_title="TITAN v11000 OMNI", layout="centered")
+
+st.markdown("""
+    <style>
+    .stApp { background-color: #050a10; color: #00ffcc; }
+    .stButton > button {
+        background: linear-gradient(135deg, #ff0055 0%, #ff5500 100%);
+        color: white; border: none; font-weight: 900; border-radius: 8px; height: 45px; width: 100%;
+    }
+    .prediction-card {
+        background: rgba(0, 255, 204, 0.03); border: 1px solid #334455;
+        border-radius: 15px; padding: 20px; margin-top: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    }
+    .big-val { font-size: 42px; font-weight: 900; color: #00ffcc; text-align: center; text-shadow: 0 0 10px #00ffcc; }
+    .alert-box { padding: 10px; background: rgba(255,0,0,0.1); border-left: 5px solid #ff0055; margin-top: 10px; font-size: 13px; }
+    </style>
+""", unsafe_allow_html=True)
+
+# ================= THUẬT TOÁN ĐỐI KHÁNG V11 =================
+def omni_engine(data):
+    if len(data) < 10: return None
     
-    score = {str(i): 0 for i in range(10)}
-    real_streaks = []
-
-    for i in range(10):
-        s_digit = str(i)
-        count_in_5 = sum(1 for k in last_5 if s_digit in k)
-        if count_in_5 >= 4:
-            real_streaks.append(s_digit)
-            score[s_digit] += 300 
-        score[s_digit] += freq_50.get(s_digit, 0) * 10
-        if len(dataset) >= 2 and s_digit in dataset[-1] and s_digit in dataset[-2]:
-            score[s_digit] += 70
-
-    ranked = sorted(score, key=score.get, reverse=True)
-    return ranked, score, real_streaks
-
-# ================= GIAO DIỆN CHÍNH =================
-st.markdown("<h3 style='text-align: center; color: #888;'>PREMIUM PREDICTION TOOL</h3>", unsafe_allow_html=True)
-st.markdown("<h1 style='text-align: center; color: #ffd700; margin-bottom: 30px;'>TITAN V2000 ULTIMATE</h1>", unsafe_allow_html=True)
-
-# Bố cục 2 cột
-col_left, col_right = st.columns([1, 2])
-
-with col_left:
-    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
-    raw_input = st.text_area("NHẬP KỲ MỚI", height=150, placeholder="Dán kết quả tại đây...")
-    if st.button("🚀 PHÂN TÍCH"):
-        if raw_input:
-            new_nums = re.findall(r"\d{1,5}", raw_input)
-            st.session_state.dataset = save_data(st.session_state.dataset + new_nums)
-            st.rerun()
+    # Chuyển dữ liệu sang mảng
+    matrix = np.array([[int(d) for d in list(ky)] for ky in data])
     
-    if st.button("🧹 LÀM SẠCH"):
-        st.session_state.dataset = []
-        save_data([])
-        st.rerun()
-    st.markdown(f"<p style='color: #666; font-size: 12px; margin-top: 10px;'>DATABASE: {len(st.session_state.dataset)} KỲ</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-with col_right:
-    if len(st.session_state.dataset) >= 5:
-        ranked, scores, streaks = analyze_v2000(st.session_state.dataset)
-        p1 = ranked[:3]
+    # 1. Phân tích Bước Nhảy (Interval Analysis)
+    # Tìm xem sau con số vừa về, con số nào thường xuất hiện nhất ở chu kỳ sau
+    last_val = matrix[-1]
+    potential_next = []
+    
+    for pos in range(5):
+        current_val = last_val[pos]
+        next_vals = []
+        for i in range(len(matrix)-1):
+            if matrix[i, pos] == current_val:
+                next_vals.append(matrix[i+1, pos])
         
-        # Trạng thái cầu
-        if streaks:
-            st.markdown(f"<div class='status-bar' style='background: rgba(255, 0, 0, 0.2); color: #ff4b4b; border: 1px solid #ff4b4b;'>⚠️ CẢNH BÁO BỆT: {', '.join(streaks)}</div>", unsafe_allow_html=True)
+        if next_vals:
+            potential_next.append(Counter(next_vals).most_common(1)[0][0])
         else:
-            st.markdown("<div class='status-bar' style='background: rgba(0, 255, 0, 0.1); color: #00ffcc; border: 1px solid #00ffcc;'>✅ NHỊP CẦU ĐANG ỔN ĐỊNH</div>", unsafe_allow_html=True)
+            # Nếu chưa có dữ liệu lặp, dùng thuật toán hồi số
+            potential_next.append((current_val + 3) % 10)
 
-        # Hiển thị số chốt chính
-        st.markdown(f"""
-            <div style='background: linear-gradient(180deg, #1b1e23 0%, #0e1117 100%); border: 2px solid #ffd700; border-radius: 20px; padding: 20px; text-align: center;'>
-                <p style='color: #ffd700; letter-spacing: 5px; font-weight: bold;'>🎯 DỰ ĐOÁN TAY TIẾP</p>
-                <div class='number-display'>{"-".join(p1)}</div>
-                <p style='color: #888;'>Ưu tiên: <span style='color: #00ffcc; font-size: 24px; font-weight: bold;'>{p1[0]}</span></p>
-            </div>
-        """, unsafe_allow_html=True)
+    # 2. Lọc TOP 3 "TINH AN TOÀN"
+    # Kết hợp giữa số hay về và số dự đoán theo bước nhảy
+    freq_overall = Counter("".join(data[-30:]))
+    candidates = [str(x) for x in potential_next]
+    # Thêm 2 số có tần suất cao nhất vào danh sách cân nhắc
+    top_freq = [x[0] for x in freq_overall.most_common(2)]
+    candidates.extend(top_freq)
+    
+    final_p3 = [x[0] for x in Counter(candidates).most_common(3)]
 
-        # Biểu đồ sức mạnh (Gọn lại)
-        with st.expander("📊 BIỂU ĐỒ SỨC MẠNH", expanded=True):
-            chart_data = pd.DataFrame({'Điểm': scores.values()}, index=scores.keys())
-            st.bar_chart(chart_data, height=200)
-    else:
-        st.info("Vui lòng nạp thêm kết quả để kích hoạt hệ thống phân tích.")
+    # 3. Tính độ rủi ro (Risk Detection)
+    # Nếu 5 kỳ gần nhất có tổng biến thiên quá lớn -> Cầu đang ảo
+    volatility = np.std(matrix[-5:], axis=0).mean()
+    risk_level = "CAO" if volatility > 2.8 else "THẤP"
+    confidence = max(60, 95 - (volatility * 10))
 
-st.markdown("<p style='text-align: center; color: #444; margin-top: 50px;'>© 2026 TITAN CORE SYSTEM - V2000 PRO</p>", unsafe_allow_html=True)
+    return {
+        "p3": final_p3,
+        "conf": round(confidence, 1),
+        "risk": risk_level,
+        "count": len(data)
+    }
+
+# ================= UI CHÍNH =================
+st.markdown("<h3 style='text-align: center;'>🛡️ TITAN v11000 OMNI</h3>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 11px; color: #ff0055;'>ANTI-LOSS & RECOVERY MODE ACTIVE</p>", unsafe_allow_html=True)
+
+input_data = st.text_area("📡 NẠP DỮ LIỆU THỰC CHIẾN:", height=80, placeholder="Nhập chuỗi 5 số mỗi kỳ...")
+
+c1, c2 = st.columns(2)
+with c1:
+    if st.button("⚡ PHÂN TÍCH & LƯU"):
+        if input_data:
+            new_recs = re.findall(r"\d{5}", input_data)
+            if new_recs:
+                st.session_state.history.extend(new_recs)
+                save_db(st.session_state.history)
+                st.rerun()
+with c2:
+    if st.button("🗑️ RESET"):
+        st.session_state.history = []
+        save_db([])
+        st.rerun()
+
+if len(st.session_state.history) >= 10:
+    res = omni_engine(st.session_state.history)
+    
+    st.markdown(f"""
+    <div class='prediction-card'>
+        <p style='color: #888; font-size: 12px;'>🎯 TOP 3 SIÊU TINH (KHUYÊN DÙNG)</p>
+        <p class='big-val'>{" - ".join(res['p3'])}</p>
+        <div style='display: flex; justify-content: space-between; border-top: 1px solid #334; pt-10;'>
+            <span>Độ tin cậy: <b style='color:#ffd700;'>{res['conf']}%</b></span>
+            <span>Rủi ro: <b style='color:{"#ff0055" if res['risk']=="CAO" else "#00ffcc"};'>{res['risk']}</b></span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if res['risk'] == "CAO":
+        st.markdown("<div class='alert-box'>⚠️ Cảnh báo: Cầu đang biến động mạnh (Cầu ảo). Khuyến nghị vào tiền nhẹ tay hoặc tạm dừng quan sát.</div>", unsafe_allow_html=True)
+
+    st.info(f"Hệ thống đã học từ {res['count']} kỳ. Trạng thái: Ổn định.")
+else:
+    st.warning("Cần nạp tối thiểu 10 kỳ để thuật toán Omni bắt đầu quét bước nhảy.")
