@@ -1,160 +1,124 @@
 import streamlit as st
 import re
 import json
-import numpy as np
+import pandas as pd
 from collections import Counter
 from pathlib import Path
 
-# ================= CONFIG LƯU TRỮ VĨNH VIỄN =================
-DATA_FILE = "titan_database_v10.json"
+# ================= CONFIG GIAO DIỆN CAO CẤP =================
+st.set_page_config(page_title="TITAN V2000 ULTIMATE", layout="wide", initial_sidebar_state="collapsed")
 
-def load_db():
-    if Path(DATA_FILE).exists():
-        with open(DATA_FILE, "r") as f:
-            try: return json.load(f)
-            except: return []
-    return []
-
-def save_db(data):
-    # Tăng giới hạn lên 10,000 kỳ để thuật toán Markov có đủ "độ sâu"
-    with open(DATA_FILE, "w") as f:
-        json.dump(data[-10000:], f)
-
-if "history" not in st.session_state:
-    st.session_state.history = load_db()
-
-# ================= GIAO DIỆN DARK MODE TITAN =================
-st.set_page_config(page_title="TITAN v10000 OLYMPUS", layout="centered")
-
+# CSS để biến Streamlit thành app chuyên nghiệp
 st.markdown("""
     <style>
-    .stApp { background-color: #000; color: #00ffcc; }
-    [data-testid="stHeader"] {display: none;}
-    .stButton > button {
-        background: linear-gradient(135deg, #00ffcc 0%, #0055ff 100%);
-        color: #000; border: none; font-weight: 900; border-radius: 4px; height: 42px; width: 100%;
+    .main { background-color: #0e1117; }
+    div.stButton > button:first-child {
+        background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
+        color: black; font-weight: bold; border: none; border-radius: 10px; height: 3em; width: 100%;
     }
-    .prediction-card {
-        background: rgba(0, 255, 204, 0.05); border: 1px solid #00ffcc;
-        border-radius: 12px; padding: 15px; margin-top: 10px;
-        box-shadow: 0 0 15px rgba(0, 255, 204, 0.1);
+    .stTextArea textarea {
+        background-color: #1b1e23; color: #ffd700; border: 1px solid #444; border-radius: 10px;
     }
-    .big-val { font-size: 35px; font-weight: 900; color: #fff; margin: 0; text-align: center; letter-spacing: 5px; }
-    .status-text { font-size: 12px; color: #888; margin-bottom: 5px; }
-    .highlight { color: #ffd700; font-weight: bold; }
+    .metric-card {
+        background: #1b1e23; border: 1px solid #333; border-radius: 15px; padding: 15px; text-align: center;
+    }
+    .number-display {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 80px; font-weight: 900; color: #ffd700;
+        text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        margin: 20px 0;
+    }
+    .status-bar {
+        padding: 10px; border-radius: 50px; font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 20px;
+    }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# ================= THUẬT TOÁN NÂNG CẤP OLYMPUS =================
-def olympus_engine(data):
-    if len(data) < 15: return None
+DATA_FILE = "titan_dataset.json"
+
+def load_data():
+    if Path(DATA_FILE).exists():
+        with open(DATA_FILE, "r") as f: return list(dict.fromkeys(json.load(f)))
+    return []
+
+def save_data(data):
+    clean = list(dict.fromkeys(data))
+    with open(DATA_FILE, "w") as f: json.dump(clean, f)
+    return clean
+
+if "dataset" not in st.session_state: st.session_state.dataset = load_data()
+
+# ================= CORE LOGIC (V1800 PRECISION) =================
+def analyze_v2000(dataset):
+    recent_50 = dataset[-50:]
+    recent_str = "".join(recent_50)
+    freq_50 = Counter(recent_str)
+    last_5 = dataset[-5:]
     
-    # Chuyển đổi dữ liệu sang dạng ma trận số
-    matrix = np.array([[int(d) for d in list(ky)] for ky in data])
-    last_matrix = matrix[-50:] # Phân tích 50 kỳ gần nhất
-    
-    # 1. THUẬT TOÁN 3-TINH: Markov Chain kết hợp Decay Weight
-    # Dự đoán cho từng vị trí (C.Ngàn, Ngàn, Trăm, Chục, Đơn vị)
-    predictions = []
-    for pos in range(5):
-        seq = last_matrix[:, pos]
-        # Tính trọng số: Kỳ gần nhất có trọng số cao hơn
-        weights = np.exp(np.linspace(-1, 0, len(seq)))
-        weighted_counts = Counter()
-        for i, val in enumerate(seq):
-            weighted_counts[val] += weights[i]
-        
-        # Lọc ra con số có tiềm năng nhất ở mỗi vị trí
-        top_val = weighted_counts.most_common(1)[0][0]
-        predictions.append(top_val)
+    score = {str(i): 0 for i in range(10)}
+    real_streaks = []
 
-    # Lấy 3 con số xuất hiện nhiều nhất trong dự đoán 5 vị trí
-    final_p3_counts = Counter(predictions)
-    p3 = [str(x[0]) for x in final_p3_counts.most_common(3)]
-    
-    # Tính tỉ lệ chính xác dựa trên độ lệch chuẩn (Volatility)
-    volatility = np.std(last_matrix, axis=0).mean()
-    p3_prob = max(82.0, 98.5 - (volatility * 5))
+    for i in range(10):
+        s_digit = str(i)
+        count_in_5 = sum(1 for k in last_5 if s_digit in k)
+        if count_in_5 >= 4:
+            real_streaks.append(s_digit)
+            score[s_digit] += 300 
+        score[s_digit] += freq_50.get(s_digit, 0) * 10
+        if len(dataset) >= 2 and s_digit in dataset[-1] and s_digit in dataset[-2]:
+            score[s_digit] += 70
 
-    # 2. TỔNG 5 (TÀI/XỈU - CHẴN/LẺ)
-    totals = np.sum(last_matrix[-20:], axis=1)
-    avg_total = np.mean(totals)
-    # Thuật toán điểm rơi: Tài/Xỉu dựa trên trung bình động
-    tx = "TÀI" if avg_total < 22.5 else "XỈU"
-    cl = "LẺ" if int(avg_total) % 2 != 0 else "CHẴN"
-
-    # 3. RỒNG HỔ (VỊ TRÍ 0 VS 4)
-    r_wing = last_matrix[-10:, 0]
-    h_wing = last_matrix[-10:, 4]
-    rh_diff = np.sum(r_wing) - np.sum(h_wing)
-    rh = "RỒNG" if rh_diff > 0 else "HỔ"
-    rh_p = min(92, 70 + abs(rh_diff))
-
-    return {
-        "p3": p3, 
-        "p3_p": round(p3_prob, 1), 
-        "t5": f"{tx} {cl}", 
-        "rh": rh, 
-        "rh_p": rh_p,
-        "history_count": len(data)
-    }
+    ranked = sorted(score, key=score.get, reverse=True)
+    return ranked, score, real_streaks
 
 # ================= GIAO DIỆN CHÍNH =================
-st.markdown("<h4 style='text-align: center; color: #00ffcc;'>💎 TITAN v10000 OLYMPUS</h4>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 10px; color: #555;'>116 ALGORITHMS POWERED BY GEMINI QUANTUM</p>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #888;'>PREMIUM PREDICTION TOOL</h3>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #ffd700; margin-bottom: 30px;'>TITAN V2000 ULTIMATE</h1>", unsafe_allow_html=True)
 
-input_data = st.text_area("Dán dữ liệu kỳ mới:", height=70, label_visibility="collapsed")
+# Bố cục 2 cột
+col_left, col_right = st.columns([1, 2])
 
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("⚡ QUÉT & LƯU"):
-        if input_data:
-            new_records = re.findall(r"\d{5}", input_data)
-            if new_records:
-                st.session_state.history.extend(new_records)
-                save_db(st.session_state.history)
-                st.rerun()
-
-with col2:
-    if st.button("🗑️ XÓA HẾT"):
-        st.session_state.history = []
-        save_db([])
-        st.rerun()
-
-# HIỂN THỊ KẾT QUẢ
-if len(st.session_state.history) >= 15:
-    res = olympus_engine(st.session_state.history)
+with col_left:
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    raw_input = st.text_area("NHẬP KỲ MỚI", height=150, placeholder="Dán kết quả tại đây...")
+    if st.button("🚀 PHÂN TÍCH"):
+        if raw_input:
+            new_nums = re.findall(r"\d{1,5}", raw_input)
+            st.session_state.dataset = save_data(st.session_state.dataset + new_nums)
+            st.rerun()
     
-    # Card 1: 3-Tinh Chốt (Dàn hàng ngang 9-6-3 như anh yêu cầu)
-    st.markdown(f"""
-    <div class='prediction-card'>
-        <p class='status-text'>🎯 3-TINH CHỐT (NHẬN DIỆN CẦU BỆT/HỒI)</p>
-        <p class='big-val' style='color:#00ff00;'>{" - ".join(res['p3'])}</p>
-        <p style='text-align:right; margin:0; font-size:14px;' class='highlight'>{res['p3_p']}%</p>
-    </div>
-    """, unsafe_allow_html=True)
+    if st.button("🧹 LÀM SẠCH"):
+        st.session_state.dataset = []
+        save_data([])
+        st.rerun()
+    st.markdown(f"<p style='color: #666; font-size: 12px; margin-top: 10px;'>DATABASE: {len(st.session_state.dataset)} KỲ</p>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Card 2: Tài Xỉu & Rồng Hổ
-    st.markdown(f"""
-    <div class='prediction-card'>
-        <div style='display: flex; justify-content: space-between;'>
-            <div>
-                <p class='status-text'>📊 TỔNG 5: <span class='highlight'>{res['t5']}</span></p>
-                <p class='status-text'>🐲 RỒNG HỔ: <span class='highlight'>{res['rh']}</span></p>
+with col_right:
+    if len(st.session_state.dataset) >= 5:
+        ranked, scores, streaks = analyze_v2000(st.session_state.dataset)
+        p1 = ranked[:3]
+        
+        # Trạng thái cầu
+        if streaks:
+            st.markdown(f"<div class='status-bar' style='background: rgba(255, 0, 0, 0.2); color: #ff4b4b; border: 1px solid #ff4b4b;'>⚠️ CẢNH BÁO BỆT: {', '.join(streaks)}</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div class='status-bar' style='background: rgba(0, 255, 0, 0.1); color: #00ffcc; border: 1px solid #00ffcc;'>✅ NHỊP CẦU ĐANG ỔN ĐỊNH</div>", unsafe_allow_html=True)
+
+        # Hiển thị số chốt chính
+        st.markdown(f"""
+            <div style='background: linear-gradient(180deg, #1b1e23 0%, #0e1117 100%); border: 2px solid #ffd700; border-radius: 20px; padding: 20px; text-align: center;'>
+                <p style='color: #ffd700; letter-spacing: 5px; font-weight: bold;'>🎯 DỰ ĐOÁN TAY TIẾP</p>
+                <div class='number-display'>{"-".join(p1)}</div>
+                <p style='color: #888;'>Ưu tiên: <span style='color: #00ffcc; font-size: 24px; font-weight: bold;'>{p1[0]}</span></p>
             </div>
-            <div style='text-align: right;'>
-                <p class='status-text'>Accuracy: 89%</p>
-                <p class='status-text'>Prob: {res['rh_p']}%</p>
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    st.markdown(f"""
-        <div style='margin-top: 15px; padding: 10px; background: rgba(0,85,255,0.1); border-radius: 5px; text-align: center;'>
-            <span style='font-size: 12px; color: #0055ff;'>Hệ thống đã tự học từ {res['history_count']} kỳ. Auto-Correction: [ACTIVE]</span>
-        </div>
-    """, unsafe_allow_html=True)
-else:
-    st.info(f"Đang thiếu dữ liệu. Cần thêm {15 - len(st.session_state.history)} kỳ nữa để kích hoạt OLYMPUS Engine.")
+        # Biểu đồ sức mạnh (Gọn lại)
+        with st.expander("📊 BIỂU ĐỒ SỨC MẠNH", expanded=True):
+            chart_data = pd.DataFrame({'Điểm': scores.values()}, index=scores.keys())
+            st.bar_chart(chart_data, height=200)
+    else:
+        st.info("Vui lòng nạp thêm kết quả để kích hoạt hệ thống phân tích.")
 
+st.markdown("<p style='text-align: center; color: #444; margin-top: 50px;'>© 2026 TITAN CORE SYSTEM - V2000 PRO</p>", unsafe_allow_html=True)
