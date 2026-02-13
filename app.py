@@ -2,70 +2,86 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import json
+from collections import Counter
 
-# ================= KÍCH HOẠT NÃO BỘ GEMINI =================
-# Em đã dán sẵn Key anh vừa gửi vào đây
-GEMINI_API_KEY = "AIzaSyCF4AFrKTI8xs3uFX7OJwWcApa5dbRTIxA"
+# ================= CẤU HÌNH API MỚI =================
+# Em dán mã mới của anh vào đây
+GEMINI_API_KEY = "AIzaSyB29CfRv79fqzOtCSvhTqMURyw9sB1xUIA"
 
-try:
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    st.session_state.api_status = "✅ ĐÃ KẾT NỐI GEMINI"
-except:
-    st.session_state.api_status = "❌ LỖI KẾT NỐI API"
+def init_gemini():
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        return genai.GenerativeModel('gemini-1.5-flash')
+    except:
+        return None
 
-# ================= GIAO DIỆN CHUYÊN NGHIỆP =================
-st.set_page_config(page_title="TITAN v13.5 STREAK MASTER", layout="centered")
+model = init_gemini()
+
+# ================= GIAO DIỆN PHẲNG CHỐNG ĐẢO =================
+st.set_page_config(page_title="TITAN v13.9 STREAK", layout="wide")
 st.markdown("""
     <style>
     .stApp { background-color: #050a10; color: #00ffcc; }
-    .status-bar { padding: 10px; border-radius: 5px; background: #111b27; text-align: center; font-weight: bold; }
-    .number-card { font-size: 40px; font-weight: 900; color: #ffffff; text-shadow: 0 0 10px #00ffcc; text-align: center; }
+    .status-active { color: #00ffcc; font-weight: bold; border: 1px solid #00ffcc; padding: 5px; border-radius: 5px; }
+    .streak-box { background: rgba(255, 0, 85, 0.1); border-left: 5px solid #ff0055; padding: 15px; margin: 10px 0; }
+    .number-highlight { font-size: 45px; font-weight: 900; color: #ffffff; text-shadow: 0 0 15px #00ffcc; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🧠 TITAN v13.5 - STREAK MASTER")
-st.markdown(f"<div class='status-bar'>{st.session_state.api_status}</div>", unsafe_allow_html=True)
+# Hiển thị trạng thái kết nối thực tế
+if model:
+    st.markdown("<div class='status-active'>● GEMINI ĐÃ THÔNG NÃO (API LIVE)</div>", unsafe_allow_html=True)
+else:
+    st.error("● LỖI API: HÃY KIỂM TRA LẠI KEY TRÊN GOOGLE AI STUDIO")
 
-# ================= XỬ LÝ DỮ LIỆU & BỆT =================
-input_data = st.text_area("📡 DÁN DỮ LIỆU KỲ VỪA VỀ:", height=100, placeholder="Ví dụ: 70938...")
+st.title("🧠 TITAN v13.9 - CHUYÊN GIA BẮT BỆT")
 
-if st.button("🔥 KÍCH HOẠT TƯ DUY AI"):
+# ================= XỬ LÝ DỮ LIỆU =================
+input_data = st.text_area("📡 DÁN DỮ LIỆU NHÀ CÁI (VÍ DỤ: 70938...):", height=120)
+
+if st.button("🚀 KÍCH HOẠT TƯ DUY AI"):
+    # Tách lấy các kỳ số
     history = re.findall(r"\d{5}", input_data)
     
-    if len(history) < 5:
-        st.error("Anh cần dán ít nhất 5-10 kỳ gần nhất để AI thấy được cầu bệt!")
+    if len(history) < 3:
+        st.warning("Anh cần dán ít nhất 3-5 kỳ để AI thấy được cầu!")
     else:
-        # Prompt mới: Ép AI nhận diện bệt (số lặp lại)
+        # 1. Thuật toán nhận diện bệt thủ công (Phòng hờ)
+        all_nums = "".join(history)
+        count_map = Counter(all_nums)
+        top_streaks = [num for num, count in count_map.most_common(4)]
+        
+        # 2. Gửi lệnh cho Gemini tư duy sâu
         prompt = f"""
-        Bạn là chuyên gia toán xác suất 5D. 
-        Dữ liệu thực tế: {history}.
+        Bạn là chuyên gia phân tích cầu 5D. Dữ liệu thực tế: {history}.
         Yêu cầu:
-        1. Tìm các số đang có xu hướng lặp lại (BỆT) ở 5 vị trí.
-        2. Nếu nhà cái đảo cầu, hãy chọn 7 số có biên độ ổn định nhất.
-        3. Chia thành 2 dàn: Dàn 4 (Chủ lực) và Dàn 3 (Lót).
-        Trả về JSON duy nhất: {{"dan4": [], "dan3": [], "tu_duy": "giải thích ngắn gọn"}}
+        1. Nhận diện các số đang BỆT (xuất hiện liên tục).
+        2. Nếu nhà cái đảo cầu, hãy tính toán bước nhảy để chặn đầu.
+        3. Trả về JSON: {{"dan4_chuluc": [], "dan3_lot": [], "ly_do": ""}}
         """
         
         try:
             response = model.generate_content(prompt)
-            # Trích xuất JSON từ phản hồi
             res_text = response.text
             json_match = re.search(r'\{.*\}', res_text, re.DOTALL)
             data = json.loads(json_match.group())
             
-            st.success("AI ĐÃ PHÂN TÍCH XONG!")
-            st.markdown(f"**💡 Tư duy AI:** {data['tu_duy']}")
+            # HIỂN THỊ KẾT QUẢ
+            st.markdown(f"<div class='streak-box'><b>💡 Phân tích bệt:</b> {data['ly_do']}</div>", unsafe_allow_html=True)
             
             c1, c2 = st.columns(2)
             with c1:
-                st.info("🎯 DÀN 4 (CHỦ LỰC)")
-                st.markdown(f"<div class='number-card'>{' - '.join(map(str, data['dan4']))}</div>", unsafe_allow_html=True)
+                st.subheader("🎯 DÀN 4 CHỦ LỰC")
+                st.markdown(f"<div class='number-highlight'>{' - '.join(map(str, data['dan4_chuluc']))}</div>", unsafe_allow_html=True)
             with c2:
-                st.warning("🛡️ DÀN 3 (LÓT)")
-                st.markdown(f"<div class='number-card' style='color:#ffaa00;'>{' - '.join(map(str, data['dan3']))}</div>", unsafe_allow_html=True)
+                st.subheader("🛡️ DÀN 3 LÓT")
+                st.markdown(f"<div class='number-highlight' style='color:#ffaa00;'>{' - '.join(map(str, data['dan3_lot']))}</div>", unsafe_allow_html=True)
             
-            st.text_input("📋 COPY NHANH DÀN 7 SỐ:", "".join(map(str, data['dan4'])) + "".join(map(str, data['dan3'])))
+            full_7 = "".join(map(str, data['dan4_chuluc'])) + "".join(map(str, data['dan3_lot']))
+            st.text_input("📋 COPY DÀN 7 SỐ NHANH:", full_7)
             
         except Exception as e:
-            st.error(f"Lỗi khi AI tư duy: {e}. Anh kiểm tra xem đã bật Gemini 1.5 trong Google AI Studio chưa nhé!")
+            st.error(f"AI đang bận hoặc Key bị giới hạn. Dàn bệt dự phòng: {top_streaks}")
+
+st.markdown("---")
+st.caption("Mẹo: Nếu thấy nhà cái ra số lặp (ví dụ 1-1, 9-9), hãy dán ngay vào để AI bắt cầu bệt.")
