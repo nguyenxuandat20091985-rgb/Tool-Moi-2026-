@@ -16,7 +16,7 @@ from collections import defaultdict, Counter
 GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "")
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", "")
 
-# =============== THUẬT TOÁN CAO CẤP NÂNG CẤP ===============
+# =============== THUẬT TOÁN CAO CẤP ===============
 class LotteryAIAnalyzer:
     def __init__(self):
         self.history = []
@@ -37,48 +37,10 @@ class LotteryAIAnalyzer:
             'kep': -0.5,
             'missing_cycle': 2.0,
             'variance': 1.2,
-            'frequency_drop': 1.3,
-            
-            # THÊM TRỌNG SỐ MỚI CHO CÁC THUẬT TOÁN NÂNG CẤP
-            'entropy': 1.7,
-            'kalman': 1.4,
-            'wavelet': 1.3,
-            'lstm': 2.0,
-            'monte_carlo': 1.6,
-            'kelly': 0.9,
-            'martingale': 0.8,
-            'volatility': 1.1,
-            'cluster': 1.2,
-            'fourier': 1.5,
-            'arima': 1.4,
-            'rng_detection': 2.2,
-            'pattern_recognition': 1.9,
-            'ensemble_voting': 2.1,
-            'adaboost': 1.8,
-            'random_forest': 2.0,
-            'gradient_boosting': 2.0,
-            'svm': 1.5,
-            'neural_network': 2.2,
-            'deep_learning': 2.5,
-            'reinforcement': 1.7,
-            'genetic': 1.6,
-            'pso': 1.4,
-            'bayesian': 1.9,
-            'change_point': 1.3,
-            'outlier_detection': 1.5,
-            'spectral': 1.4,
-            'hurst': 1.2,
-            'copula': 1.3,
-            'garch': 1.4,
-            'dtw': 1.5,
-            'hmm': 1.8,
-            'threshold': 1.2,
-            'cusum': 1.3,
-            'bsts': 1.6
+            'frequency_drop': 1.3
         }
         return weights
     
-    # =============== THUẬT TOÁN GỐC (GIỮ NGUYÊN) ===============
     def connect_gemini(self, prompt: str) -> str:
         """Kết nối với Gemini AI để phân tích pattern phức tạp"""
         try:
@@ -162,6 +124,7 @@ class LotteryAIAnalyzer:
     def _calculate_markov_chain_advanced(self, nums: List[str], order: int = 3) -> Dict:
         """Tính Markov Chain bậc cao (tối đa bậc 3)"""
         transitions = {}
+        probabilities = {}
         
         for o in range(1, order + 1):
             trans = {}
@@ -176,9 +139,8 @@ class LotteryAIAnalyzer:
             # Chuẩn hóa
             for state in trans:
                 total = sum(trans[state].values())
-                if total > 0:
-                    for next_num in trans[state]:
-                        trans[state][next_num] = trans[state][next_num] / total
+                for next_num in trans[state]:
+                    trans[state][next_num] = trans[state][next_num] / total
             
             transitions[f'order_{o}'] = trans
         
@@ -352,650 +314,194 @@ class LotteryAIAnalyzer:
         all_nums = set(str(i) for i in range(10))
         cold_nums = list(all_nums - recent_set)
         
+        # Phân tích thêm về độ lạnh
+        cold_analysis = {}
+        for num in cold_nums:
+            last_pos = -1
+            for i, val in enumerate(reversed(nums)):
+                if val == num:
+                    last_pos = i
+                    break
+            
+            cold_analysis[num] = {
+                'missing_for': last_pos + 1 if last_pos >= 0 else len(nums),
+                'severity': 'high' if last_pos > 30 else 'medium' if last_pos > 15 else 'low'
+            }
+        
         return cold_nums
     
     def eliminate_risk_numbers(self, data: str) -> Tuple[List[str], List[str], Dict]:
-        """Loại 3 số rủi ro với thuật toán đa tầng - SỬA LỖI"""
+        """Loại 3 số rủi ro với thuật toán đa tầng"""
         nums = list(filter(str.isdigit, data))
         
-        # THÊM: Kiểm tra dữ liệu đầu vào
         if len(nums) < 10:
-            return [], [str(i) for i in range(10)], {}
+            return [], [], {}
         
-        try:
-            # Phân tích đa chiều
-            analysis = self.analyze_advanced_frequency(data)
-            
-            # Tính điểm rủi ro với trọng số thông minh
-            risk_scores = {str(i): 0.0 for i in range(10)}
-            
-            # 1. PHÂN TÍCH SỐ LẠNH - TRỌNG SỐ CAO
-            if 'multi_window' in analysis and 'window_20' in analysis['multi_window']:
-                for num in analysis['multi_window']['window_20'].get('cold', []):
-                    risk_scores[num] += self.weight_matrix['cold']
-            
-            # 2. PHÂN TÍCH MARKOV
-            if len(nums) >= 2:
-                last_states = [
-                    tuple(nums[-2:]) if len(nums) >= 2 else None,
-                    tuple(nums[-3:]) if len(nums) >= 3 else None
-                ]
-                
-                for i, state in enumerate(last_states):
-                    if state and state in analysis.get('markov', {}).get(f'order_{i+1}', {}):
-                        for num, prob in analysis['markov'][f'order_{i+1}'][state].items():
-                            if prob < 0.03:  # Xác suất rất thấp
-                                risk_scores[num] += self.weight_matrix['markov_low'] * (i + 1)
-                            elif prob > 0.2:  # Xác suất cao
-                                risk_scores[num] -= self.weight_matrix['markov_high'] * (i + 1)
-            
-            # 3. PHÂN TÍCH CHU KỲ
-            for num, cycle_info in analysis.get('cycles', {}).items():
-                if cycle_info['current_missing'] > 30:
-                    risk_scores[num] += self.weight_matrix['missing_cycle'] * 1.5
-                elif cycle_info['current_missing'] > 20:
-                    risk_scores[num] += self.weight_matrix['missing_cycle']
-                elif cycle_info['current_missing'] > 10:
-                    risk_scores[num] += self.weight_matrix['missing_cycle'] * 0.5
-            
-            # 4. PHÂN TÍCH POISSON
-            for num, poisson_info in analysis.get('poisson', {}).items():
-                if poisson_info['prob_next'] < 0.1:
-                    risk_scores[num] += 1.0
-                elif poisson_info['prob_next'] > 0.3:
-                    risk_scores[num] -= 0.8
-            
-            # 5. SỐ NÓNG - GIẢM ĐIỂM RỦI RO
-            for window_data in analysis.get('multi_window', {}).values():
-                for num in window_data.get('hot', []):
-                    risk_scores[num] = max(0, risk_scores[num] - self.weight_matrix['hot'])
-            
-            # 6. PATTERN THỜI GIAN
-            for num in analysis.get('hour_pattern', []):
-                risk_scores[num] = max(0, risk_scores[num] - self.weight_matrix['hour_pattern'])
-            
-            for num in analysis.get('weekday_pattern', []):
-                risk_scores[num] = max(0, risk_scores[num] - 0.3)
-            
-            # 7. PHÂN TÍCH ĐỘ BIẾN ĐỘNG
-            variance = self._calculate_variance(nums[-20:]) if len(nums) >= 20 else 0
-            if variance > 8:  # Biến động cao
-                for num in risk_scores:
-                    risk_scores[num] += self.weight_matrix['variance'] * 0.5
-            
-            # 8. PHÂN TÍCH TƯƠNG QUAN
-            for pair in analysis.get('correlation', {}).get('pairs', [])[:5]:
-                risk_scores[pair[1]] -= 0.3  # Số có tương quan cao giảm rủi ro
-            
-            # Lấy 3 số có điểm rủi ro cao nhất
-            eliminated = sorted(risk_scores.items(), key=lambda x: x[1], reverse=True)[:3]
-            eliminated_nums = [num for num, score in eliminated]
-            
-            # 7 số còn lại
-            remaining = [str(i) for i in range(10) if str(i) not in eliminated_nums]
-            
-            return eliminated_nums, remaining, analysis
-            
-        except Exception as e:
-            # THÊM: Xử lý lỗi, trả về giá trị mặc định
-            print(f"Lỗi trong eliminate_risk_numbers: {str(e)}")
-            return [], [str(i) for i in range(10)], {}
+        # Phân tích đa chiều
+        analysis = self.analyze_advanced_frequency(nums)
+        
+        # Tính điểm rủi ro với trọng số thông minh
+        risk_scores = {str(i): 0.0 for i in range(10)}
+        
+        # 1. PHÂN TÍCH SỐ LẠNH - TRỌNG SỐ CAO
+        for num in analysis['multi_window'].get('window_20', {}).get('cold', []):
+            risk_scores[num] += self.weight_matrix['cold']
+        
+        # 2. PHÂN TÍCH MARKOV
+        last_states = [
+            tuple(nums[-2:]) if len(nums) >= 2 else None,
+            tuple(nums[-3:]) if len(nums) >= 3 else None
+        ]
+        
+        for i, state in enumerate(last_states):
+            if state and state in analysis['markov'].get(f'order_{i+1}', {}):
+                for num, prob in analysis['markov'][f'order_{i+1}'][state].items():
+                    if prob < 0.03:  # Xác suất rất thấp
+                        risk_scores[num] += self.weight_matrix['markov_low'] * (i + 1)
+                    elif prob > 0.2:  # Xác suất cao
+                        risk_scores[num] -= self.weight_matrix['markov_high'] * (i + 1)
+        
+        # 3. PHÂN TÍCH CHU KỲ
+        for num, cycle_info in analysis['cycles'].items():
+            if cycle_info['current_missing'] > 30:
+                risk_scores[num] += self.weight_matrix['missing_cycle'] * 1.5
+            elif cycle_info['current_missing'] > 20:
+                risk_scores[num] += self.weight_matrix['missing_cycle']
+            elif cycle_info['current_missing'] > 10:
+                risk_scores[num] += self.weight_matrix['missing_cycle'] * 0.5
+        
+        # 4. PHÂN TÍCH POISSON
+        for num, poisson_info in analysis['poisson'].items():
+            if poisson_info['prob_next'] < 0.1:
+                risk_scores[num] += 1.0
+            elif poisson_info['prob_next'] > 0.3:
+                risk_scores[num] -= 0.8
+        
+        # 5. SỐ NÓNG - GIẢM ĐIỂM RỦI RO
+        for window_data in analysis['multi_window'].values():
+            for num in window_data.get('hot', []):
+                risk_scores[num] = max(0, risk_scores[num] - self.weight_matrix['hot'])
+        
+        # 6. PATTERN THỜI GIAN
+        for num in analysis['hour_pattern']:
+            risk_scores[num] = max(0, risk_scores[num] - self.weight_matrix['hour_pattern'])
+        
+        for num in analysis['weekday_pattern']:
+            risk_scores[num] = max(0, risk_scores[num] - 0.3)
+        
+        # 7. PHÂN TÍCH ĐỘ BIẾN ĐỘNG
+        variance = self._calculate_variance(nums[-20:]) if len(nums) >= 20 else 0
+        if variance > 8:  # Biến động cao
+            for num in risk_scores:
+                risk_scores[num] += self.weight_matrix['variance'] * 0.5
+        
+        # 8. PHÂN TÍCH TƯƠNG QUAN
+        for pair in analysis['correlation']['pairs'][:5]:
+            risk_scores[pair[1]] -= 0.3  # Số có tương quan cao giảm rủi ro
+        
+        # Lấy 3 số có điểm rủi ro cao nhất
+        eliminated = sorted(risk_scores.items(), key=lambda x: x[1], reverse=True)[:3]
+        eliminated_nums = [num for num, score in eliminated]
+        
+        # 7 số còn lại
+        remaining = [str(i) for i in range(10) if str(i) not in eliminated_nums]
+        
+        return eliminated_nums, remaining, analysis
     
     def select_top_three(self, remaining_nums: List[str], data: str, analysis: Dict = None) -> List[str]:
-        """Chọn 3 số với thuật toán dự đoán đa tầng - SỬA LỖI"""
+        """Chọn 3 số với thuật toán dự đoán đa tầng"""
         nums = list(filter(str.isdigit, data))
         
-        # THÊM: Kiểm tra dữ liệu đầu vào
         if not remaining_nums or len(remaining_nums) < 3:
             return ["0", "1", "2"]
         
-        if not nums:
-            return remaining_nums[:3]
+        # Tính điểm cho từng số còn lại
+        scores = {num: 0.0 for num in remaining_nums}
         
-        try:
-            # Tính điểm cho từng số còn lại
-            scores = {num: 0.0 for num in remaining_nums}
-            
-            last_num = nums[-1] if nums else "0"
-            
-            # 1. BÓNG DƯƠNG - ÂM
-            bong_duong = {"0": "5", "1": "6", "2": "7", "3": "8", "4": "9",
-                          "5": "0", "6": "1", "7": "2", "8": "3", "9": "4"}
-            bong_am = {"0": "7", "1": "4", "2": "9", "3": "6", "4": "1",
-                       "5": "8", "6": "3", "7": "0", "8": "5", "9": "2"}
-            
-            if bong_duong.get(last_num) in remaining_nums:
-                scores[bong_duong[last_num]] += 3.0
-            
-            if bong_am.get(last_num) in remaining_nums:
-                scores[bong_am[last_num]] += 2.5
-            
-            # 2. SỐ LIỀN KỀ
-            next_num = str((int(last_num) + 1) % 10)
-            prev_num = str((int(last_num) - 1) % 10)
-            
-            if next_num in remaining_nums:
-                scores[next_num] += 2.0
-            if prev_num in remaining_nums:
-                scores[prev_num] += 1.8
-            
-            # 3. SỐ KẸP
-            if len(nums) >= 2:
-                kẹp_số = str((int(nums[-2]) + int(nums[-1])) % 10)
-                if kẹp_số in remaining_nums:
-                    scores[kẹp_số] += 1.5
-            
-            # 4. TẦN SUẤT CAO
-            if len(nums) >= 10:
-                recent_counts = Counter(nums[-10:])
-                for num, count in recent_counts.most_common():
+        last_num = nums[-1] if nums else "0"
+        
+        # 1. BÓNG DƯƠNG - ÂM
+        bong_duong = {"0": "5", "1": "6", "2": "7", "3": "8", "4": "9",
+                      "5": "0", "6": "1", "7": "2", "8": "3", "9": "4"}
+        bong_am = {"0": "7", "1": "4", "2": "9", "3": "6", "4": "1",
+                   "5": "8", "6": "3", "7": "0", "8": "5", "9": "2"}
+        
+        if bong_duong.get(last_num) in remaining_nums:
+            scores[bong_duong[last_num]] += 3.0
+        
+        if bong_am.get(last_num) in remaining_nums:
+            scores[bong_am[last_num]] += 2.5
+        
+        # 2. SỐ LIỀN KỀ
+        next_num = str((int(last_num) + 1) % 10)
+        prev_num = str((int(last_num) - 1) % 10)
+        
+        if next_num in remaining_nums:
+            scores[next_num] += 2.0
+        if prev_num in remaining_nums:
+            scores[prev_num] += 1.8
+        
+        # 3. SỐ KẸP
+        if len(nums) >= 2:
+            kẹp_số = str((int(nums[-2]) + int(nums[-1])) % 10)
+            if kẹp_số in remaining_nums:
+                scores[kẹp_số] += 1.5
+        
+        # 4. TẦN SUẤT CAO
+        if len(nums) >= 10:
+            recent_counts = Counter(nums[-10:])
+            for num, count in recent_counts.most_common():
+                if num in remaining_nums:
+                    scores[num] += count * 0.3
+        
+        # 5. PHÂN TÍCH MARKOV
+        if analysis and 'markov' in analysis:
+            last_state = tuple(nums[-2:]) if len(nums) >= 2 else None
+            if last_state and last_state in analysis['markov'].get('order_2', {}):
+                for num, prob in analysis['markov']['order_2'][last_state].items():
                     if num in remaining_nums:
-                        scores[num] += count * 0.3
-            
-            # 5. PHÂN TÍCH MARKOV
-            if analysis and 'markov' in analysis and len(nums) >= 2:
-                last_state = tuple(nums[-2:]) if len(nums) >= 2 else None
-                if last_state and last_state in analysis['markov'].get('order_2', {}):
-                    for num, prob in analysis['markov']['order_2'][last_state].items():
-                        if num in remaining_nums:
-                            scores[num] += prob * 5
-            
-            # 6. PHÂN TÍCH POISSON
-            if analysis and 'poisson' in analysis:
-                for num in remaining_nums:
-                    scores[num] += analysis['poisson'].get(num, {}).get('prob_next', 0) * 3
-            
-            # 7. PATTERN THỜI GIAN
-            if analysis:
-                if last_num in analysis.get('hour_pattern', []):
-                    for num in analysis['hour_pattern']:
-                        if num in remaining_nums:
-                            scores[num] += 0.5
-                
-                if last_num in analysis.get('weekday_pattern', []):
-                    for num in analysis['weekday_pattern']:
-                        if num in remaining_nums:
-                            scores[num] += 0.3
-            
-            # 8. TƯƠNG QUAN MẠNH
-            if analysis and 'correlation' in analysis:
-                for pair in analysis['correlation'].get('pairs', [])[:3]:
-                    if len(pair) >= 2 and pair[0] == last_num and pair[1] in remaining_nums:
-                        scores[pair[1]] += pair[2] * 3
-            
-            # THÊM: Các thuật toán nâng cao (bọc trong try-catch để tránh lỗi)
-            
-            # 9. KALMAN FILTER
-            try:
-                kalman_result = self.kalman_filter_prediction(nums)
-                if kalman_result and str(kalman_result.get('prediction', '')) in remaining_nums:
-                    scores[str(kalman_result['prediction'])] += self.weight_matrix.get('kalman', 1.4) * 2
-            except:
-                pass
-            
-            # 10. WAVELET
-            try:
-                wavelet_result = self.wavelet_decomposition(nums)
-                if wavelet_result and str(wavelet_result.get('prediction', '')) in remaining_nums:
-                    scores[str(wavelet_result['prediction'])] += self.weight_matrix.get('wavelet', 1.3) * 2
-            except:
-                pass
-            
-            # 11. ENSEMBLE VOTING
-            try:
-                ensemble_result = self.ensemble_voting_advanced(nums)
-                if ensemble_result and 'predictions' in ensemble_result:
-                    for i, pred in enumerate(ensemble_result['predictions'][:2]):
-                        if pred in remaining_nums:
-                            scores[pred] += self.weight_matrix.get('ensemble_voting', 2.1) * (1.5 - i * 0.3)
-            except:
-                pass
-            
-            # 12. LSTM
-            try:
-                lstm_result = self.lstm_enhanced_prediction(nums)
-                if lstm_result and 'predictions' in lstm_result:
-                    for i, pred in enumerate(lstm_result['predictions'][:2]):
-                        if pred in remaining_nums:
-                            scores[pred] += self.weight_matrix.get('lstm', 2.0) * (2.0 - i * 0.5)
-            except:
-                pass
-            
-            # 13. MONTE CARLO
-            try:
-                mc_result = self.monte_carlo_advanced(nums)
-                if mc_result and 'predictions' in mc_result:
-                    step1_preds = mc_result['predictions'].get('step_1', {}).get('top_3', [])
-                    for i, pred in enumerate(step1_preds[:2]):
-                        if pred in remaining_nums:
-                            scores[pred] += self.weight_matrix.get('monte_carlo', 1.6) * (1.8 - i * 0.4)
-            except:
-                pass
-            
-            # Sắp xếp theo điểm số
-            sorted_nums = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-            
-            # Lấy top 3
-            top_three = [num for num, score in sorted_nums[:3]]
-            
-            # Nếu chưa đủ 3, bổ sung
-            while len(top_three) < 3:
-                for num in remaining_nums:
-                    if num not in top_three:
-                        top_three.append(num)
-                    if len(top_three) >= 3:
-                        break
-            
-            return top_three[:3]
-            
-        except Exception as e:
-            # THÊM: Xử lý lỗi, trả về giá trị mặc định
-            print(f"Lỗi trong select_top_three: {str(e)}")
-            return remaining_nums[:3] if len(remaining_nums) >= 3 else remaining_nums + ["0", "1", "2"][:3-len(remaining_nums)]
-    
-    # =============== 1. THUẬT TOÁN ENTROPY & INFORMATION THEORY (THÊM MỚI) ===============
-    def analyze_entropy_multiscale(self, nums: List[str], scales: List[int] = [1, 2, 3, 5]) -> Dict:
-        """THÊM: Phân tích Entropy đa tỷ lệ - Đo độ hỗn loạn của chuỗi số"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < 10:
-            return {}
+                        scores[num] += prob * 5
         
-        entropy_results = {}
+        # 6. PHÂN TÍCH POISSON
+        if analysis and 'poisson' in analysis:
+            for num in remaining_nums:
+                scores[num] += analysis['poisson'].get(num, {}).get('prob_next', 0) * 3
         
-        for scale in scales:
-            try:
-                scaled_series = []
-                for i in range(0, len(int_nums) - scale + 1, scale):
-                    scaled_series.append(np.mean(int_nums[i:i+scale]))
-                
-                # Tính entropy cho chuỗi đã được scale
-                hist, _ = np.histogram(scaled_series, bins=10)
-                probs = hist / len(scaled_series)
-                entropy = -np.sum(p * np.log2(p) for p in probs if p > 0)
-                
-                entropy_results[f'scale_{scale}'] = {
-                    'entropy': entropy,
-                    'randomness': entropy / np.log2(10),
-                    'complexity': entropy * scale,
-                    'prediction_difficulty': 'Cao' if entropy > 2.5 else 'Trung bình' if entropy > 1.5 else 'Thấp'
-                }
-            except:
-                pass
+        # 7. PATTERN THỜI GIAN
+        if analysis:
+            if last_num in analysis.get('hour_pattern', []):
+                for num in analysis['hour_pattern']:
+                    if num in remaining_nums:
+                        scores[num] += 0.5
+            
+            if last_num in analysis.get('weekday_pattern', []):
+                for num in analysis['weekday_pattern']:
+                    if num in remaining_nums:
+                        scores[num] += 0.3
         
-        return entropy_results
-    
-    # =============== 2. THUẬT TOÁN KALMAN & WAVELET (THÊM MỚI) ===============
-    def kalman_filter_prediction(self, nums: List[str]) -> Dict:
-        """THÊM: Dự đoán bằng bộ lọc Kalman"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < 5:
-            return {}
+        # 8. TƯƠNG QUAN MẠNH
+        if analysis and 'correlation' in analysis:
+            for pair in analysis['correlation']['pairs'][:3]:
+                if pair[0] == last_num and pair[1] in remaining_nums:
+                    scores[pair[1]] += pair[2] * 3
         
-        try:
-            # Khởi tạo Kalman filter
-            x_est = int_nums[0]  # ước lượng ban đầu
-            p_est = 1.0  # ước lượng sai số ban đầu
-            q = 0.01  # nhiễu quá trình
-            r = 0.1   # nhiễu đo lường
-            
-            estimates = [x_est]
-            
-            for z in int_nums[1:]:
-                # Dự đoán
-                x_pred = x_est
-                p_pred = p_est + q
-                
-                # Cập nhật
-                k = p_pred / (p_pred + r) if (p_pred + r) > 0 else 0
-                x_est = x_pred + k * (z - x_pred)
-                p_est = (1 - k) * p_pred
-                
-                estimates.append(x_est)
-            
-            # Dự đoán giá trị tiếp theo
-            next_prediction = x_est
-            confidence = 1 - (p_est / (p_est + r)) if (p_est + r) > 0 else 0.5
-            
-            return {
-                'prediction': int(round(next_prediction)) % 10,
-                'confidence': min(confidence * 100, 95),
-                'estimates': estimates[-5:],
-                'uncertainty': p_est
-            }
-        except:
-            return {}
-    
-    def wavelet_decomposition(self, nums: List[str], levels: int = 3) -> Dict:
-        """THÊM: Phân tích Wavelet để phát hiện xu hướng"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < 5:
-            return {}
+        # Sắp xếp theo điểm số
+        sorted_nums = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         
-        try:
-            # Moving average như wavelet approximation
-            window = min(5, len(int_nums))
-            weights = np.ones(window) / window
-            smoothed = np.convolve(int_nums, weights, mode='valid')
-            
-            if len(smoothed) < 2:
-                return {'prediction': int_nums[-1] % 10, 'confidence': 50}
-            
-            detail = int_nums[window-1:len(smoothed)] - smoothed[:len(int_nums[window-1:len(smoothed)])]
-            
-            return {
-                'energy_ratios': [np.var(smoothed) if len(smoothed) > 0 else 0, 
-                                 np.var(detail) if len(detail) > 0 else 0],
-                'trend': 'Tăng' if smoothed[-1] > smoothed[-2] else 'Giảm',
-                'prediction': int(round(smoothed[-1])) % 10,
-                'confidence': 70
-            }
-        except:
-            return {'prediction': int_nums[-1] % 10, 'confidence': 50}
-    
-    # =============== 3. THUẬT TOÁN LSTM & DEEP LEARNING (THÊM MỚI) ===============
-    def lstm_enhanced_prediction(self, nums: List[str], lookback: int = 10) -> Dict:
-        """THÊM: LSTM nâng cao với attention mechanism (phiên bản đơn giản)"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < lookback:
-            return self._lstm_simple(int_nums, lookback)
+        # Lấy top 3
+        top_three = [num for num, score in sorted_nums[:3]]
         
-        try:
-            # Exponential weighted moving average
-            weights = np.exp(np.linspace(0, 2, min(lookback, len(int_nums))))
-            weights = weights / weights.sum()
-            
-            last_sequence = int_nums[-min(lookback, len(int_nums)):]
-            prediction = np.average(last_sequence, weights=weights[-len(last_sequence):])
-            
-            # Tính confidence dựa trên độ ổn định
-            volatility = np.std(last_sequence) if len(last_sequence) > 1 else 0
-            confidence = max(0, 100 - volatility * 10)
-            
-            # Tạo top 3 predictions
-            pred_int = int(round(prediction)) % 10
-            neighbors = [(pred_int + i) % 10 for i in [0, 1, -1]]
-            
-            return {
-                'predictions': [str(p) for p in neighbors[:3]],
-                'probabilities': [0.5, 0.3, 0.2],
-                'confidence': min(confidence, 85),
-                'loss': 0.5
-            }
-        except:
-            return self._lstm_simple(int_nums, lookback)
-    
-    def _lstm_simple(self, nums: List[int], lookback: int) -> Dict:
-        """THÊM: LSTM đơn giản"""
-        if not nums:
-            return {'predictions': ['0'], 'confidence': 50}
+        # Nếu chưa đủ 3, bổ sung
+        while len(top_three) < 3:
+            for num in remaining_nums:
+                if num not in top_three:
+                    top_three.append(num)
+                if len(top_three) >= 3:
+                    break
         
-        try:
-            weights = np.exp(np.linspace(0, 2, min(lookback, len(nums))))
-            weights = weights / weights.sum()
-            
-            last_sequence = nums[-min(lookback, len(nums)):]
-            prediction = np.average(last_sequence, weights=weights[-len(last_sequence):])
-            
-            pred_int = int(round(prediction)) % 10
-            neighbors = [str((pred_int + i) % 10) for i in [0, 1, -1]]
-            
-            return {
-                'predictions': neighbors[:3],
-                'probabilities': [0.4, 0.3, 0.3],
-                'confidence': 60,
-                'loss': 0.6
-            }
-        except:
-            return {'predictions': [str(nums[-1] % 10)], 'confidence': 50}
-    
-    # =============== 4. THUẬT TOÁN MONTE CARLO & SIMULATION (THÊM MỚI) ===============
-    def monte_carlo_advanced(self, nums: List[str], n_simulations: int = 1000) -> Dict:
-        """THÊM: Monte Carlo với phân phối xác suất động"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < 20:
-            return {}
-        
-        try:
-            # Xây dựng phân phối xác suất từ dữ liệu lịch sử
-            probs = np.zeros(10)
-            for i in range(10):
-                probs[i] = int_nums.count(i) / len(int_nums)
-            
-            # Thêm nhiễu Bayesian
-            alpha = 1.0
-            probs = (probs * len(int_nums) + alpha) / (len(int_nums) + 10 * alpha)
-            
-            # Monte Carlo simulation
-            simulations = np.random.choice(10, size=(n_simulations, 5), p=probs)
-            
-            # Phân tích kết quả
-            results = {}
-            for i in range(min(5, simulations.shape[1])):
-                step_results = simulations[:, i]
-                unique, counts = np.unique(step_results, return_counts=True)
-                probs_step = counts / n_simulations
-                
-                top_3_idx = np.argsort(probs_step)[-3:][::-1]
-                results[f'step_{i+1}'] = {
-                    'top_3': [str(unique[idx]) for idx in top_3_idx],
-                    'probabilities': [float(probs_step[idx]) for idx in top_3_idx],
-                    'entropy': -np.sum(probs_step * np.log2(probs_step + 1e-10))
-                }
-            
-            return {
-                'predictions': results,
-                'expected_value': float(simulations.mean()),
-                'confidence': 75
-            }
-        except:
-            return {}
-    
-    # =============== 9. THUẬT TOÁN ENSEMBLE VOTING NÂNG CAO (THÊM MỚI) ===============
-    def ensemble_voting_advanced(self, nums: List[str]) -> Dict:
-        """THÊM: Ensemble voting với nhiều thuật toán"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < 10:
-            return {}
-        
-        try:
-            predictions = []
-            weights = []
-            
-            # 1. Markov Chain prediction
-            markov_pred = self.markov_predict_simple(nums)
-            if markov_pred:
-                predictions.append(int(markov_pred))
-                weights.append(1.5)
-            
-            # 2. Kalman Filter prediction
-            kalman_result = self.kalman_filter_prediction(nums)
-            if kalman_result and 'prediction' in kalman_result:
-                predictions.append(kalman_result['prediction'])
-                weights.append(1.3)
-            
-            # 3. LSTM prediction
-            lstm_result = self.lstm_enhanced_prediction(nums)
-            if lstm_result and 'predictions' in lstm_result and lstm_result['predictions']:
-                predictions.append(int(lstm_result['predictions'][0]))
-                weights.append(2.0)
-            
-            # 4. Wavelet prediction
-            wavelet_result = self.wavelet_decomposition(nums)
-            if wavelet_result and 'prediction' in wavelet_result:
-                predictions.append(wavelet_result['prediction'])
-                weights.append(1.2)
-            
-            if not predictions:
-                return {}
-            
-            # Weighted voting
-            weighted_votes = defaultdict(float)
-            for pred, weight in zip(predictions, weights):
-                weighted_votes[pred % 10] += weight
-            
-            # Top predictions
-            top_predictions = sorted(weighted_votes.items(), key=lambda x: x[1], reverse=True)[:3]
-            
-            return {
-                'predictions': [str(p[0]) for p in top_predictions],
-                'probabilities': [p[1] / sum(weighted_votes.values()) for p in top_predictions],
-                'weights': weights[:len(top_predictions)],
-                'n_models': len(predictions),
-                'confidence': min(top_predictions[0][1] / sum(weighted_votes.values()) * 100 + 30, 95),
-                'method': 'weighted_ensemble'
-            }
-        except:
-            return {}
-    
-    def markov_predict_simple(self, nums: List[str]) -> Optional[str]:
-        """Helper: Markov prediction đơn giản"""
-        if len(nums) < 2:
-            return None
-        
-        try:
-            transitions = {}
-            for i in range(len(nums) - 1):
-                current = nums[i]
-                next_num = nums[i + 1]
-                if current not in transitions:
-                    transitions[current] = []
-                transitions[current].append(next_num)
-            
-            last_num = nums[-1]
-            if last_num in transitions and transitions[last_num]:
-                next_predictions = Counter(transitions[last_num])
-                return next_predictions.most_common(1)[0][0]
-        except:
-            pass
-        
-        return None
-    
-    # =============== 17. THUẬT TOÁN PSO (Particle Swarm Optimization) (THÊM MỚI) ===============
-    def pso_optimization(self, nums: List[str]) -> Dict:
-        """THÊM: Tối ưu hóa bầy đàn PSO (phiên bản đơn giản)"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < 20:
-            return {}
-        
-        try:
-            n_particles = 20
-            n_iterations = 20
-            
-            # Particle position: weights for prediction
-            particles = np.random.rand(n_particles, 5)
-            particles = particles / particles.sum(axis=1, keepdims=True)
-            
-            velocities = np.random.randn(n_particles, 5) * 0.1
-            
-            personal_best_pos = particles.copy()
-            personal_best_score = np.zeros(n_particles)
-            global_best_pos = particles[0].copy()
-            global_best_score = 0
-            
-            def fitness(weights):
-                """Evaluate prediction accuracy with weights"""
-                if len(int_nums) < 6:
-                    return 0
-                predictions = []
-                for i in range(len(int_nums) - 5):
-                    pattern = int_nums[i:i+5]
-                    pred = int(np.average(pattern, weights=weights[:len(pattern)]))
-                    actual = int_nums[i+5]
-                    predictions.append(1 if pred % 10 == actual % 10 else 0)
-                return np.mean(predictions) if predictions else 0
-            
-            # Initialize personal best scores
-            for i in range(n_particles):
-                personal_best_score[i] = fitness(particles[i])
-                if personal_best_score[i] > global_best_score:
-                    global_best_score = personal_best_score[i]
-                    global_best_pos = particles[i].copy()
-            
-            # PSO iterations
-            w = 0.7  # inertia
-            c1 = 1.5  # cognitive
-            c2 = 1.5  # social
-            
-            for _ in range(n_iterations):
-                for i in range(n_particles):
-                    # Update velocity
-                    r1, r2 = np.random.rand(2)
-                    velocities[i] = (w * velocities[i] + 
-                                   c1 * r1 * (personal_best_pos[i] - particles[i]) +
-                                   c2 * r2 * (global_best_pos - particles[i]))
-                    
-                    # Update position
-                    particles[i] = particles[i] + velocities[i]
-                    particles[i] = np.maximum(particles[i], 0)
-                    particles[i] = particles[i] / (particles[i].sum() + 1e-6)
-                    
-                    # Evaluate
-                    score = fitness(particles[i])
-                    
-                    # Update personal best
-                    if score > personal_best_score[i]:
-                        personal_best_score[i] = score
-                        personal_best_pos[i] = particles[i].copy()
-                    
-                    # Update global best
-                    if score > global_best_score:
-                        global_best_score = score
-                        global_best_pos = particles[i].copy()
-            
-            # Dự đoán với optimal weights
-            if len(int_nums) >= 5:
-                last_pattern = int_nums[-5:]
-                prediction = int(np.average(last_pattern, weights=global_best_pos[:5])) % 10
-            else:
-                prediction = int_nums[-1] % 10
-            
-            return {
-                'optimal_weights': [float(w) for w in global_best_pos],
-                'fitness_score': float(global_best_score * 100),
-                'prediction': str(prediction),
-                'confidence': float(global_best_score * 100),
-                'method': 'pso'
-            }
-        except:
-            return {}
-    
-    # =============== 18. THUẬT TOÁN HURST EXPONENT (THÊM MỚI) ===============
-    def hurst_exponent_analysis(self, nums: List[str]) -> Dict:
-        """THÊM: Phân tích Hurst exponent - Đo tính fractal của chuỗi"""
-        int_nums = [int(n) for n in nums if n.isdigit()]
-        if len(int_nums) < 50:
-            return {}
-        
-        try:
-            def _hurst(ts):
-                lags = range(2, min(len(ts) // 2, 20))
-                tau = []
-                lagvec = []
-                
-                for lag in lags:
-                    if lag < len(ts):
-                        pp = np.subtract(ts[lag:], ts[:-lag])
-                        tau.append(np.std(pp))
-                        lagvec.append(lag)
-                
-                if len(tau) > 1 and len(lagvec) > 1:
-                    m = np.polyfit(np.log(lagvec), np.log(tau), 1)
-                    return m[0]
-                return 0.5
-            
-            # Tính Hurst exponent
-            h = _hurst(int_nums[-200:]) if len(int_nums) >= 200 else _hurst(int_nums)
-            
-            return {
-                'hurst': h,
-                'type': 'Persistent' if h > 0.5 else 'Anti-persistent' if h < 0.5 else 'Random',
-                'predictability': 'Cao' if h > 0.65 else 'Trung bình' if h > 0.45 else 'Thấp',
-                'fractal_dimension': 2 - h
-            }
-        except:
-            return {}
+        return top_three[:3]
 
-# =============== GIAO DIỆN RESPONSIVE (GIỮ NGUYÊN 100%) ===============
+# =============== GIAO DIỆN RESPONSIVE ===============
 st.set_page_config(
     page_title="🎯 AI 3-TINH ELITE PRO V2.0",
     page_icon="🎯",
@@ -1003,7 +509,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS RESPONSIVE TỐI ƯU - GIỮ NGUYÊN 100%
+# CSS RESPONSIVE TỐI ƯU
 st.markdown("""
 <style>
     /* RESET & VARIABLES */
@@ -1321,7 +827,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# =============== HEADER (GIỮ NGUYÊN) ===============
+# =============== HEADER ===============
 st.markdown("""
 <div class='header-card animate-in'>
     <h1 class='main-title'>🎯 AI 3-TINH ELITE PRO V2.0</h1>
@@ -1329,14 +835,14 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# =============== KHỞI TẠO ANALYZER (GIỮ NGUYÊN) ===============
+# =============== KHỞI TẠO ANALYZER ===============
 @st.cache_resource
 def init_analyzer():
     return LotteryAIAnalyzer()
 
 analyzer = init_analyzer()
 
-# =============== SESSION STATE (GIỮ NGUYÊN) ===============
+# =============== SESSION STATE ===============
 if 'analysis_history' not in st.session_state:
     st.session_state.analysis_history = []
 if 'prediction_history' not in st.session_state:
@@ -1348,11 +854,11 @@ if 'accuracy_stats' not in st.session_state:
         'accuracy_rate': 0.0
     }
 
-# =============== TABS CHÍNH (GIỮ NGUYÊN) ===============
+# =============== TABS CHÍNH ===============
 tab1, tab2, tab3, tab4 = st.tabs(["🎯 DỰ ĐOÁN", "📊 PHÂN TÍCH", "📈 THỐNG KÊ", "⚙️ CÀI ĐẶT"])
 
 with tab1:
-    # INPUT AREA (GIỮ NGUYÊN)
+    # INPUT AREA
     col1, col2 = st.columns([3, 1])
     
     with col1:
@@ -1374,7 +880,7 @@ with tab1:
         )
         st.metric("DỮ LIỆU", f"{len(list(filter(str.isdigit, data_input)))} số", "Đã nhập")
     
-    # NÚT PHÂN TÍCH (GIỮ NGUYÊN)
+    # NÚT PHÂN TÍCH
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         analyze_button = st.button(
@@ -1389,7 +895,7 @@ with tab1:
         if len(nums) < 15:
             st.error("⚠️ CẦN ÍT NHẤT 15 SỐ ĐỂ PHÂN TÍCH CHÍNH XÁC!")
         else:
-            # PROGRESS BAR (GIỮ NGUYÊN)
+            # PROGRESS BAR
             progress_bar = st.progress(0)
             status_text = st.empty()
             
@@ -1404,14 +910,14 @@ with tab1:
                 time.sleep(0.4)
                 progress_bar.progress(35)
                 
-                # Bước 3: Loại 3 số rủi ro - SỬA LỖI: chỉ nhận 3 giá trị
+                # Bước 3: Loại 3 số rủi ro
                 status_text.text("🚫 Đang loại bỏ 3 số rủi ro...")
                 eliminated, remaining, analysis = analyzer.eliminate_risk_numbers(data_input)
                 time.sleep(0.4)
                 progress_bar.progress(60)
                 
                 # Bước 4: Chọn 3 số tốt nhất
-                status_text.text("🎯 Đang chọn 3 số chiến thuật (đa thuật toán nâng cao)...")
+                status_text.text("🎯 Đang chọn 3 số chiến thuật...")
                 top_three = analyzer.select_top_three(remaining, data_input, analysis)
                 time.sleep(0.4)
                 progress_bar.progress(85)
@@ -1436,7 +942,7 @@ with tab1:
                     'top_three': top_three
                 })
                 
-                # HIỂN THỊ KẾT QUẢ (GIỮ NGUYÊN GIAO DIỆN)
+                # HIỂN THỊ KẾT QUẢ
                 st.balloons()
                 
                 # RESULT CARD
@@ -1461,7 +967,7 @@ with tab1:
                             <div class='info-title'>
                                 <span style='color: var(--danger);'>🚫 3 SỐ RỦI RO (BẪY NHÀ CÁI)</span>
                             </div>
-                            <div class='info-numbers'>{", ".join(eliminated) if eliminated else "Không có"}</div>
+                            <div class='info-numbers'>{", ".join(eliminated)}</div>
                             <small style='color: #94a3b8;'>Tuyệt đối tránh xa các số này!</small>
                         </div>
                         
@@ -1476,7 +982,7 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # CHIẾN THUẬT (GIỮ NGUYÊN)
+                # CHIẾN THUẬT
                 st.markdown(f"""
                 <div class='info-box strategy-box' style='margin-top: 1rem;'>
                     <div class='info-title'>
@@ -1491,7 +997,7 @@ with tab1:
                         <div style='padding: 0.5rem;'>
                             <span style='font-size: 1.3rem;'>🛡️</span><br>
                             <strong>Tránh xa</strong><br>
-                            <small>3 số: {", ".join(eliminated) if eliminated else "Không có"}</small>
+                            <small>3 số: {", ".join(eliminated)}</small>
                         </div>
                         <div style='padding: 0.5rem;'>
                             <span style='font-size: 1.3rem;'>📊</span><br>
@@ -1502,23 +1008,53 @@ with tab1:
                 </div>
                 """, unsafe_allow_html=True)
                 
-            except Exception as e:
-                st.error(f"Lỗi trong quá trình phân tích: {str(e)}")
-                st.info("Vui lòng thử lại hoặc kiểm tra dữ liệu đầu vào.")
-
-# Các tab khác giữ nguyên
-with tab2:
-    st.info("📊 PHÂN TÍCH CHI TIẾT - Đang phát triển...")
-
-with tab3:
-    st.info("📈 THỐNG KÊ - Đang phát triển...")
-
-with tab4:
-    st.info("⚙️ CÀI ĐẶT - Đang phát triển...")
-
-# Footer (giữ nguyên)
-st.markdown("""
-<div class='footer'>
-    <p>© 2024 AI 3-TINH ELITE PRO V2.0 - Tích hợp 25+ thuật toán nâng cao | Phát hiện bẫy nhà cái | Độ chính xác cao</p>
-</div>
-""", unsafe_allow_html=True)
+                # PHÂN TÍCH CHI TIẾT
+                with st.expander("📊 XEM PHÂN TÍCH CHI TIẾT", expanded=False):
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.markdown("##### 🔥 TOP 5 SỐ NÓNG")
+                        hot_nums = analyzer._find_hot_numbers(nums[-30:])
+                        if hot_nums:
+                            hot_text = " • ".join(hot_nums[:5])
+                            st.markdown(f"<div style='font-size: 1.5rem; color: #ef4444;'>{hot_text}</div>", 
+                                      unsafe_allow_html=True)
+                        else:
+                            st.info("Không có số nóng")
+                    
+                    with col2:
+                        st.markdown("##### ❄️ TOP 5 SỐ LẠNH")
+                        cold_nums = analyzer._find_cold_numbers(nums, 30)
+                        if cold_nums:
+                            cold_text = " • ".join(cold_nums[:5])
+                            st.markdown(f"<div style='font-size: 1.5rem; color: #3b82f6;'>{cold_text}</div>", 
+                                      unsafe_allow_html=True)
+                        else:
+                            st.info("Không có số lạnh")
+                    
+                    with col3:
+                        st.markdown("##### 🎯 PHÂN TÍCH POISSON")
+                        if analysis and 'poisson' in analysis:
+                            poisson_data = []
+                            for num, info in analysis['poisson'].items():
+                                poisson_data.append({
+                                    'Số': num,
+                                    'Xác suất': f"{info['prob_next']*100:.1f}%"
+                                })
+                            poisson_df = pd.DataFrame(poisson_data).head(5)
+                            st.dataframe(poisson_df, use_container_width=True, hide_index=True)
+                    
+                    # PHÂN TÍCH MARKOV
+                    if analysis and 'markov' in analysis and len(nums) >= 3:
+                        st.markdown("##### 🔗 PHÂN TÍCH MARKOV BẬC 2")
+                        last_state = tuple(nums[-2:])
+                        if last_state in analysis['markov'].get('order_2', {}):
+                            markov_data = []
+                            for num, prob in sorted(
+                                analysis['markov']['order_2'][last_state].items(), 
+                                key=lambda x: x[1], 
+                                reverse=True
+                            )[:5]:
+                                markov_data.append({
+                                    'Số tiếp theo': num,
+                                    'Xác suất': f"{prob*100:.1f}
