@@ -4,6 +4,7 @@ import re
 import json
 import os
 from collections import Counter
+import itertools
 
 # ================= CẤU HÌNH HỆ THỐNG =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
@@ -26,15 +27,14 @@ def load_memory():
     return []
 
 def save_memory(data):
-    # Giữ lại 1000 kỳ gần nhất để AI có dữ liệu sâu
     with open(DB_FILE, "w") as f: 
         json.dump(data[-1000:], f)
 
 if "history" not in st.session_state:
     st.session_state.history = load_memory()
 
-# ================= UI DESIGN (Tối giản - Chống nhầm số) =================
-st.set_page_config(page_title="TITAN v21.0 PRO", layout="centered")
+# ================= UI DESIGN (GIỮ NGUYÊN UI v21) =================
+st.set_page_config(page_title="TITAN v21.0 PRO - NHÓM 24", layout="centered")
 st.markdown("""
     <style>
     .stApp { background: #010409; color: #c9d1d9; }
@@ -45,20 +45,18 @@ st.markdown("""
         box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
     .num-display { 
-        font-size: 60px; font-weight: 900; color: #58a6ff; 
-        text-align: center; letter-spacing: 10px; text-shadow: 0 0 25px #58a6ff;
+        font-size: 45px; font-weight: 900; color: #58a6ff; 
+        text-align: center; letter-spacing: 5px; text-shadow: 0 0 25px #58a6ff;
     }
     .logic-box { font-size: 14px; color: #8b949e; background: #161b22; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v21.0 OMNI</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v21.0 OMNI - NHÓM 24</h2>", unsafe_allow_html=True)
 if neural_engine:
-    st.markdown(f"<p class='status-active'>● KẾT NỐI NEURAL-LINK: OK | DỮ LIỆU: {len(st.session_state.history)} KỲ</p>", unsafe_allow_html=True)
-else:
-    st.error("LỖI KẾT NỐI API - KIỂM TRA LẠI KEY")
+    st.markdown(f"<p class='status-active'>● KẾT NỐI NEURAL-LINK: OK | CHẾ ĐỘ: NHÓM 24 TỔ HỢP</p>", unsafe_allow_html=True)
 
-# ================= XỬ LÝ DỮ LIỆU =================
+# ================= XỬ LÝ DỮ LIỆU & THUẬT TOÁN MỚI =================
 raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, placeholder="32880\n21808\n...")
 
 col1, col2 = st.columns(2)
@@ -69,28 +67,27 @@ with col1:
             st.session_state.history.extend(new_data)
             save_memory(st.session_state.history)
             
-            # Gửi Prompt "Bẫy nhà cái" cho AI
+            # NÂNG CẤP PROMPT: CHUYÊN BIỆT CHO NHÓM 24
             prompt = f"""
-            Bạn là AI chuyên gia xác suất 5D. 
-            Lịch sử lưu trữ: {st.session_state.history[-100:]}.
+            Bạn là AI chuyên gia xác suất Hậu Tứ Nhóm 24. 
+            Lịch sử 100 kỳ: {st.session_state.history[-100:]}.
             Yêu cầu:
-            1. Phân tích các số đang bệt (Streak) và các số "bóng" sắp nổ.
-            2. Phát hiện nếu nhà cái đang đảo cầu để né các số hay về.
-            3. Chốt dàn 7 số an toàn nhất.
-            TRẢ VỀ JSON: {{"dan4": [], "dan3": [], "logic": "viết ngắn gọn cách nhà cái đang chạy số"}}
+            1. Phân tích 4 số cuối (Ngàn, Trăm, Chục, Đơn vị).
+            2. Tìm 7 số có xác suất xuất hiện cùng nhau cao nhất nhưng không lặp lại trong 1 bộ.
+            3. Trả về 4 tổ hợp mạnh nhất (mỗi tổ hợp 4 số khác nhau) và dàn 7 số tổng.
+            TRẢ VỀ JSON: {{"tohop": ["1234", "5678", "1357", "2468"], "dan7": "1234567", "logic": "Dữ liệu bệt tổ hợp 4 số không lặp"}}
             """
             
             try:
                 response = neural_engine.generate_content(prompt)
-                res_text = response.text
-                data = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
+                data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
                 st.session_state.last_result = data
             except:
-                # Thuật toán dự phòng nếu AI bận
-                all_nums = "".join(st.session_state.history[-30:])
-                counts = Counter(all_nums).most_common(7)
-                res = [str(x[0]) for x in counts]
-                st.session_state.last_result = {"dan4": res[:4], "dan3": res[4:], "logic": "Dùng thống kê tần suất thực tế."}
+                # Thuật toán dự phòng (Lọc 7 số rồi ghép tổ hợp ngẫu nhiên không lặp)
+                all_nums = "".join([s[1:] for s in st.session_state.history[-30:]]) # Chỉ lấy 4 số cuối
+                counts = [x[0] for x in Counter(all_nums).most_common(7)]
+                combos = ["".join(p) for p in itertools.combinations(counts, 4)][:4]
+                st.session_state.last_result = {"tohop": combos, "dan7": "".join(counts), "logic": "Thống kê tổ hợp xác suất thực tế."}
             st.rerun()
 
 with col2:
@@ -103,16 +100,17 @@ with col2:
 if "last_result" in st.session_state:
     res = st.session_state.last_result
     st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='logic-box'><b>💡 Phân tích:</b> {res['logic']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='logic-box'><b>💡 Phân tích Nhóm 24:</b> {res['logic']}</div>", unsafe_allow_html=True)
     
-    st.markdown("<p style='text-align:center; font-size:12px; color:#888;'>🎯 4 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-display'>{''.join(map(str, res['dan4']))}</div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888;'>🎯 4 TỔ HỢP MẠNH NHẤT (VÀO TIỀN)</p>", unsafe_allow_html=True)
+    # Hiển thị các tổ hợp cách nhau bằng dấu phẩy để anh dễ nhìn
+    st.markdown(f"<div class='num-display'>{', '.join(res['tohop'])}</div>", unsafe_allow_html=True)
     
-    st.markdown("<p style='text-align:center; font-size:12px; color:#888; margin-top:20px;'>🛡️ 3 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-display' style='color:#f2cc60; text-shadow: 0 0 25px #f2cc60;'>{''.join(map(str, res['dan3']))}</div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888; margin-top:20px;'>🛡️ DÀN 7 SỐ TỔNG (ĐỂ ANH TỰ GHÉP THÊM)</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-display' style='color:#f2cc60; text-shadow: 0 0 25px #f2cc60;'>{res['dan7']}</div>", unsafe_allow_html=True)
     
-    copy_val = "".join(map(str, res['dan4'])) + "".join(map(str, res['dan3']))
-    st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", copy_val)
+    # Mục copy dán thẳng vào web
+    st.text_input("📋 SAO CHÉP DÀN TỔ HỢP (Dán vào mục Nhập Số):", ", ".join(res['tohop']))
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Hệ thống tự học từ dữ liệu lịch sử</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Thiết kế nâng cấp riêng cho Nhóm 24 - Không lặp số</p>", unsafe_allow_html=True)
