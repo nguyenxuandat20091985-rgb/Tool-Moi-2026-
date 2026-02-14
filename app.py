@@ -3,12 +3,11 @@ import google.generativeai as genai
 import re
 import json
 import os
-import pandas as pd
 from collections import Counter
 
 # ================= CẤU HÌNH HỆ THỐNG =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_memory_v20.json"
+DB_FILE = "titan_memory_v21.json"
 
 def setup_neural():
     try:
@@ -19,90 +18,101 @@ def setup_neural():
 neural_engine = setup_neural()
 
 # ================= HỆ THỐNG GHI NHỚ VĨNH VIỄN =================
-def get_memory():
+def load_memory():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f: return json.load(f)
+        with open(DB_FILE, "r") as f: 
+            try: return json.load(f)
+            except: return []
     return []
 
-def update_memory(new_data):
-    current = get_memory()
-    current.extend(new_data)
-    # Giữ lại 1000 kỳ gần nhất để AI không bị loạn
-    with open(DB_FILE, "w") as f: json.dump(current[-1000:], f)
-    return current[-1000:]
+def save_memory(data):
+    # Giữ lại 1000 kỳ gần nhất để AI có dữ liệu sâu
+    with open(DB_FILE, "w") as f: 
+        json.dump(data[-1000:], f)
 
-# ================= UI DESIGN (Tối giản - Chính xác) =================
-st.set_page_config(page_title="TITAN v20.0 PRO", layout="centered")
+if "history" not in st.session_state:
+    st.session_state.history = load_memory()
+
+# ================= UI DESIGN (Tối giản - Chống nhầm số) =================
+st.set_page_config(page_title="TITAN v21.0 PRO", layout="centered")
 st.markdown("""
     <style>
     .stApp { background: #010409; color: #c9d1d9; }
-    .status-ok { color: #238636; font-weight: bold; font-size: 14px; }
-    .prediction-box {
+    .status-active { color: #238636; font-weight: bold; border-left: 3px solid #238636; padding-left: 10px; }
+    .prediction-card {
         background: #0d1117; border: 2px solid #30363d;
-        border-radius: 12px; padding: 20px; margin-top: 15px;
+        border-radius: 12px; padding: 25px; margin-top: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
-    .num-highlight { 
-        font-size: 55px; font-weight: 900; color: #58a6ff; 
-        text-align: center; letter-spacing: 5px; text-shadow: 0 0 20px #58a6ff;
+    .num-display { 
+        font-size: 60px; font-weight: 900; color: #58a6ff; 
+        text-align: center; letter-spacing: 10px; text-shadow: 0 0 25px #58a6ff;
     }
-    .logic-text { font-size: 13px; color: #8b949e; font-style: italic; border-left: 3px solid #58a6ff; padding-left: 10px; }
+    .logic-box { font-size: 14px; color: #8b949e; background: #161b22; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
-# Hiển thị trạng thái
-st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v20.0 OMNI</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v21.0 OMNI</h2>", unsafe_allow_html=True)
 if neural_engine:
-    st.markdown("<p style='text-align: center;' class='status-ok'>● KẾT NỐI NEURAL-LINK THÀNH CÔNG</p>", unsafe_allow_html=True)
+    st.markdown(f"<p class='status-active'>● KẾT NỐI NEURAL-LINK: OK | DỮ LIỆU: {len(st.session_state.history)} KỲ</p>", unsafe_allow_html=True)
 else:
     st.error("LỖI KẾT NỐI API - KIỂM TRA LẠI KEY")
 
 # ================= XỬ LÝ DỮ LIỆU =================
-raw_input = st.text_area("📡 NẠP DỮ LIỆU THỰC CHIẾN (Copy dãy số 5D):", height=120)
+raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, placeholder="32880\n21808\n...")
 
 col1, col2 = st.columns(2)
 with col1:
     if st.button("🚀 GIẢI MÃ THUẬT TOÁN"):
-        valid_nums = re.findall(r"\d{5}", raw_input)
-        if valid_nums:
-            history = update_memory(valid_nums)
+        new_data = re.findall(r"\d{5}", raw_input)
+        if new_data:
+            st.session_state.history.extend(new_data)
+            save_memory(st.session_state.history)
             
-            # PROMPT ÉP AI SUY LUẬN ĐA TẦNG
+            # Gửi Prompt "Bẫy nhà cái" cho AI
             prompt = f"""
-            Bạn là AI chuyên giải mã thuật toán 5D. 
-            Dữ liệu lịch sử (1000 kỳ): {history[-100:]}.
-            Yêu cầu phân tích:
-            1. Tìm các số đang chạy theo cầu bệt (Streak).
-            2. Tìm các số đang chạy theo nhịp đảo 1-1 hoặc 2-2.
-            3. Tính toán 7 số có xác suất nổ cao nhất trong 3 kỳ tới.
-            TRẢ VỀ JSON: {{"dan4": [4 số], "dan3": [3 số], "logic": "giải thích thuật toán nhà cái đang dùng"}}
+            Bạn là AI chuyên gia xác suất 5D. 
+            Lịch sử lưu trữ: {st.session_state.history[-100:]}.
+            Yêu cầu:
+            1. Phân tích các số đang bệt (Streak) và các số "bóng" sắp nổ.
+            2. Phát hiện nếu nhà cái đang đảo cầu để né các số hay về.
+            3. Chốt dàn 7 số an toàn nhất.
+            TRẢ VỀ JSON: {{"dan4": [], "dan3": [], "logic": "viết ngắn gọn cách nhà cái đang chạy số"}}
             """
             
             try:
                 response = neural_engine.generate_content(prompt)
-                data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-                
-                st.markdown("<div class='prediction-box'>", unsafe_allow_html=True)
-                st.markdown(f"<p class='logic-text'><b>Phân tích cầu:</b> {data['logic']}</p>", unsafe_allow_html=True)
-                
-                st.markdown("<p style='text-align:center; font-size:12px;'>🎯 DÀN 4 CHỦ LỰC (VÀO TIỀN MẠNH)</p>", unsafe_allow_html=True)
-                st.markdown(f"<div class='num-highlight'>{''.join(map(str, data['dan4']))}</div>", unsafe_allow_html=True)
-                
-                st.markdown("<p style='text-align:center; font-size:12px;'>🛡️ DÀN 3 LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
-                st.markdown(f"<div class='num-highlight' style='color:#f2cc60; text-shadow: 0 0 20px #f2cc60;'>{''.join(map(str, data['dan3']))}</div>", unsafe_allow_html=True)
-                
-                full_dan = "".join(map(str, data['dan4'])) + "".join(map(str, data['dan3']))
-                st.text_input("📋 COPY DÀN 7 SỐ:", full_dan)
-                st.markdown("</div>", unsafe_allow_html=True)
-                
-            except Exception as e:
-                st.error("Hệ thống đang quá tải dữ liệu, anh bấm lại lần nữa nhé!")
-        else:
-            st.warning("Dán dữ liệu vào anh ơi!")
+                res_text = response.text
+                data = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
+                st.session_state.last_result = data
+            except:
+                # Thuật toán dự phòng nếu AI bận
+                all_nums = "".join(st.session_state.history[-30:])
+                counts = Counter(all_nums).most_common(7)
+                res = [str(x[0]) for x in counts]
+                st.session_state.last_result = {"dan4": res[:4], "dan3": res[4:], "logic": "Dùng thống kê tần suất thực tế."}
+            st.rerun()
 
 with col2:
-    if st.button("🗑️ XÓA BỘ NHỚ TOOL"):
+    if st.button("🗑️ RESET BỘ NHỚ"):
+        st.session_state.history = []
         if os.path.exists(DB_FILE): os.remove(DB_FILE)
         st.rerun()
 
-st.markdown("---")
-st.markdown("<p style='text-align:center; font-size:10px; color:#444;'>Thiết kế riêng cho AIzaSyChq...RqM</p>", unsafe_allow_html=True)
+# ================= HIỂN THỊ KẾT QUẢ =================
+if "last_result" in st.session_state:
+    res = st.session_state.last_result
+    st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
+    st.markdown(f"<div class='logic-box'><b>💡 Phân tích:</b> {res['logic']}</div>", unsafe_allow_html=True)
+    
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888;'>🎯 4 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-display'>{''.join(map(str, res['dan4']))}</div>", unsafe_allow_html=True)
+    
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888; margin-top:20px;'>🛡️ 3 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-display' style='color:#f2cc60; text-shadow: 0 0 25px #f2cc60;'>{''.join(map(str, res['dan3']))}</div>", unsafe_allow_html=True)
+    
+    copy_val = "".join(map(str, res['dan4'])) + "".join(map(str, res['dan3']))
+    st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", copy_val)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Hệ thống tự học từ dữ liệu lịch sử</p>", unsafe_allow_html=True)
