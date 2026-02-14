@@ -3,12 +3,11 @@ import google.generativeai as genai
 import re
 import json
 import os
-import numpy as np
 from collections import Counter
 
 # ================= CẤU HÌNH HỆ THỐNG =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_quantum_v22.json"
+DB_FILE = "titan_memory_v21.json"
 
 def setup_neural():
     try:
@@ -16,101 +15,104 @@ def setup_neural():
         return genai.GenerativeModel('gemini-1.5-flash')
     except: return None
 
-model = setup_neural()
+neural_engine = setup_neural()
 
-# ================= QUẢN LÝ DỮ LIỆU ĐA CHIỀU =================
-def load_db():
+# ================= HỆ THỐNG GHI NHỚ VĨNH VIỄN =================
+def load_memory():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f: return json.load(f)
+        with open(DB_FILE, "r") as f: 
+            try: return json.load(f)
+            except: return []
     return []
 
-def save_db(data):
-    with open(DB_FILE, "w") as f: json.dump(data[-1500:], f)
+def save_memory(data):
+    # Giữ lại 1000 kỳ gần nhất để AI có dữ liệu sâu
+    with open(DB_FILE, "w") as f: 
+        json.dump(data[-1000:], f)
 
-if "db" not in st.session_state:
-    st.session_state.db = load_db()
+if "history" not in st.session_state:
+    st.session_state.history = load_memory()
 
-# ================= UI LUXURY - CHỐNG SAI SỐ =================
-st.set_page_config(page_title="TITAN v22.0 QUANTUM", layout="centered")
+# ================= UI DESIGN (Tối giản - Chống nhầm số) =================
+st.set_page_config(page_title="TITAN v21.0 PRO", layout="centered")
 st.markdown("""
     <style>
-    .stApp { background: #00050a; color: #00d4ff; }
-    .status-ok { color: #00ff88; font-weight: bold; font-size: 13px; text-shadow: 0 0 5px #00ff88; }
-    .main-card {
-        background: rgba(0, 20, 40, 0.8); border: 1px solid #00d4ff;
-        border-radius: 20px; padding: 30px; margin-top: 10px;
-        box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
+    .stApp { background: #010409; color: #c9d1d9; }
+    .status-active { color: #238636; font-weight: bold; border-left: 3px solid #238636; padding-left: 10px; }
+    .prediction-card {
+        background: #0d1117; border: 2px solid #30363d;
+        border-radius: 12px; padding: 25px; margin-top: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
-    .num-main { 
-        font-size: 75px; font-weight: 900; color: #ffffff; 
-        text-align: center; letter-spacing: 15px; 
-        background: linear-gradient(to bottom, #ffffff, #00d4ff);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    .num-display { 
+        font-size: 60px; font-weight: 900; color: #58a6ff; 
+        text-align: center; letter-spacing: 10px; text-shadow: 0 0 25px #58a6ff;
     }
-    .num-sub { font-size: 45px; font-weight: 700; color: #ff8800; text-align: center; letter-spacing: 8px; opacity: 0.8; }
-    .logic-box { background: #001a33; border-left: 4px solid #00d4ff; padding: 15px; border-radius: 8px; margin-bottom: 25px; font-size: 14px; }
+    .logic-box { font-size: 14px; color: #8b949e; background: #161b22; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center;'>💠 TITAN v22.0</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #888;'>HỆ THỐNG DỰ ĐOÁN Đón Đầu (Quantum Prediction)</p>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v21.0 OMNI</h2>", unsafe_allow_html=True)
+if neural_engine:
+    st.markdown(f"<p class='status-active'>● KẾT NỐI NEURAL-LINK: OK | DỮ LIỆU: {len(st.session_state.history)} KỲ</p>", unsafe_allow_html=True)
+else:
+    st.error("LỖI KẾT NỐI API - KIỂM TRA LẠI KEY")
 
-if model:
-    st.markdown(f"<p class='status-ok'>● KẾT NỐI QUANTUM CORE: SẴN SÀNG | DỮ LIỆU: {len(st.session_state.db)} KỲ</p>", unsafe_allow_html=True)
-
-# ================= XỬ LÝ DỮ LIỆU & AI =================
-raw_data = st.text_area("📡 NẠP DỮ LIỆU (Copy chuỗi kỳ):", height=100)
+# ================= XỬ LÝ DỮ LIỆU =================
+raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, placeholder="32880\n21808\n...")
 
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("🌀 GIẢI MÃ CẦU"):
-        ky_vua_ve = re.findall(r"\d{5}", raw_data)
-        if ky_vua_ve:
-            st.session_state.db.extend(ky_vua_ve)
-            save_db(st.session_state.db)
+    if st.button("🚀 GIẢI MÃ THUẬT TOÁN"):
+        new_data = re.findall(r"\d{5}", raw_input)
+        if new_data:
+            st.session_state.history.extend(new_data)
+            save_memory(st.session_state.history)
             
-            # PROMPT ÉP AI BẮT CẦU HỒI (CHỐNG CHẾT CHỦ LỰC)
+            # Gửi Prompt "Bẫy nhà cái" cho AI
             prompt = f"""
-            Bạn là siêu máy tính Quantum phân tích 5D. 
-            Dữ liệu gần đây: {st.session_state.db[-60:]}.
+            Bạn là AI chuyên gia xác suất 5D. 
+            Lịch sử lưu trữ: {st.session_state.history[-100:]}.
             Yêu cầu:
-            1. Bỏ qua tần suất đơn giản. Hãy tìm quy luật "Hồi số" (Số sắp nổ sau chuỗi gan).
-            2. Phân tích nhịp nhảy của nhà cái (ví dụ: đang bệt thì sắp gãy chưa?).
-            3. Chốt 4 số chủ lực đón đầu và 3 số lót giữ vốn.
-            TRẢ VỀ JSON: {{"main": [], "sub": [], "tu_duy": "giải thích nhịp cầu ngắn gọn"}}
+            1. Phân tích các số đang bệt (Streak) và các số "bóng" sắp nổ.
+            2. Phát hiện nếu nhà cái đang đảo cầu để né các số hay về.
+            3. Chốt dàn 7 số an toàn nhất.
+            TRẢ VỀ JSON: {{"dan4": [], "dan3": [], "logic": "viết ngắn gọn cách nhà cái đang chạy số"}}
             """
+            
             try:
-                response = model.generate_content(prompt)
-                data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-                st.session_state.quantum_res = data
+                response = neural_engine.generate_content(prompt)
+                res_text = response.text
+                data = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
+                st.session_state.last_result = data
             except:
-                # Thuật toán dự phòng (Quantum Fallback)
-                all_nums = "".join(st.session_state.db[-40:])
+                # Thuật toán dự phòng nếu AI bận
+                all_nums = "".join(st.session_state.history[-30:])
                 counts = Counter(all_nums).most_common(7)
                 res = [str(x[0]) for x in counts]
-                st.session_state.quantum_res = {"main": res[:4], "sub": res[4:], "tu_duy": "Dùng thuật toán xác suất hồi số."}
+                st.session_state.last_result = {"dan4": res[:4], "dan3": res[4:], "logic": "Dùng thống kê tần suất thực tế."}
             st.rerun()
 
 with col2:
-    if st.button("🗑️ RESET"):
-        st.session_state.db = []
+    if st.button("🗑️ RESET BỘ NHỚ"):
+        st.session_state.history = []
         if os.path.exists(DB_FILE): os.remove(DB_FILE)
         st.rerun()
 
 # ================= HIỂN THỊ KẾT QUẢ =================
-if "quantum_res" in st.session_state:
-    res = st.session_state.quantum_res
-    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='logic-box'><b>💎 Nhịp cầu:</b> {res['tu_duy']}</div>", unsafe_allow_html=True)
+if "last_result" in st.session_state:
+    res = st.session_state.last_result
+    st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
+    st.markdown(f"<div class='logic-box'><b>💡 Phân tích:</b> {res['logic']}</div>", unsafe_allow_html=True)
     
-    st.markdown("<p style='text-align:center; color:#00d4ff; font-weight:bold;'>🎯 4 CHỦ LỰC (ĐÓN ĐẦU)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-main'>{''.join(map(str, res['main']))}</div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888;'>🎯 4 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-display'>{''.join(map(str, res['dan4']))}</div>", unsafe_allow_html=True)
     
-    st.markdown("<p style='text-align:center; color:#ff8800; font-weight:bold; margin-top:30px;'>🛡️ 3 LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-sub'>{''.join(map(str, res['sub']))}</div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888; margin-top:20px;'>🛡️ 3 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-display' style='color:#f2cc60; text-shadow: 0 0 25px #f2cc60;'>{''.join(map(str, res['dan3']))}</div>", unsafe_allow_html=True)
     
-    copy_str = "".join(map(str, res['main'])) + "".join(map(str, res['sub']))
-    st.text_input("📋 COPY DÀN 7 SỐ:", copy_str)
+    copy_val = "".join(map(str, res['dan4'])) + "".join(map(str, res['dan3']))
+    st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", copy_val)
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<br><p style='text-align:center; font-size:10px; color:#333;'>Quantum Core - Giải mã mọi thuật toán nhà cái</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Hệ thống tự học từ dữ liệu lịch sử</p>", unsafe_allow_html=True)
