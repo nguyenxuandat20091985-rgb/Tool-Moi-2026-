@@ -4,11 +4,10 @@ import re
 import json
 import os
 from collections import Counter
-import itertools
 
-# ================= CONFIG =================
+# ================= CẤU HÌNH HỆ THỐNG =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_memory_v30.json"
+DB_FILE = "titan_memory_v21.json"
 
 def setup_neural():
     try:
@@ -18,6 +17,7 @@ def setup_neural():
 
 neural_engine = setup_neural()
 
+# ================= HỆ THỐNG GHI NHỚ VĨNH VIỄN =================
 def load_memory():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f: 
@@ -26,77 +26,93 @@ def load_memory():
     return []
 
 def save_memory(data):
+    # Giữ lại 1000 kỳ gần nhất để AI có dữ liệu sâu
     with open(DB_FILE, "w") as f: 
-        json.dump(data[-800:], f)
+        json.dump(data[-1000:], f)
 
 if "history" not in st.session_state:
     st.session_state.history = load_memory()
 
-# ================= UI MATRIX DESIGN =================
-st.set_page_config(page_title="TITAN v30.0 MATRIX", layout="centered")
+# ================= UI DESIGN (Tối giản - Chống nhầm số) =================
+st.set_page_config(page_title="TITAN v21.0 PRO", layout="centered")
 st.markdown("""
     <style>
-    .stApp { background: #000b00; color: #00ff41; }
+    .stApp { background: #010409; color: #c9d1d9; }
+    .status-active { color: #238636; font-weight: bold; border-left: 3px solid #238636; padding-left: 10px; }
     .prediction-card {
-        background: rgba(0, 40, 0, 0.9); border: 2px solid #00ff41;
-        border-radius: 15px; padding: 20px; box-shadow: 0 0 20px #00ff41;
+        background: #0d1117; border: 2px solid #30363d;
+        border-radius: 12px; padding: 25px; margin-top: 15px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }
     .num-display { 
-        font-family: 'Courier New', monospace; font-size: 20px; 
-        color: #00ff41; background: #000; padding: 15px; border-radius: 10px;
-        line-height: 1.6; border: 1px solid #00ff41;
+        font-size: 60px; font-weight: 900; color: #58a6ff; 
+        text-align: center; letter-spacing: 10px; text-shadow: 0 0 25px #58a6ff;
     }
-    .highlight-label { color: #ffffff; font-weight: bold; font-size: 14px; margin-bottom: 10px; }
+    .logic-box { font-size: 14px; color: #8b949e; background: #161b22; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h2 style='text-align: center;'>📟 TITAN v30.0 OMNI-MATRIX</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #aaa;'>HẬU TỨ NHÓM 24 - CHIẾN THUẬT VÂY BẮT 20 TỔ HỢP</p>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v21.0 OMNI</h2>", unsafe_allow_html=True)
+if neural_engine:
+    st.markdown(f"<p class='status-active'>● KẾT NỐI NEURAL-LINK: OK | DỮ LIỆU: {len(st.session_state.history)} KỲ</p>", unsafe_allow_html=True)
+else:
+    st.error("LỖI KẾT NỐI API - KIỂM TRA LẠI KEY")
 
 # ================= XỬ LÝ DỮ LIỆU =================
-raw_input = st.text_area("📥 DÁN LỊCH SỬ KỲ (5 SỐ):", height=100)
+raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, placeholder="32880\n21808\n...")
 
-if st.button("📡 GIẢI MÃ MA TRẬN"):
-    new_data = re.findall(r"\d{5}", raw_input)
-    if new_data:
-        st.session_state.history.extend(new_data)
-        save_memory(st.session_state.history)
-        
-        prompt = f"""
-        Hệ thống phân tích Nhóm 24. Dữ liệu: {st.session_state.history[-100:]}.
-        Nhiệm vụ:
-        1. Tìm ra 8 con số gốc (8-digit core) xuất hiện nhiều và có nhịp hồi đẹp.
-        2. Từ 8 số đó, lọc ra 20 tổ hợp 4 số (không lặp) có khả năng nổ cao nhất.
-        3. Định dạng: Danh sách các tổ hợp cách nhau bằng dấu phẩy.
-        TRẢ VỀ JSON: {{"combos": [], "core8": "12345678", "logic": "..."}}
-        """
-        
-        try:
-            response = neural_engine.generate_content(prompt)
-            data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-            st.session_state.matrix_res = data
-        except:
-            # Thuật toán dự phòng Matrix
-            last_nums = "".join([s[1:] for s in st.session_state.history[-40:]])
-            core8 = [x[0] for x in Counter(last_nums).most_common(8)]
-            combos = ["".join(p) for p in itertools.combinations(core8, 4)][:20]
-            st.session_state.matrix_res = {"combos": combos, "core8": "".join(core8), "logic": "Dữ liệu Matrix dự phòng."}
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("🚀 GIẢI MÃ THUẬT TOÁN"):
+        new_data = re.findall(r"\d{5}", raw_input)
+        if new_data:
+            st.session_state.history.extend(new_data)
+            save_memory(st.session_state.history)
+            
+            # Gửi Prompt "Bẫy nhà cái" cho AI
+            prompt = f"""
+            Bạn là AI chuyên gia xác suất 5D. 
+            Lịch sử lưu trữ: {st.session_state.history[-100:]}.
+            Yêu cầu:
+            1. Phân tích các số đang bệt (Streak) và các số "bóng" sắp nổ.
+            2. Phát hiện nếu nhà cái đang đảo cầu để né các số hay về.
+            3. Chốt dàn 7 số an toàn nhất.
+            TRẢ VỀ JSON: {{"dan4": [], "dan3": [], "logic": "viết ngắn gọn cách nhà cái đang chạy số"}}
+            """
+            
+            try:
+                response = neural_engine.generate_content(prompt)
+                res_text = response.text
+                data = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
+                st.session_state.last_result = data
+            except:
+                # Thuật toán dự phòng nếu AI bận
+                all_nums = "".join(st.session_state.history[-30:])
+                counts = Counter(all_nums).most_common(7)
+                res = [str(x[0]) for x in counts]
+                st.session_state.last_result = {"dan4": res[:4], "dan3": res[4:], "logic": "Dùng thống kê tần suất thực tế."}
+            st.rerun()
+
+with col2:
+    if st.button("🗑️ RESET BỘ NHỚ"):
+        st.session_state.history = []
+        if os.path.exists(DB_FILE): os.remove(DB_FILE)
         st.rerun()
 
 # ================= HIỂN THỊ KẾT QUẢ =================
-if "matrix_res" in st.session_state:
-    res = st.session_state.matrix_res
+if "last_result" in st.session_state:
+    res = st.session_state.last_result
     st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#fff;'><b>💡 Logic:</b> {res['logic']}</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='logic-box'><b>💡 Phân tích:</b> {res['logic']}</div>", unsafe_allow_html=True)
     
-    st.markdown("<p class='highlight-label'>🎯 DÀN 20 TỔ HỢP (CHẠM ĐỂ COPY):</p>", unsafe_allow_html=True)
-    copy_string = ", ".join(res['combos'])
-    st.text_area("", value=copy_string, height=150, key="copy_area")
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888;'>🎯 4 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-display'>{''.join(map(str, res['dan4']))}</div>", unsafe_allow_html=True)
     
-    st.markdown(f"<p class='highlight-label'>🛡️ 8 SỐ GỐC: <span style='color:#00ff41;'>{res['core8']}</span></p>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; font-size:12px; color:#888; margin-top:20px;'>🛡️ 3 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-display' style='color:#f2cc60; text-shadow: 0 0 25px #f2cc60;'>{''.join(map(str, res['dan3']))}</div>", unsafe_allow_html=True)
+    
+    copy_val = "".join(map(str, res['dan4'])) + "".join(map(str, res['dan3']))
+    st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", copy_val)
     st.markdown("</div>", unsafe_allow_html=True)
 
-if st.button("🗑️ RESET"):
-    st.session_state.history = []
-    if os.path.exists(DB_FILE): os.remove(DB_FILE)
-    st.rerun()
+st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Hệ thống tự học từ dữ liệu lịch sử</p>", unsafe_allow_html=True)
