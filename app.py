@@ -3,37 +3,35 @@ import google.generativeai as genai
 import re
 import json
 import os
-from collections import Counter
+from collections import Counter 
 
 # ================= CẤU HÌNH HỆ THỐNG =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_memory_v21.json"
+DB_FILE = "titan_memory_v21.json" 
 
 def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
         return genai.GenerativeModel('gemini-1.5-flash')
-    except: return None
+    except: return None 
 
-neural_engine = setup_neural()
+neural_engine = setup_neural() 
 
-# ================= HỆ THỐNG GHI NHỚ VĨNH VIỄN =================
 def load_memory():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f: 
             try: return json.load(f)
             except: return []
-    return []
+    return [] 
 
 def save_memory(data):
-    # Giữ lại 1000 kỳ gần nhất để AI có dữ liệu sâu
     with open(DB_FILE, "w") as f: 
-        json.dump(data[-1000:], f)
+        json.dump(data[-1000:], f) 
 
 if "history" not in st.session_state:
-    st.session_state.history = load_memory()
+    st.session_state.history = load_memory() 
 
-# ================= UI DESIGN (Tối giản - Chống nhầm số) =================
+# ================= UI DESIGN (Giữ nguyên kết cấu anh yêu cầu) =================
 st.set_page_config(page_title="TITAN v21.0 PRO", layout="centered")
 st.markdown("""
     <style>
@@ -50,16 +48,16 @@ st.markdown("""
     }
     .logic-box { font-size: 14px; color: #8b949e; background: #161b22; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
     </style>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True) 
 
 st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v21.0 OMNI</h2>", unsafe_allow_html=True)
 if neural_engine:
     st.markdown(f"<p class='status-active'>● KẾT NỐI NEURAL-LINK: OK | DỮ LIỆU: {len(st.session_state.history)} KỲ</p>", unsafe_allow_html=True)
 else:
-    st.error("LỖI KẾT NỐI API - KIỂM TRA LẠI KEY")
+    st.error("LỖI KẾT NỐI API - KIỂM TRA LẠI KEY") 
 
 # ================= XỬ LÝ DỮ LIỆU =================
-raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, placeholder="32880\n21808\n...")
+raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, placeholder="32880\n21808\n...") 
 
 col1, col2 = st.columns(2)
 with col1:
@@ -69,35 +67,33 @@ with col1:
             st.session_state.history.extend(new_data)
             save_memory(st.session_state.history)
             
-            # Gửi Prompt "Bẫy nhà cái" cho AI
             prompt = f"""
             Bạn là AI chuyên gia xác suất 5D. 
             Lịch sử lưu trữ: {st.session_state.history[-100:]}.
             Yêu cầu:
             1. Phân tích các số đang bệt (Streak) và các số "bóng" sắp nổ.
             2. Phát hiện nếu nhà cái đang đảo cầu để né các số hay về.
-            3. Chốt dàn 7 số an toàn nhất.
-            TRẢ VỀ JSON: {{"dan4": [], "dan3": [], "logic": "viết ngắn gọn cách nhà cái đang chạy số"}}
+            3. Chốt dàn 7 số an toàn nhất cho sảnh 3 số 5 tinh (Không cố định).
+            TRẢ VỀ JSON: {{"dan4": ["1","2","3","4"], "dan3": ["5","6","7"], "logic": "viết ngắn gọn"}}
             """
             
             try:
                 response = neural_engine.generate_content(prompt)
-                res_text = response.text
-                data = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
+                data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
                 st.session_state.last_result = data
             except:
-                # Thuật toán dự phòng nếu AI bận
                 all_nums = "".join(st.session_state.history[-30:])
                 counts = Counter(all_nums).most_common(7)
                 res = [str(x[0]) for x in counts]
                 st.session_state.last_result = {"dan4": res[:4], "dan3": res[4:], "logic": "Dùng thống kê tần suất thực tế."}
-            st.rerun()
+            st.rerun() 
 
 with col2:
     if st.button("🗑️ RESET BỘ NHỚ"):
         st.session_state.history = []
         if os.path.exists(DB_FILE): os.remove(DB_FILE)
-        st.rerun()
+        if "last_result" in st.session_state: del st.session_state.last_result
+        st.rerun() 
 
 # ================= HIỂN THỊ KẾT QUẢ =================
 if "last_result" in st.session_state:
@@ -113,6 +109,4 @@ if "last_result" in st.session_state:
     
     copy_val = "".join(map(str, res['dan4'])) + "".join(map(str, res['dan3']))
     st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", copy_val)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Hệ thống tự học từ dữ liệu lịch sử</p>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True) 
