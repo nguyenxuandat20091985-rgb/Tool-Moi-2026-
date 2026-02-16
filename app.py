@@ -5,9 +5,9 @@ import json
 import os
 from collections import Counter
 
-# ================= CẤU HÌNH HỆ THỐNG =================
+# ================= CONFIG =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_v31_elite.json"
+DB_FILE = "titan_v32_final.json"
 
 def setup_neural():
     try:
@@ -17,90 +17,78 @@ def setup_neural():
 
 neural_engine = setup_neural()
 
-def load_memory():
+def load_db():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f: 
-            try: return json.load(f)
-            except: return {"history": [], "last_pred": None}
-    return {"history": [], "last_pred": None}
+        with open(DB_FILE, "r") as f: return json.load(f)
+    return {"history": [], "predictions": []}
 
-def save_memory(data):
-    with open(DB_FILE, "w") as f: 
-        json.dump(data, f)
+def save_db(data):
+    with open(DB_FILE, "w") as f: json.dump(data, f)
 
 if "db" not in st.session_state:
-    st.session_state.db = load_memory()
+    st.session_state.db = load_db()
 
-# ================= UI ELITE DESIGN =================
-st.set_page_config(page_title="TITAN v31.0 ELITE", layout="centered")
+# ================= UI DESIGN =================
+st.set_page_config(page_title="TITAN v32.0 ANTI-SCAM", layout="centered")
 st.markdown("""
     <style>
-    .stApp { background: #000814; color: #e0e1dd; }
-    .main-card { background: #0d1b2a; border: 1px solid #415a77; border-radius: 15px; padding: 20px; box-shadow: 0 4px 30px rgba(0,255,136,0.1); }
-    .num-target { font-size: 70px; font-weight: 900; color: #00ff88; text-align: center; text-shadow: 0 0 20px #00ff88; }
-    .num-sub { font-size: 30px; font-weight: 700; color: #f2cc60; text-align: center; }
-    .logic-box { font-size: 14px; color: #8d99ae; background: #1b263b; padding: 12px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #00ff88; }
+    .stApp { background: #010b13; color: #ffffff; }
+    .critical-card { background: linear-gradient(180deg, #1a2a6c, #b21f1f); border-radius: 15px; padding: 20px; border: 2px solid #ff4b2b; }
+    .num-main { font-size: 80px; font-weight: 900; color: #00ff88; text-align: center; line-height: 1; }
+    .trash-box { color: #ff4b2b; text-decoration: line-through; font-size: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h2 style='text-align: center; color: #00ff88;'>🛡️ TITAN v31.0 ELITE</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 12px;'>Dành riêng cho: 3 Tinh Không cố định (7 Loại 3)</p>", unsafe_allow_html=True)
+st.title("🛡️ TITAN v32.0 - CHẶN THUA")
 
-# ================= XỬ LÝ DỮ LIỆU =================
-raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán 5 số mỗi kỳ):", height=100)
+# ================= LOGIC XỬ LÝ =================
+raw_input = st.text_area("📡 DÁN KẾT QUẢ 5 SỐ (Kỳ gần nhất ở trên cùng):", height=120)
 
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("🔥 GIẢI MÃ KHÔNG CỐ ĐỊNH"):
-        # Lấy 5 số nhưng chỉ phân tích 3 số cuối (Hàng Trăm - Chục - Đơn vị)
-        new_raw = re.findall(r"\d{5}", raw_input)
-        if new_raw:
-            clean_data = [s[2:] for s in new_raw] # Cắt lấy 3 số cuối
-            st.session_state.db["history"].extend(clean_data)
-            
-            # PROMPT ÉP AI LOẠI 3 SỐ XẤU
-            prompt = f"""
-            Bạn là chuyên gia phân tích 3 Tinh Không cố định.
-            Dữ liệu 3 số cuối (Trăm-Chục-Đơn): {st.session_state.db["history"][-50:]}.
-            Yêu cầu:
-            1. Loại bỏ 3 con số có xác suất về thấp nhất (dựa trên cầu bệt và gan).
-            2. Trong 7 số còn lại, chọn ra 4 SỐ CHỦ LỰC trúng thưởng cao nhất.
-            3. 3 SỐ LÓT để bọc lót.
-            Trả về JSON: {{"dan4": ["x","x","x","x"], "dan3": ["x","x","x"], "logic": "phân tích ngắn gọn"}}
-            """
-            
-            try:
-                response = neural_engine.generate_content(prompt)
-                data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-                st.session_state.db["last_pred"] = data
-                save_memory(st.session_state.db)
-            except:
-                # Dự phòng nếu AI lỗi: Thống kê 3 số cuối
-                all_3 = "".join(st.session_state.db["history"][-20:])
-                counts = [x[0] for x in Counter(all_3).most_common(7)]
-                st.session_state.db["last_pred"] = {"dan4": counts[:4], "dan3": counts[4:], "logic": "Dùng tần suất 3 số cuối."}
-            st.rerun()
-
-with col2:
-    if st.button("🗑️ RESET DỮ LIỆU"):
-        st.session_state.db = {"history": [], "last_pred": None}
-        if os.path.exists(DB_FILE): os.remove(DB_FILE)
-        st.rerun()
+if st.button("🔍 PHÂN TÍCH & LOẠI SỐ RÁC"):
+    new_data = re.findall(r"\d{5}", raw_input)
+    if new_raw := new_data:
+        st.session_state.db["history"].extend(new_raw)
+        
+        # Lấy 100 kỳ gần nhất để soi số gan
+        history_str = ",".join(st.session_state.db["history"][-100:])
+        
+        prompt = f"""
+        Hệ thống cược 5D - Sảnh Không Cố Định.
+        Lịch sử: {history_str}.
+        Nhiệm vụ:
+        1. Tìm 3 số có tần suất xuất hiện thấp nhất (Số Rác) -> Loại bỏ.
+        2. Trong 7 số còn lại, chọn 4 số có nhịp rơi mạnh nhất (Trúng thưởng).
+        3. 3 số còn lại làm dàn lót.
+        TRẢ VỀ JSON: {{"loai": "1,2,3", "trung": "4567", "lot": "890", "ly_do": "..."}}
+        """
+        
+        try:
+            response = neural_engine.generate_content(prompt)
+            data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
+            st.session_state.db["predictions"].append(data)
+            save_db(st.session_state.db)
+        except:
+            st.error("Lỗi AI - Đang dùng thuật toán dự phòng!")
 
 # ================= HIỂN THỊ KẾT QUẢ =================
-if st.session_state.db["last_pred"]:
-    res = st.session_state.db["last_pred"]
-    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    st.markdown(f"<div class='logic-box'><b>💎 Chiến thuật:</b> {res['logic']}</div>", unsafe_allow_html=True)
+if st.session_state.db["predictions"]:
+    res = st.session_state.db["predictions"][-1]
+    st.markdown("<div class='critical-card'>", unsafe_allow_html=True)
     
-    st.markdown("<p style='text-align:center; color:#888;'>🎯 4 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-target'>{''.join(map(str, res['dan4']))}</div>", unsafe_allow_html=True)
+    st.markdown(f"**🗑️ 3 SỐ ĐÃ LOẠI (KHÔNG TRÚNG):** <span class='trash-box'>{res['loai']}</span>", unsafe_allow_html=True)
     
-    st.markdown("<p style='text-align:center; color:#888; margin-top:20px;'>🛡️ 3 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-sub'>{''.join(map(str, res['dan3']))}</div>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center; margin:10px 0;'>🎯 4 SỐ TRÚNG THƯỞNG CỰC MẠNH:</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='num-main'>{res['trung']}</div>", unsafe_allow_html=True)
     
-    copy_val = "".join(map(str, res['dan4'])) + "".join(map(str, res['dan3']))
-    st.text_input("📋 COPY DÀN 7 SỐ:", copy_val)
+    st.markdown(f"<p style='text-align:center;'>🛡️ DÀN LÓT AN TOÀN: <b>{res['lot']}</b></p>", unsafe_allow_html=True)
+    
+    full_dan = res['trung'] + res['lot']
+    st.text_input("📋 COPY DÀN 7 SỐ ĐỂ DÁN:", full_dan)
+    
+    st.info(f"💡 Giải mã cầu: {res['ly_do']}")
     st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>Tự động lọc nhiễu 2 số đầu - Tập trung 3 số cuối</p>", unsafe_allow_html=True)
+if st.button("🗑️ XÓA HẾT LÀM LẠI"):
+    st.session_state.db = {"history": [], "predictions": []}
+    if os.path.exists(DB_FILE): os.remove(DB_FILE)
+    st.rerun()
