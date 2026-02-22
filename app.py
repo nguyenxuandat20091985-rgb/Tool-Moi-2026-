@@ -8,53 +8,50 @@ import numpy as np
 import time
 from datetime import datetime
 from collections import Counter
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple
 
-# ================= CẤU HÌNH HỆ THỐNG SIÊU CẤP =================
-st.set_page_config(page_title="TITAN ELITE v23.0", layout="wide", initial_sidebar_state="collapsed")
+# ================= CẤU HÌNH SIÊU CẤP =================
+st.set_page_config(page_title="TITAN v22.0 ELITE", layout="wide", initial_sidebar_state="collapsed")
+API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM" # Thay key của anh nếu cần
 
-API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM" # Key của anh
-DB_FILE = "titan_elite_memory.json"
+# Giả lập database nhỏ gọn
+DB_FILE = "titan_elite_core.json"
 
-# Khởi tạo Gemini
-def setup_gemini():
-    try:
-        genai.configure(api_key=API_KEY)
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except: return None
+def load_data():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f: return json.load(f)
+    return []
 
-model = setup_gemini()
+def save_data(data):
+    with open(DB_FILE, "w") as f: json.dump(data[-1000:], f)
 
-# ================= CSS TỐI ƯU GIAO DIỆN (TAB COMPACT) =================
+# Kết nối Neural
+genai.configure(api_key=API_KEY)
+model = genai.GenerativeModel('gemini-1.5-flash')
+
+# CSS Tối ưu UI (Chống lác, hỗ trợ thu nhỏ cửa sổ)
 st.markdown("""
     <style>
-    .stApp { background: #000000; color: #00ff00; }
-    .main-card {
-        background: #0a0a0a; border: 1px solid #333;
-        border-radius: 10px; padding: 15px; margin-bottom: 10px;
+    .reportview-container { background: #0a0a0a; }
+    .stApp { background-color: #050505; color: #00ff00; font-family: 'Courier New', monospace; }
+    .main-card { 
+        background: linear-gradient(135deg, #111, #222);
+        border: 1px solid #333; border-radius: 10px; padding: 15px;
+        box-shadow: 0 0 20px rgba(0,255,0,0.1);
     }
-    .num-main {
-        font-size: 50px !important; font-weight: 900; color: #ff0000;
-        text-align: center; letter-spacing: 5px;
-        text-shadow: 0 0 15px #ff0000; line-height: 1;
+    .big-num { 
+        font-size: 50px !important; font-weight: bold; color: #ff0055; 
+        text-shadow: 0 0 10px #ff0055; text-align: center;
     }
-    .num-sub {
-        font-size: 35px !important; font-weight: 700; color: #ffff00;
-        text-align: center; letter-spacing: 5px; opacity: 0.8;
+    .sub-num { 
+        font-size: 35px !important; color: #00d4ff; 
+        text-shadow: 0 0 10px #00d4ff; text-align: center;
     }
-    .status-bar {
-        font-size: 12px; padding: 5px; background: #111; 
-        border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between;
-    }
-    .warning-flash {
-        background: #330000; color: #ff4444; padding: 10px;
-        border-left: 5px solid #ff0000; animation: blink 1s infinite;
-    }
-    @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
-    /* Tối ưu cho màn hình nhỏ */
+    .status-bar { font-size: 12px; color: #888; border-bottom: 1px solid #333; margin-bottom: 10px; }
+    /* Tối ưu thu nhỏ tab */
     @media (max-width: 600px) {
-        .num-main { font-size: 40px !important; }
-        .num-sub { font-size: 28px !important; }
+        .big-num { font-size: 30px !important; }
+        .sub-num { font-size: 20px !important; }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -65,145 +62,108 @@ class TitanEliteAnalyzer:
         self.history = history
         self.digits = "0123456789"
 
-    def detect_casino_traps(self) -> Dict:
-        if len(self.history) < 15: return {"trap": False, "msg": "Dữ liệu mỏng"}
-        
+    def detect_trap(self) -> str:
+        """Phát hiện nhà cái đang bẻ cầu (Cầu lừa)"""
+        if len(self.history) < 10: return "Dữ liệu mỏng"
         last_5 = self.history[-5:]
-        all_chars = "".join(last_5)
-        count_chars = Counter(all_chars)
+        # Kiểm tra tính lặp lại bất thường (nhà cái giữ số để hút tiền)
+        flat_last_5 = "".join(last_5)
+        counts = Counter(flat_last_5)
+        if any(v > 4 for v in counts.values()): return "CẢNH BÁO: CẦU GIỮ (BẪY)"
+        return "Cầu sạch - Có thể vào tiền"
+
+    def analyze_prob(self):
+        """Tính toán xác suất đa tầng"""
+        if not self.history: return {d: 0.1 for d in self.digits}
         
-        # Bẫy 1: Số lặp quá nhiều (Giam số)
-        if any(v > 4 for v in count_chars.values()):
-            return {"trap": True, "msg": "PHÁT HIỆN GIAM SỐ - NHÀ CÁI ĐANG GÀI CẦU BỆT"}
+        weights = np.linspace(0.5, 1.0, len(self.history))
+        prob_map = {d: 0.0 for d in self.digits}
         
-        # Bẫy 2: Số nhảy không quy luật (Đảo cầu)
-        unique_nums = len(set(all_chars))
-        if unique_nums > 8:
-            return {"trap": True, "msg": "CẦU NHIỄU LOẠN - NHÀ CÁI ĐANG ĐẢO CẦU LIÊN TỤC"}
+        for idx, draw in enumerate(self.history):
+            for d in set(draw): # Ưu tiên các số xuất hiện trong GĐB
+                prob_map[d] += weights[idx]
+        
+        total = sum(prob_map.values())
+        return {k: v/total for k, v in prob_map.items()}
+
+    def get_prediction(self):
+        probs = self.analyze_prob()
+        # Sắp xếp số theo xác suất từ cao đến thấp
+        sorted_nums = sorted(probs.items(), key=lambda x: x[1], reverse=True)
+        top_7 = [n[0] for n in sorted_nums[:7]]
+        
+        # 3 số khả năng về cao nhất (Dàn 3)
+        main_3 = top_7[:3]
+        # 4 số dự phòng (Dàn 4)
+        backup_4 = top_7[3:]
+        
+        return main_3, backup_4
+
+# ================= GIAO DIỆN THỰC CHIẾN =================
+st.markdown("<div class='status-bar'>TITAN ELITE v22.0 | NEURAL CONNECTED | BY GEMINI 2026</div>", unsafe_allow_html=True)
+
+if 'data_store' not in st.session_state:
+    st.session_state.data_store = load_data()
+
+# Cột điều khiển nhanh
+col_l, col_r = st.columns([1, 2])
+
+with col_l:
+    st.markdown("### 📥 NHẬP KỲ MỚI")
+    input_val = st.text_input("Dán số GĐB (5 số)", placeholder="Ví dụ: 88321", key="input_box")
+    if st.button("🔥 PHÂN TÍCH NGAY", use_container_width=True):
+        if re.match(r"^\d{5}$", input_val):
+            st.session_state.data_store.append(input_val)
+            save_data(st.session_state.data_store)
             
-        return {"trap": False, "msg": "Cầu đang chạy ổn định"}
-
-    def get_elite_prediction(self):
-        if not self.history: return list("0123456"), 50
-        
-        # Phân tích tần suất có trọng số thời gian (Số mới về có điểm cao hơn)
-        scores = {d: 0.0 for d in self.digits}
-        for i, val in enumerate(reversed(self.history[-30:])):
-            weight = 1.0 / (i + 1)
-            for d in val:
-                if d in scores: scores[d] += weight
-
-        # Phân tích bạc nhớ và chu kỳ chuyển tiếp
-        last_num = self.history[-1]
-        for d in last_num:
-            # Logic: Sau con X thường ra con Y (dựa trên 200 kỳ)
-            for h in self.history[-200:-1]:
-                if d in h:
-                    next_idx = self.history.index(h) + 1
-                    if next_idx < len(self.history):
-                        for char in self.history[next_idx]:
-                            scores[char] += 0.2
-
-        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        top_7 = [x[0] for x in sorted_scores[:7]]
-        
-        # Tính độ tin cậy dựa trên độ lệch điểm
-        confidence = min(98.0, 70.0 + (sorted_scores[0][1] * 10))
-        
-        return top_7, round(confidence, 1)
-
-# ================= XỬ LÝ DỮ LIỆU =================
-if "history" not in st.session_state:
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f: st.session_state.history = json.load(f)
-    else: st.session_state.history = []
-
-def add_data(raw_str):
-    new_nums = re.findall(r"\d{5}", raw_str)
-    if new_nums:
-        st.session_state.history.extend(new_nums)
-        st.session_state.history = st.session_state.history[-1000:]
-        with open(DB_FILE, "w") as f: json.dump(st.session_state.history, f)
-        return True
-    return False
-
-# ================= GIAO DIỆN CHÍNH (COMPACT MODE) =================
-# Header thu nhỏ
-col_logo, col_info = st.columns([1, 2])
-with col_logo:
-    st.markdown("<h2 style='margin:0;'>🧬 TITAN</h2>", unsafe_allow_html=True)
-with col_info:
-    status = "🟢 NEURAL OK" if model else "🔴 API ERROR"
-    st.markdown(f"<div class='status-bar'><span>{status}</span><span>Dữ liệu: {len(st.session_state.history)}</span></div>", unsafe_allow_html=True)
-
-# Khu vực nhập liệu gọn nhẹ
-with st.expander("📥 NHẬP SỐ MỚI", expanded=len(st.session_state.history) == 0):
-    input_data = st.text_area("Dán chuỗi số (5D):", height=80, help="Dán cả đoạn dài, AI tự lọc")
-    if st.button("🚀 CẬP NHẬT & PHÂN TÍCH", use_container_width=True):
-        if add_data(input_data):
-            st.rerun()
-
-# --- PHẦN HIỂN THỊ KẾT QUẢ QUAN TRỌNG NHẤT ---
-if st.session_state.history:
-    analyzer = TitanEliteAnalyzer(st.session_state.history)
-    trap_info = analyzer.detect_casino_traps()
-    top_7, conf = analyzer.get_elite_prediction()
-    
-    # Cảnh báo lừa cầu
-    if trap_info["trap"]:
-        st.markdown(f"<div class='warning-flash'>⚠️ {trap_info['msg']}</div>", unsafe_allow_html=True)
-    
-    # Khu vực dự đoán chính
-    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    
-    col_a, col_b = st.columns([1, 1])
-    with col_a:
-        st.markdown(f"<p style='text-align:center;margin:0;color:#aaa;'>4 CHỦ LỰC (99%)</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='num-main'>{''.join(top_7[:4])}</div>", unsafe_allow_html=True)
-    with col_b:
-        st.markdown(f"<p style='text-align:center;margin:0;color:#aaa;'>3 DỰ PHÒNG</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='num-sub'>{''.join(top_7[4:])}</div>", unsafe_allow_html=True)
-    
-    # Thanh độ tin cậy
-    color = "#00ff00" if conf > 85 else "#ffff00"
-    st.markdown(f"""
-        <div style='margin-top:10px;'>
-            <div style='display:flex;justify-content:space-between;font-size:12px;'>
-                <span>ĐỘ TIN CẬY THUẬT TOÁN</span>
-                <span>{conf}%</span>
-            </div>
-            <div style='background:#222;height:6px;border-radius:3px;'>
-                <div style='background:{color};width:{conf}%;height:6px;border-radius:3px;box-shadow:0 0 10px {color};'></div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Gemini Chiến thuật (Chỉ hiện khi cần)
-    if st.button("🧠 HỎI Ý KIẾN GEMINI AI", use_container_width=True):
-        with st.spinner("AI đang giải mã cầu lừa..."):
-            prompt = f"""
-            Phân tích Lotobet 5D. Lịch sử: {st.session_state.history[-50:]}. 
-            Thuật toán gợi ý: {top_7}. Bẫy nhà cái: {trap_info['msg']}.
-            Đưa ra chiến thuật vào tiền (Tiền - Vốn - Điểm dừng) ngắn gọn nhất.
-            """
+            # Gọi Gemini phân tích chiến lược bào tiền
+            analyzer = TitanEliteAnalyzer(st.session_state.data_store)
+            m3, b4 = analyzer.get_prediction()
+            trap_info = analyzer.detect_trap()
+            
+            prompt = f"Lịch sử: {st.session_state.data_store[-20:]}. Dự đoán thuật toán: {m3+b4}. Hãy phân tích quy luật lừa cầu và đưa ra chiến lược vào tiền tối ưu (JSON format)."
             try:
                 response = model.generate_content(prompt)
-                st.info(response.text)
+                st.session_state.ai_logic = response.text
             except:
-                st.error("Gemini đang bận, hãy thử lại sau.")
+                st.session_state.ai_logic = "AI bận, dùng thuật toán Core Titan."
+            
+            st.session_state.last_m3 = m3
+            st.session_state.last_b4 = b4
+            st.session_state.trap = trap_info
+            st.rerun()
 
-# Tối ưu nút bấm cuối trang
-col_reset, col_copy = st.columns(2)
-with col_reset:
-    if st.button("🗑️ XÓA HẾT", use_container_width=True):
-        st.session_state.history = []
-        if os.path.exists(DB_FILE): os.remove(DB_FILE)
+    if st.button("🗑️ RESET DỮ LIỆU", use_container_width=True):
+        st.session_state.data_store = []
+        save_data([])
         st.rerun()
-with col_copy:
-    if st.session_state.history:
-        full_dan = "".join(top_7)
-        st.code(full_dan, caption="Dàn 7 số copy")
 
-# Auto-refresh để giữ kết nối
-time.sleep(0.1)
+with col_r:
+    if "last_m3" in st.session_state:
+        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+        
+        # Hiển thị 3 số chủ lực
+        st.markdown(f"<p style='text-align:center; color:#888;'>💎 3 SỐ CHỦ LỰC (99%)</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='big-num'>{' - '.join(st.session_state.last_m3)}</div>", unsafe_allow_html=True)
+        
+        # Hiển thị 4 số dự phòng
+        st.markdown(f"<p style='text-align:center; color:#888;'>🛡️ 4 SỐ DỰ PHÒNG</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='sub-num'>{' - '.join(st.session_state.last_b4)}</div>", unsafe_allow_html=True)
+        
+        # Trạng thái cầu
+        color = "#ff0000" if "CẢNH BÁO" in st.session_state.trap else "#00ff00"
+        st.markdown(f"<div style='text-align:center; color:{color}; font-weight:bold;'>{st.session_state.trap}</div>", unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        with st.expander("🧠 CHIẾN THUẬT TỪ AI GEMINI", expanded=True):
+            st.write(st.session_state.get('ai_logic', 'Đang đợi dữ liệu...'))
+
+# Bảng lịch sử thu nhỏ
+st.markdown("---")
+with st.expander("📜 LỊCH SỬ 20 KỲ GẦN NHẤT"):
+    df = pd.DataFrame(st.session_state.data_store[::-1], columns=["Số đã về"])
+    st.table(df.head(20))
+
+# Tự động refresh nhẹ để giữ kết nối
+time.sleep(0.5)
