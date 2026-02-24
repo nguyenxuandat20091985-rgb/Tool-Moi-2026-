@@ -1,201 +1,198 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import plotly.express as px
 from datetime import datetime
 import os
 
-# ================= CONFIG & UI =================
-st.set_page_config(page_title="AI 2-TINH LOTOBET v2", layout="wide", page_icon="🎯")
+# ================= CONFIG =================
+st.set_page_config(page_title="AI LOTOBET 2-TINH v2", layout="wide", page_icon="🎯")
 
+# Giao diện Dark/Light mode tối ưu
 st.markdown("""
     <style>
-    .reportview-container { background: #f0f2f6; }
-    .stMetric { background: white; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
-    .status-box { padding: 20px; border-radius: 10px; text-align: center; margin: 10px 0; }
-    .prediction-card { background: #ffffff; padding: 25px; border-radius: 15px; border: 2px solid #ff4b4b; text-align: center; }
+    .main { background-color: #f0f2f6; }
+    .stMetric { background-color: white; padding: 15px; border-radius: 12px; border: 1px solid #d1d5db; }
+    .prediction-box { padding: 25px; border-radius: 15px; background: #ffffff; border-left: 8px solid #ff4b4b; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-DATA_FILE = "loto_data_v2.csv"
+DATA_FILE = "lotobet_v2_history.csv"
 
-# ================= AI LOGIC ENGINE =================
-class LotobetStandardAI:
+# ================= CORE AI LOGIC v2 =================
+class LotobetAIv2:
     def __init__(self):
-        self.min_draws = 10
-        self.states = ["NÓNG", "ỔN ĐỊNH", "YẾU", "NGUY HIỂM"]
+        self.labels = {
+            "HOT": "🔥 NÓNG",
+            "STABLE": "🟢 ỔN ĐỊNH",
+            "WEAK": "⚪ YẾU",
+            "RISK": "⚠️ NGUY HIỂM"
+        }
 
-    def analyze_single_numbers(self, df):
-        """Bước 3: Phân tích từng số đơn từ 0-9"""
-        if len(df) < 5: return None
-        
-        # Chuyển dữ liệu thành mảng số đơn
+    def clean_data(self, df):
+        """Xử lý dữ liệu thô, loại bỏ dòng lỗi"""
         matrix = []
         for val in df['numbers'].values:
-            matrix.append([int(d) for d in str(val) if d.isdigit()])
-        matrix = np.array(matrix)
+            digits = [int(d) for d in str(val).strip() if d.isdigit()]
+            if len(digits) == 5:
+                matrix.append(digits)
+        return np.array(matrix)
+
+    def analyze_numbers(self, matrix):
+        """Phân tích 10 số đơn (0-9) theo Đặc tả v2"""
+        if len(matrix) < 5: return None
         
         analysis = {}
+        total_draws = len(matrix)
+        
         for num in range(10):
-            # Tìm vị trí xuất hiện (0 là kỳ cũ nhất, len-1 là kỳ mới nhất)
-            pos = np.where(np.any(matrix == num, axis=1))[0]
-            gaps = np.diff(pos) if len(pos) > 1 else []
+            # Vị trí xuất hiện (kỳ)
+            appears = np.where(np.any(matrix == num, axis=1))[0]
+            gaps = np.diff(appears) if len(appears) > 1 else []
             
-            # 1. Kiểm tra Lặp (Kỳ gần nhất có ra không)
-            is_last_present = (num in matrix[-1])
+            # Thống kê tần suất
+            recent_3 = sum(1 for row in matrix[-3:] if num in row)
+            recent_5 = sum(1 for row in matrix[-5:] if num in row)
+            recent_10 = sum(1 for row in matrix[-10:] if num in row)
             
-            # 2. Đếm tần suất
-            freq_3 = sum(1 for row in matrix[-3:] if num in row)
-            freq_5 = sum(1 for row in matrix[-5:] if num in row)
-            freq_10 = sum(1 for row in matrix[-10:] if num in row)
+            last_seen = total_draws - 1 - appears[-1] if len(appears) > 0 else 99
             
-            # 3. Gán nhãn trạng thái (Bước 6)
-            state = "ỔN ĐỊNH"
-            if freq_3 >= 2: state = "NGUY HIỂM" # Ra dồn
-            elif freq_5 >= 3: state = "NÓNG"
-            elif freq_10 <= 1: state = "YẾU"
-            
-            # 4. Nhận diện nhịp cầu (Bước 4)
-            bridge = "BÌNH THƯỜNG"
-            if len(gaps) >= 2:
-                if gaps[-1] == 1 and gaps[-2] == 1: bridge = "BỆT"
-                elif 2 <= gaps[-1] <= 3 and gaps[-1] == gaps[-2]: bridge = "NHẢY"
-            
+            # --- PHÂN LOẠI TRẠNG THÁI (Đặc tả mục 6) ---
+            if recent_3 >= 2 or (len(gaps) > 0 and gaps[-1] == 1):
+                state = "RISK" # Vừa ra hoặc ra dồn
+            elif recent_10 >= 4:
+                state = "HOT" # Ra dày
+            elif 1 <= recent_10 <= 3 and last_seen <= 7:
+                state = "STABLE" # Ra đều, có nhịp
+            else:
+                state = "WEAK" # Ít xuất hiện
+
             analysis[num] = {
                 "state": state,
-                "bridge": bridge,
-                "is_last": is_last_present,
-                "score": self.calculate_score(state, bridge, is_last_present, freq_10)
+                "last_seen": last_seen,
+                "recent_5": recent_5,
+                "avg_gap": np.mean(gaps) if len(gaps) > 0 else 99
             }
         return analysis
 
-    def calculate_score(self, state, bridge, is_last, freq_10):
-        """Tính điểm sức mạnh cho từng số đơn"""
-        score = 50
-        # Ưu tiên theo đặc tả
-        if bridge == "NHẢY": score += 20
-        if state == "ỔN ĐỊNH": score += 15
-        if is_last: score -= 25 # Số vừa ra kỳ trước -> giảm trọng số (Bước 5)
-        if state == "YẾU": score -= 10
-        if state == "NÓNG": score -= 5
-        return score
+    def get_predictions(self, matrix):
+        """Logic ghép cặp & Lọc KHÔNG ĐÁNH (Đặc tả mục 7 & 8)"""
+        analysis = self.analyze_numbers(matrix)
+        if not analysis: return [], "THIẾU DỮ LIỆU", []
 
-    def get_predictions(self, df):
-        """Logic ghép cặp và lọc (Bước 7 & 8)"""
-        analysis = self.analyze_single_numbers(df)
-        if not analysis: return None, "DỮ LIỆU THIẾU", []
-
-        # Kiểm tra điều kiện KHÔNG ĐÁNH (Bước 8)
-        hot_count = sum(1 for v in analysis.values() if v['state'] == "NÓNG")
-        recent_count = sum(1 for v in analysis.values() if v['is_last'])
+        reasons_to_skip = []
         
-        if hot_count >= 7: return None, "KHÔNG ĐÁNH", ["Toàn số quá NÓNG"]
-        if recent_count >= 4: return None, "KHÔNG ĐÁNH", ["Quá nhiều số vừa ra kỳ trước"]
-        if len(df) < self.min_draws: return None, "KHÔNG ĐÁNH", ["Dữ liệu quá ít"]
+        # Kiểm tra điều kiện KHÔNG ĐÁNH
+        hot_count = sum(1 for v in analysis.values() if v['state'] in ["HOT", "RISK"])
+        if hot_count >= 7: 
+            reasons_to_skip.append("Toàn số quá NÓNG/NGUY HIỂM (Cầu nhiễu)")
+        
+        last_draw = matrix[-1]
+        repeats = sum(1 for n in last_draw if analysis[n]['state'] == "RISK")
+        if repeats >= 3:
+            reasons_to_skip.append("Quá nhiều số vừa ra kỳ trước (Cầu bệt ảo)")
 
-        # Lọc danh sách số đơn tiềm năng (Loại Nóng, Nguy hiểm, Yếu nếu cần)
+        if reasons_to_skip:
+            return [], "KHÔNG ĐÁNH KỲ NÀY", reasons_to_skip
+
+        # Ghép cặp (Loại số chập)
         candidates = []
-        for num, data in analysis.items():
-            # Bước 6: Không ghép 2 số cùng trạng thái xấu
-            candidates.append({"num": num, **data})
-        
-        # Sắp xếp theo điểm số
+        for i in range(10):
+            for j in range(i + 1, 10): # i+1 đảm bảo i != j (Loại số chập 11, 22...)
+                s1, s2 = analysis[i], analysis[j]
+                
+                # Logic Ưu tiên: Ổn định + Hồi hoặc Nhảy + Ổn định
+                score = 0
+                if s1['state'] == "STABLE" and s2['state'] == "STABLE": score = 85
+                elif (s1['state'] == "STABLE" and 5 <= s2['last_seen'] <= 8): score = 78 # Hồi
+                elif (s1['state'] == "STABLE" and s2['state'] == "WEAK"): score = 65
+                
+                # Loại trừ theo đặc tả (Mục 6)
+                invalid_states = ["HOT", "RISK", "WEAK"]
+                if s1['state'] in ["HOT", "RISK"] and s2['state'] in ["HOT", "RISK"]: score = 0
+                if s1['state'] == "WEAK" and s2['state'] == "WEAK": score = 0
+
+                if score >= 60:
+                    candidates.append({"pair": f"{i}{j}", "score": score})
+
         candidates.sort(key=lambda x: x['score'], reverse=True)
         
-        pairs = []
-        # Logic ghép (Bước 1 & 7)
-        for i in range(len(candidates)):
-            for j in range(i + 1, len(candidates)):
-                n1, n2 = candidates[i], candidates[j]
-                
-                # ❌ CẤM số chập (Bước 1) - n1['num'] và n2['num'] luôn khác nhau do vòng lặp
-                # ❌ Không ghép 2 số đều nóng/nguy hiểm (Bước 6)
-                bad_states = ["NÓNG", "NGUY HIỂM"]
-                if n1['state'] in bad_states and n2['state'] in bad_states: continue
-                if n1['state'] == "YẾU" and n2['state'] == "YẾU": continue
-
-                conf = (n1['score'] + n2['score']) / 1.5 # Thang đo độ tự tin
-                
-                if conf >= 60: # Bước 9: Chỉ lấy trên 60%
-                    pairs.append({
-                        "pair": f"{n1['num']}{n2['num']}",
-                        "conf": int(conf),
-                        "detail": f"{n1['state']} + {n2['state']}"
-                    })
-
-        pairs.sort(key=lambda x: x['conf'], reverse=True)
-        
-        if not pairs or pairs[0]['conf'] < 60:
-            return None, "KHÔNG ĐÁNH", ["Không có cặp nào đạt ngưỡng an toàn"]
+        if not candidates:
+            return [], "KHÔNG ĐÁNH KỲ NÀY", ["Không có cặp đạt ngưỡng an toàn"]
             
-        return pairs[:1], "ĐÁNH", [] # Chỉ trả về 1 cặp tốt nhất (Bước 7)
+        return candidates[:1], "PREDICT", [] # Trả về tối đa 1 cặp tốt nhất theo đặc tả
 
-# ================= UTILS =================
-def handle_data():
-    if not os.path.exists(DATA_FILE):
-        pd.DataFrame(columns=["numbers"]).to_csv(DATA_FILE, index=False)
-    return pd.read_csv(DATA_FILE)
-
-# ================= APP UI =================
+# ================= UI RENDER =================
 def main():
-    st.title("🎯 AI LOTOBET 2-TINH (CHUẨN v2)")
-    ai = LotobetStandardAI()
+    ai = LotobetAIv2()
     
-    # Sidebar nhập liệu
-    with st.sidebar:
-        st.header("📥 Nhập dữ liệu")
-        new_data = st.text_area("Nhập kết quả (5 số viết liền, mỗi dòng 1 kỳ):", height=200)
-        if st.button("💾 Lưu & Phân tích"):
-            lines = [n.strip() for n in new_data.split("\n") if len(n.strip()) == 5]
+    # Load data
+    if os.path.exists(DATA_FILE):
+        df = pd.read_csv(DATA_FILE)
+    else:
+        df = pd.DataFrame(columns=["time", "numbers"])
+
+    tab1, tab2 = st.tabs(["📊 Phân tích & Dự đoán", "📥 Nhập dữ liệu"])
+
+    with tab2:
+        st.subheader("📥 Cập nhật kết quả Lotobet")
+        raw_input = st.text_area("Nhập kết quả (5 số viết liền, mỗi dòng 1 kỳ):", height=200, placeholder="12345\n67890\n...")
+        if st.button("💾 Lưu dữ liệu"):
+            lines = [l.strip() for l in raw_input.split("\n") if len(l.strip()) == 5]
             if lines:
-                old_df = handle_data()
-                new_df = pd.DataFrame(lines, columns=["numbers"])
-                pd.concat([old_df, new_df]).tail(50).to_csv(DATA_FILE, index=False)
-                st.success(f"Đã thêm {len(lines)} kỳ!")
+                new_df = pd.DataFrame([{"time": datetime.now().strftime("%H:%M:%S"), "numbers": l} for l in lines])
+                df = pd.concat([df, new_df], ignore_index=True).tail(100) # Giữ 100 kỳ gần nhất
+                df.to_csv(DATA_FILE, index=False)
+                st.success(f"Đã lưu {len(lines)} kỳ!")
                 st.rerun()
-        
-        if st.button("🗑 Xóa dữ liệu cũ"):
-            os.remove(DATA_FILE)
-            st.rerun()
-
-    # Main Area
-    df = handle_data()
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.subheader("📊 Phân tích & Dự đoán")
-        if len(df) < 5:
-            st.warning("Vui lòng nhập ít nhất 5 kỳ để bắt đầu phân tích.")
-        else:
-            preds, status, reasons = ai.get_predictions(df)
-            
-            if status == "KHÔNG ĐÁNH":
-                st.markdown(f"""<div class="status-box" style="background:#ffebee; color:#c62828;">
-                    <h2>🚫 KHÔNG ĐÁNH KỲ NÀY</h2>
-                    <p>{', '.join(reasons)}</p>
-                </div>""", unsafe_allow_html=True)
             else:
-                for p in preds:
-                    color = "#4caf50" if p['conf'] >= 75 else "#ff9800"
-                    st.markdown(f"""<div class="prediction-card">
-                        <p style="color:gray; margin:0;">CẶP SỐ ĐỀ XUẤT</p>
-                        <h1 style="font-size:80px; margin:10px 0;">{p['pair']}</h1>
-                        <div style="font-size:24px; font-weight:bold; color:{color};">ĐỘ TỰ TIN: {p['conf']}%</div>
-                        <p style="color:gray;">Trạng thái: {p['detail']}</p>
-                    </div>""", unsafe_allow_html=True)
+                st.error("Dữ liệu không đúng định dạng (5 chữ số)!")
 
-    with col2:
-        st.subheader("📋 Lịch sử gần đây")
-        st.dataframe(df.tail(10), use_container_width=True)
-        
-        if len(df) >= 5:
-            st.subheader("💡 Trạng thái số đơn")
-            analysis = ai.analyze_single_numbers(df)
-            stat_df = pd.DataFrame([
-                {"Số": k, "Trạng thái": v['state'], "Cầu": v['bridge']} 
-                for k, v in analysis.items()
-            ])
-            st.table(stat_df)
+    with tab1:
+        if len(df) < 10:
+            st.warning("⚠️ Cần tối thiểu 10 kỳ để AI bắt đầu phân tích.")
+            return
+
+        matrix = ai.clean_data(df)
+        analysis = ai.analyze_numbers(matrix)
+        preds, status, reasons = ai.get_predictions(matrix)
+
+        # Hiển thị kết quả dự đoán
+        st.subheader("🎯 Dự đoán kỳ kế tiếp")
+        if status == "KHÔNG ĐÁNH KỲ NÀY":
+            st.error("🚫 **KHÔNG ĐÁNH KỲ NÀY**")
+            for r in reasons: st.write(f"- {r}")
+        else:
+            for p in preds:
+                st.markdown(f"""
+                <div class="prediction-box">
+                    <span style="color: #6b7280;">CẶP SỐ ĐỀ XUẤT:</span>
+                    <h1 style="font-size: 80px; margin: 0; color: #ff4b4b;">{p['pair']}</h1>
+                    <span style="font-weight: bold;">Độ tự tin: {p['score']}%</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Hiển thị bảng trạng thái số đơn
+        st.divider()
+        st.subheader("📊 Trạng thái số đơn (0-9)")
+        cols = st.columns(5)
+        for i in range(10):
+            with cols[i % 5]:
+                data = analysis[i]
+                color = "red" if "NÓNG" in ai.labels[data['state']] or "NGUY" in ai.labels[data['state']] else "green"
+                st.markdown(f"""
+                <div style="padding:10px; border:1px solid #ddd; border-radius:8px; text-align:center; background:white;">
+                    <b style="font-size:20px;">{i}</b><br>
+                    <span style="color:{color}; font-size:12px;">{ai.labels[data['state']]}</span><br>
+                    <small>Gần nhất: {data['last_seen']} kỳ</small>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # Biểu đồ tần suất
+        st.divider()
+        freq_df = pd.DataFrame([{"Số": i, "Tần suất (10 kỳ)": analysis[i]['recent_5']*2} for i in range(10)])
+        fig = px.bar(freq_df, x='Số', y='Tần suất (10 kỳ)', title="Biểu đồ mật độ xuất hiện", color='Tần suất (10 kỳ)')
+        st.plotly_chart(fig, use_container_width=True)
 
 if __name__ == "__main__":
     main()
