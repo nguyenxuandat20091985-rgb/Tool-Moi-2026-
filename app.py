@@ -3,121 +3,133 @@ import google.generativeai as genai
 import re
 import json
 import os
+import pandas as pd
+import numpy as np
 from collections import Counter
 
-# ================= CẤU HÌNH TỐI CAO =================
+# ================= CẤU HÌNH TITAN v23.0 =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-genai.configure(api_key=API_KEY)
+DB_FILE = "titan_v23_neural_core.json"
 
-st.set_page_config(page_title="TITAN v23.0 ULTIMATE", layout="wide")
+def setup_neural():
+    try:
+        genai.configure(api_key=API_KEY)
+        return genai.GenerativeModel('gemini-1.5-pro') # Nâng cấp lên bản Pro để tính toán mạnh hơn
+    except: return None
 
-# CSS Chuyên dụng cho chế độ "Gỡ Vốn"
+neural_engine = setup_neural()
+
+# ================= HỆ THỐNG PHÂN TÍCH VỊ TRÍ (NEW) =================
+class TitanCoreV23:
+    def __init__(self, history):
+        self.history = history # List các chuỗi '12345'
+        self.matrix = np.array([[int(d) for d in s] for s in history]) if history else np.array([])
+        self.shadow_map = {0:5, 5:0, 1:6, 6:1, 2:7, 7:2, 3:8, 8:3, 4:9, 9:4}
+
+    def get_positional_stats(self):
+        """Phân tích tần suất và nhịp cho từng vị trí trong 5 hàng"""
+        if self.matrix.size == 0: return {}
+        stats = {}
+        labels = ['H.Vạn', 'H.Ngàn', 'H.Trăm', 'H.Chục', 'H.Đơn']
+        for i in range(5):
+            col = self.matrix[:, i]
+            common = Counter(col).most_common(3)
+            stats[labels[i]] = common
+        return stats
+
+    def detect_ai_trap(self):
+        """Nhận diện bẫy nhà cái: Nếu 1 số ra liên tục > 3 kỳ ở cùng 1 vị trí"""
+        if len(self.matrix) < 5: return False
+        for i in range(5):
+            last_4 = self.matrix[-4:, i]
+            if len(set(last_4)) == 1: return True # Bệt ảo - Cực kỳ nguy hiểm
+        return False
+
+# ================= GIAO DIỆN TITAN v23 =================
+st.set_page_config(page_title="TITAN v23.0 - ANTI AI KUBET", layout="wide")
 st.markdown("""
     <style>
-    .stApp { background: #0a0a0a; color: #00ff41; font-family: 'Courier New', monospace; }
-    .main-card { border: 2px solid #00ff41; padding: 20px; border-radius: 10px; background: #000; box-shadow: 0 0 20px #00ff41; }
-    .hot-num { color: #ff0000; font-size: 70px; font-weight: bold; text-shadow: 0 0 10px #ff0000; }
-    .logic-text { color: #888; font-style: italic; border-left: 3px solid #444; padding-left: 10px; }
+    .stApp { background: #050a0f; color: #e6edf3; }
+    .prediction-card {
+        background: #0d1117; border: 1px solid #238636;
+        border-radius: 12px; padding: 25px; box-shadow: 0 0 20px rgba(35, 134, 54, 0.2);
+    }
+    .main-number { 
+        font-size: 100px; font-weight: 800; color: #3fb950; 
+        text-align: center; text-shadow: 0 0 40px #238636;
+        font-family: 'Courier New', monospace;
+    }
+    .trap-warning { 
+        background: #440505; color: #ff7b72; padding: 10px; 
+        border-radius: 5px; border: 1px solid #f85149; text-align: center;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# ================= THUẬT TOÁN ĐỐI KHÁNG AI NHÀ CÁI =================
-def analyze_kubet_logic(history):
-    if not history: return {}
-    
-    # 1. Phân tích tần suất sâu (Digit Frequency)
-    all_str = "".join(history)
-    freq = Counter(all_str)
-    
-    # 2. Phân tích "Cặp bài trùng" (Co-occurrence)
-    # Tìm xem nếu số A ra thì số B nào hay ra cùng
-    pairs = []
-    for s in history:
-        unique_nums = sorted(list(set(s)))
-        for i in range(len(unique_nums)):
-            for j in range(i+1, len(unique_nums)):
-                pairs.append(unique_nums[i] + unique_nums[j])
-    common_pairs = Counter(pairs).most_common(5)
-    
-    return {"freq": freq, "pairs": common_pairs}
+st.title("🛡️ TITAN v23.0 OMNI: KHẮC CHẾ AI KUBET")
 
-# ================= PROMPT CHIẾN ĐẤU (ULTIMATE) =================
-def get_ai_prediction(history):
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    # Lấy 30 kỳ gần nhất để AI không bị loãng
-    recent_data = history[-30:]
-    
-    prompt = f"""
-    Hệ thống: TITAN v23.0 - Chuyên gia đối kháng AI Kubet 5D.
-    Dữ liệu 30 kỳ: {recent_data}.
-    Quy luật phát hiện: {analyze_kubet_logic(recent_data)}.
-    
-    Yêu cầu khắt khe:
-    1. Phân tích kèo "3 số 5 tinh" (Chỉ cần 3 số dự đoán xuất hiện trong 5 vị trí kết quả là thắng).
-    2. Phát hiện "Cầu bệt" và "Cầu nhảy". Ví dụ số 4 đang ra cực dày thì phải tận dụng.
-    3. Chọn ra 3 số CHỦ LỰC (Dàn 3 số 5 tinh).
-    4. Nếu xác suất thắng dưới 80%, đặt 'action': 'WAIT'.
-    
-    TRẢ VỀ JSON:
-    {{
-        "top_3": ["x", "y", "z"],
-        "support": ["a", "b"],
-        "logic": "Giải mã ngắn gọn cầu đang chạy",
-        "action": "BET" hoặc "WAIT",
-        "confidence": 95
-    }}
-    """
-    try:
-        response = model.generate_content(prompt)
-        return json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-    except:
-        return None
+# Quản lý bộ nhớ
+if "history" not in st.session_state:
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f: st.session_state.history = json.load(f)
+    else: st.session_state.history = []
 
-# ================= GIAO DIỆN CHÍNH =================
-st.title("⚡ TITAN v23.0 ULTIMATE: ANTI-AI KUBET")
+# Input
+raw_data = st.text_area("📥 NẠP DỮ LIỆU KỲ MỚI:", height=100, placeholder="Dán dãy số kết quả...")
 
-with st.sidebar:
-    st.header("📥 DỮ LIỆU ĐẦU VÀO")
-    raw_data = st.text_area("Dán danh sách kết quả (5 số):", height=300)
-    if st.button("🔥 GIẢI MÃ NGAY"):
-        clean = re.findall(r"\d{5}", raw_data)
-        st.session_state.history = clean
-        st.session_state.prediction = get_ai_prediction(clean)
-
-if "history" in st.session_state:
-    st.write(f"📊 Đã nạp: **{len(st.session_state.history)}** kỳ.")
-    
-    if "prediction" in st.session_state and st.session_state.prediction:
-        res = st.session_state.prediction
+if st.button("🚀 PHÁ MÃ NHÀ CÁI"):
+    new_entries = re.findall(r"\b\d{5}\b", raw_data)
+    if new_entries:
+        st.session_state.history.extend(new_entries)
+        st.session_state.history = st.session_state.history[-2000:] # Lưu 2000 kỳ
+        with open(DB_FILE, "w") as f: json.dump(st.session_state.history, f)
         
-        # HIỂN THỊ CẢNH BÁO
-        if res['action'] == 'WAIT':
-            st.warning("⚠️ AI NHÀ CÁI ĐANG ĐẢO CẦU - LỆNH: CHỜ (KHÔNG VÀO TIỀN)")
-        else:
-            st.success("✅ TÍN HIỆU ĐẸP - LỆNH: VÀO TIỀN")
+        core = TitanCoreV23(st.session_state.history)
+        is_trap = core.detect_ai_trap()
+        pos_stats = core.get_positional_stats()
 
-        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+        # Prompt Gemini chuyên sâu hơn về giải mã 5D
+        prompt = f"""
+        Bạn là hệ thống TITAN v23. Phân tích sảnh 5D KU. 
+        Dữ liệu 50 kỳ gần nhất: {st.session_state.history[-50:]}
+        Thống kê hàng vị trí: {pos_stats}
+        Cảnh báo bẫy (Trap): {'CÓ' if is_trap else 'KHÔNG'}
+        Nhiệm vụ:
+        1. Tìm 3 số (0-9) có xác suất xuất hiện cao nhất trong 5 hàng (chế độ 3 số 5 tinh).
+        2. Dùng quy luật bóng số để bù trừ sai lệch.
+        3. Nếu bẫy Trap là CÓ, hãy giảm độ tin cậy xuống dưới 50%.
+        TRẢ VỀ JSON: {{"main_3": "abc", "backup": "defg", "logic": "giải mã ngắn", "safety": 95}}
+        """
         
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.write("🎯 **3 SỐ CHỦ LỰC (Kèo 3 số 5 tinh):**")
-            st.markdown(f"<div class='hot-num'>{' - '.join(res['top_3'])}</div>", unsafe_allow_html=True)
-            st.write(f"💡 **Logic AI:** {res['logic']}")
-        
-        with col2:
-            st.metric("Độ tự tin", f"{res['confidence']}%")
-            st.write("**Số lót an toàn:**")
-            st.write(f"👉 {', '.join(res['support'])}")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Phân tích thực tế từ dữ liệu anh gửi
-        st.divider()
-        st.subheader("📈 Phân tích nhịp cầu thực tế")
-        logic_data = analyze_kubet_logic(st.session_state.history)
-        st.write(f"Số xuất hiện nhiều nhất: **{logic_data['freq'].most_common(1)[0][0]}**")
-        st.write(f"Cặp số hay đi cùng nhau: **{', '.join([p[0] for p in logic_data['pairs']])}**")
+        try:
+            response = neural_engine.generate_content(prompt)
+            data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
+            st.session_state.result = data
+            st.session_state.is_trap = is_trap
+        except:
+            st.error("AI đang bị nghẽn, hãy thử lại sau vài giây.")
+        st.rerun()
 
-else:
-    st.info("Hãy dán kết quả vào cột bên trái để AI bắt đầu quét chu kỳ.")
+# Hiển thị
+if "result" in st.session_state:
+    res = st.session_state.result
+    
+    if st.session_state.is_trap:
+        st.markdown("<div class='trap-warning'>⚠️ PHÁT HIỆN DẤU HIỆU ĐIỀU TIẾT CỦA NHÀ CÁI - CẨN THẬN BỊ BẺ CẦU ⚠️</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
+    st.markdown(f"<p style='color: #8b949e;'>💡 CHIẾN THUẬT: {res['logic']}</p>", unsafe_allow_html=True)
+    
+    st.markdown("<h3 style='text-align: center; color: #3fb950;'>💎 3 SỐ CHỦ LỰC (DÀNH CHO 3 SỐ 5 TINH)</h3>", unsafe_allow_html=True)
+    st.markdown(f"<div class='main-number'>{res['main_3']}</div>", unsafe_allow_html=True)
+    
+    st.markdown(f"<p style='text-align: center;'>🛡️ Dãy lót bảo vệ: <b>{res['backup']}</b></p>", unsafe_allow_html=True)
+    st.progress(res['safety'] / 100)
+    st.markdown(f"<p style='text-align: right; font-size: 12px;'>Độ an toàn hệ thống: {res['safety']}%</p>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# Thống kê chi tiết
+with st.expander("📊 Xem bảng giải mã nhịp cầu 5 hàng"):
+    if st.session_state.history:
+        core = TitanCoreV23(st.session_state.history)
+        st.write(core.get_positional_stats())
