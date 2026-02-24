@@ -1,179 +1,202 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 import google.generativeai as genai
 from datetime import datetime
 import os
 
 # ================= CONFIG & API =================
-# API KEY của anh: AIzaSyBgd0Au6FGhsiqTkADgz1SBECjs2e1MwGE
-genai.configure(api_key="AIzaSyBgd0Au6FGhsiqTkADgz1SBECjs2e1MwGE")
-model_gemini = genai.GenerativeModel('gemini-1.5-flash')
+st.set_page_config(page_title="AI LOTOBET 2-TINH v2", layout="wide", page_icon="🎯")
 
-st.set_page_config(page_title="AI LOTOBET V2 - CHUẨN ĐẶC TẢ", layout="wide")
+# Kết nối Gemini (Dùng API anh cung cấp)
+try:
+    genai.configure(api_key="AIzaSyBgd0Au6FGhsiqTkADgz1SBECjs2e1MwGE")
+    model = genai.GenerativeModel('gemini-pro')
+except:
+    st.error("Lỗi kết nối Gemini. Vui lòng kiểm tra lại API Key.")
 
-DATA_FILE = "lotobet_v2_data.csv"
+DATA_FILE = "lotobet_history.csv"
 
-# ================= CORE AI ENGINE =================
-class LotobetStandardV2:
+# ================= LOGIC PHÂN TÍCH AI =================
+class LotobetEngineV2:
     def __init__(self):
-        self.states = ["NÓNG", "ỔN ĐỊNH", "YẾU", "NGUY HIỂM"]
+        self.min_draws = 10
+        self.labels = {
+            "HOT": "NÓNG (Ra dày)",
+            "STABLE": "ỔN ĐỊNH (Nhịp đều)",
+            "WEAK": "YẾU (Ít ra)",
+            "RISKY": "NGUY HIỂM (Vừa ra/Bệt)"
+        }
 
-    def clean_matrix(self, df):
-        """Xử lý triệt để lỗi ValueError khi tạo matrix"""
-        clean_data = []
-        for val in df['numbers'].values:
-            val_str = str(val).strip()
-            if len(val_str) == 5 and val_str.isdigit():
-                clean_data.append([int(d) for d in val_str])
-        return np.array(clean_data)
+    def clean_input(self, text):
+        """Lọc dữ liệu rác, chỉ lấy đúng 5 chữ số"""
+        lines = text.split('\n')
+        valid_data = []
+        for line in lines:
+            clean_line = "".join(filter(str.isdigit, line.strip()))
+            if len(clean_line) == 5:
+                valid_data.append(clean_line)
+        return valid_data
 
     def analyze_numbers(self, df):
-        matrix = self.clean_matrix(df)
-        if len(matrix) < 5: return None
+        """Phân tích số đơn (0-9)"""
+        if len(df) < 5: return None
         
-        results = {}
-        for num in range(10):
-            # 1. Tìm vị trí xuất hiện
-            appears = np.where(np.any(matrix == num, axis=1))[0]
-            gaps = np.diff(appears) if len(appears) > 1 else []
-            
-            # 2. Thống kê theo trọng số thời gian
-            recent_3 = 1 if any(num in row for row in matrix[-3:]) else 0
-            recent_5 = sum(1 for row in matrix[-5:] if num in row)
-            
-            # 3. Gán trạng thái theo đặc tả v2
-            last_idx = appears[-1] if len(appears) > 0 else -1
-            dist_from_now = len(matrix) - 1 - last_idx
-            
-            if recent_5 >= 3: state = "NÓNG"
-            elif dist_from_now == 0 or (len(gaps) > 0 and gaps[-1] == 1): state = "NGUY HIỂM"
-            elif 3 <= dist_from_now <= 7: state = "ỔN ĐỊNH" # Cầu hồi/nhảy tốt
-            else: state = "YẾU"
+        # Chuyển dữ liệu sang ma trận số đơn
+        try:
+            raw_matrix = []
+            for s in df['numbers'].values:
+                raw_matrix.append([int(d) for d in str(s)])
+            matrix = np.array(raw_matrix)
+        except Exception:
+            return None
 
-            results[num] = {
+        analysis = {}
+        for num in range(10):
+            # Tìm các kỳ có mặt số này
+            appears = np.where(np.any(matrix == num, axis=1))[0]
+            count_10 = len(appears)
+            
+            # Tính khoảng cách (Gap)
+            gaps = np.diff(appears) if len(appears) > 1 else []
+            last_idx = appears[-1] if len(appears) > 0 else -1
+            dist_from_last = len(matrix) - 1 - last_idx
+
+            # Gán trạng thái theo Đặc tả v2
+            if dist_from_last == 0: state = "RISKY" # Vừa ra kỳ trước
+            elif count_10 >= 6: state = "HOT"
+            elif 1 < dist_from_last <= 4: state = "STABLE"
+            else: state = "WEAK"
+
+            analysis[num] = {
                 "state": state,
-                "freq_5": recent_5,
-                "gap": dist_from_now,
+                "count": count_10,
+                "gap": dist_from_last,
                 "avg_gap": np.mean(gaps) if len(gaps) > 0 else 10
             }
-        return results
+        return analysis
 
-    def get_gemini_advice(self, history_str, suggestion):
-        """Kết nối Gemini để thẩm định cầu lừa"""
-        try:
-            prompt = f"""
-            Dữ liệu Lotobet 5 số: {history_str}
-            AI đang định đánh cặp: {suggestion}
-            Dựa trên đặc tả: Không đánh số chập, tránh số vừa ra kỳ trước, tránh cầu bệt quá dài.
-            Hãy trả lời ngắn gọn: 'CHỐT' hoặc 'KHÔNG ĐÁNH' và lý do trong 10 từ.
-            """
-            response = model_gemini.generate_content(prompt)
-            return response.text
-        except:
-            return "Gemini đang bận, dùng logic mặc định."
+    def get_final_prediction(self, analysis, df):
+        """Logic ghép cặp & Không đánh"""
+        reasons = []
+        
+        # 1. Kiểm tra điều kiện "Không đánh"
+        hot_nums = [n for n, v in analysis.items() if v['state'] == "HOT"]
+        risky_nums = [n for n, v in analysis.items() if v['state'] == "RISKY"]
+        
+        if len(risky_nums) >= 4:
+            return None, "KHÔNG ĐÁNH KỲ NÀY", "Nhiều số vừa ra (Cầu lặp nhiễu)"
+        if len(hot_nums) >= 6:
+            return None, "KHÔNG ĐÁNH KỲ NÀY", "Thị trường quá NÓNG (Dễ gãy cầu)"
+        if len(df) < self.min_draws:
+            return None, "DỮ LIỆU THIẾU", f"Cần tối thiểu {self.min_draws} kỳ"
 
-    def final_decision(self, analysis, df):
-        """Logic ghép cặp & Quyết định KHÔNG ĐÁNH"""
-        reasons_to_skip = []
+        # 2. Logic ưu tiên ghép (Ổn định + Hồi)
+        stable = [n for n, v in analysis.items() if v['state'] == "STABLE"]
+        weak = [n for n, v in analysis.items() if v['state'] == "WEAK" and 5 <= v['gap'] <= 8]
         
-        # Kiểm tra điều kiện "KHÔNG ĐÁNH"
-        hot_count = sum(1 for v in analysis.values() if v['state'] == "NÓNG")
-        recent_matches = set([int(d) for d in str(df['numbers'].iloc[-1])])
-        
-        if hot_count >= 6: reasons_to_skip.append("Thị trường quá NÓNG (nhiều số ra dồn)")
-        if len(df) < 10: reasons_to_skip.append("Dữ liệu quá ít (cần tối thiểu 10 kỳ)")
-        
-        # Lọc số đơn để ghép
-        # Ưu tiên: Ổn định + Ổn định hoặc Ổn định + Yếu (đang hồi)
-        candidates = [n for n, v in analysis.items() if v['state'] in ["ỔN ĐỊNH", "YẾU"]]
-        
-        best_pair = None
-        confidence = 0
-        
-        if len(candidates) >= 2:
-            # Chọn 2 số có nhịp đẹp nhất (không phải số vừa ra kỳ trước)
-            potential = [c for c in candidates if c not in recent_matches]
-            if len(potential) >= 2:
-                best_pair = tuple(sorted(potential[:2]))
-                confidence = 78 if hot_count < 4 else 62
-        
-        if confidence < 60 or not best_pair:
-            return None, "KHÔNG ĐÁNH KỲ NÀY", reasons_to_skip or ["Không có cặp đạt ngưỡng an toàn"]
-        
-        return best_pair, "PREDICT", [f"Cầu đang nhịp {analysis[best_pair[0]]['state']}"]
+        candidates = []
+        if stable and weak:
+            # Ưu tiên 1 ổn định + 1 hồi
+            pair = tuple(sorted([stable[0], weak[0]]))
+            score = 85
+            reasons = ["Ghép Ổn định + Cầu hồi (Đúng nhịp)"]
+        elif len(stable) >= 2:
+            pair = tuple(sorted([stable[0], stable[1]]))
+            score = 75
+            reasons = ["Ghép 2 số Ổn định"]
+        else:
+            return None, "KHÔNG ĐÁNH KỲ NÀY", "Không tìm thấy nhịp cầu an toàn"
 
-# ================= UI & APP =================
-def load_data():
-    if os.path.exists(DATA_FILE):
-        return pd.read_csv(DATA_FILE).drop_duplicates().tail(50)
-    return pd.DataFrame(columns=["time", "numbers"])
+        # 3. Loại bỏ số chập (Đã đảm bảo do chọn 2 số khác nhau từ list)
+        if pair[0] == pair[1]:
+            return None, "LỖI HỆ THỐNG", "Số chập bị loại"
 
+        return {"pair": pair, "score": score, "reasons": reasons}, "PREDICT", ""
+
+# ================= INTERFACE =================
 def main():
-    st.markdown(f"<h1 style='text-align: center; color: #E74C3C;'>🎯 AI LOTOBET 2-TINH (BẢN CHUẨN v2)</h1>", unsafe_allow_html=True)
+    engine = LotobetEngineV2()
     
-    engine = LotobetStandardV2()
-    df = load_data()
+    st.title("🎯 AI LOTOBET 2-TINH (BẢN CHUẨN v2)")
+    st.caption("Hệ thống phân tích số đơn - Tuyệt đối không đánh số chập")
 
-    tab1, tab2 = st.tabs(["📊 Phân tích & Dự đoán", "📥 Nhập dữ liệu"])
+    # Sidebar: Nhập liệu
+    with st.sidebar:
+        st.header("📥 Nhập dữ liệu")
+        raw_data = st.text_area("Dán kết quả (5 số viết liền, mỗi dòng 1 kỳ):", height=250)
+        if st.button("💾 Cập nhật & Làm sạch"):
+            valid_list = engine.clean_input(raw_data)
+            if valid_list:
+                new_df = pd.DataFrame(valid_list, columns=["numbers"])
+                new_df.to_csv(DATA_FILE, index=False)
+                st.success(f"Đã lưu {len(valid_list)} kỳ sạch.")
+                st.rerun()
+            else:
+                st.error("Dữ liệu không hợp lệ!")
 
-    with tab2:
-        st.subheader("📥 Cập nhật dữ liệu sạch")
-        raw = st.text_area("Nhập 5 số viết liền (mỗi dòng 1 kỳ):", height=200, help="Ví dụ: 12345")
-        if st.button("💾 Lưu dữ liệu"):
-            if raw:
-                lines = [l.strip() for l in raw.split("\n") if len(l.strip()) == 5 and l.strip().isdigit()]
-                if lines:
-                    new_df = pd.DataFrame({"time": [datetime.now().strftime("%H:%M:%S")]*len(lines), "numbers": lines})
-                    df_final = pd.concat([df, new_df], ignore_index=True)
-                    df_final.to_csv(DATA_FILE, index=False)
-                    st.success(f"Đã lưu {len(lines)} kỳ hợp lệ!")
-                    st.rerun()
-                else: st.error("Dữ liệu không đúng định dạng 5 chữ số!")
+    # Load dữ liệu
+    if not os.path.exists(DATA_FILE):
+        st.info("Vui lòng nhập dữ liệu ở thanh bên trái để bắt đầu.")
+        return
+
+    df = pd.read_csv(DATA_FILE)
+    
+    # Dashboard chính
+    tab1, tab2 = st.tabs(["📊 Phân tích & Dự đoán", "📚 Lịch sử"])
 
     with tab1:
-        if len(df) < 5:
-            st.warning("Vui lòng nhập thêm dữ liệu (Cần ít nhất 5-10 kỳ).")
-            return
+        if len(df) > 0:
+            analysis = engine.analyze_numbers(df)
+            if analysis:
+                st.subheader("📡 Trạng thái số đơn (0-9)")
+                cols = st.columns(5)
+                for n in range(10):
+                    v = analysis[n]
+                    with cols[n % 5]:
+                        color = "red" if v['state'] == "HOT" else "green" if v['state'] == "STABLE" else "gray"
+                        st.markdown(f"**Số {n}**: :{color}[{v['state']}]")
+                        st.caption(f"Lần cuối: {v['gap']} kỳ")
 
-        # 1. Phân tích số đơn
-        analysis = engine.analyze_numbers(df)
-        if not analysis:
-            st.error("Lỗi xử lý ma trận dữ liệu.")
-            return
-
-        # 2. Hiển thị Dashboard trạng thái
-        st.subheader("📋 Trạng thái 10 số đơn")
-        cols = st.columns(5)
-        for i in range(10):
-            with cols[i % 5]:
-                color = "red" if analysis[i]['state'] == "NÓNG" else "green" if analysis[i]['state'] == "ỔN ĐỊNH" else "gray"
-                st.markdown(f"**Số {i}**: <span style='color:{color}'>{analysis[i]['state']}</span>", unsafe_allow_html=True)
-
-        st.divider()
-
-        # 3. Dự đoán theo Đặc tả v2
-        pair, status, reasons = engine.final_decision(analysis, df)
-        
-        if status == "KHÔNG ĐÁNH KỲ NÀY":
-            st.error("🚫 **KHÔNG ĐÁNH KỲ NÀY**")
-            for r in reasons: st.write(f"- {r}")
+                st.divider()
+                
+                # Thực hiện dự đoán
+                res, status, msg = engine.get_final_prediction(analysis, df)
+                
+                if status == "PREDICT":
+                    c1, c2 = st.columns([1, 2])
+                    with c1:
+                        st.markdown(f"""
+                        <div style="background:#1E1E1E; padding:20px; border-radius:15px; border:2px solid #00FF00; text-align:center;">
+                            <h3 style="color:white; margin:0;">CẶP DUY NHẤT</h3>
+                            <h1 style="color:#00FF00; font-size:60px; margin:10px 0;">{res['pair'][0]}{res['pair'][1]}</h1>
+                            <b style="color:#FFD700;">Độ tự tin: {res['score']}%</b>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    with c2:
+                        st.success(f"**Chiến thuật**: {res['reasons'][0]}")
+                        st.info("**Bạch thủ**: Số " + str(res['pair'][0]))
+                        
+                        # Kết nối Gemini Phân tích cầu sâu
+                        if st.button("🤖 Hỏi Gemini về cầu này"):
+                            with st.spinner("Đang hỏi ý kiến chuyên gia AI..."):
+                                prompt = f"Dữ liệu lotobet 5 kỳ gần: {df['numbers'].tail(5).tolist()}. AI đề xuất cặp {res['pair']}. Hãy phân tích ngắn gọn nhịp cầu này có an toàn không?"
+                                try:
+                                    response = model.generate_content(prompt)
+                                    st.write(f"**Gemini:** {response.text}")
+                                except:
+                                    st.write("Gemini đang bận, anh hãy thử lại sau.")
+                else:
+                    st.error(f"🚫 {status}")
+                    st.warning(f"Lý do: {msg}")
         else:
-            # Gọi Gemini thẩm định
-            history_str = ", ".join(df['numbers'].tail(5).tolist())
-            gemini_check = engine.get_gemini_advice(history_str, f"{pair[0]}{pair[1]}")
-            
-            st.success(f"✅ **CẶP SỐ ĐỀ XUẤT: {pair[0]}{pair[1]}**")
-            st.info(f"🤖 **Gemini thẩm định:** {gemini_check}")
-            
-            st.divider()
-            st.subheader("📈 Biểu đồ tần suất")
-            fig_data = pd.DataFrame([{"Số": k, "Lần ra (5 kỳ)": v['freq_5'], "Trạng thái": v['state']} for k, v in analysis.items()])
-            fig = px.bar(fig_data, x="Số", y="Lần ra (5 kỳ)", color="Trạng thái", barmode="group")
-            st.plotly_chart(fig, use_container_width=True)
+            st.warning("Dữ liệu trống.")
 
-
+    with tab2:
+        st.dataframe(df.tail(20), use_container_width=True)
+        if st.button("🗑 Xóa hết dữ liệu"):
+            os.remove(DATA_FILE)
+            st.rerun()
 
 if __name__ == "__main__":
     main()
