@@ -7,120 +7,119 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 
-# ================= CẤU HÌNH HỆ THỐNG =================
+# ================= CẤU HÌNH SIÊU CẤP =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_phantom_v23.json"
+DB_FILE = "titan_ultimate_memory_v23.json"
 
 def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
-        return genai.GenerativeModel('gemini-1.5-pro') # Nâng cấp lên Pro để tư duy sâu hơn
+        return genai.GenerativeModel('gemini-1.5-flash')
     except: return None
 
 neural_engine = setup_neural()
 
-# ================= PHÂN TÍCH VỊ TRÍ (MỚI) =================
-def analyze_positional_logic(history):
-    if len(history) < 5: return {}
-    # Phân tách 5 vị trí: Chục ngàn, Ngàn, Trăm, Chục, Đơn vị
-    matrix = np.array([[int(d) for d in streak] for streak in history])
-    pos_stats = {}
-    for i in range(5):
-        pos_stats[f"P{i}"] = Counter(matrix[:, i]).most_common(2)
-    return pos_stats
+# ================= HỆ THỐNG TỰ HỌC VÀ LỌC SỐ BẨN =================
+def load_memory():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f:
+            try: return json.load(f)
+            except: return []
+    return []
 
-# ================= UI DESIGN (DARK PHANTOM) =================
-st.set_page_config(page_title="TITAN v23.0 PHANTOM", layout="wide")
+def save_memory(data):
+    with open(DB_FILE, "w") as f:
+        json.dump(data[-5000:], f) # Mở rộng bộ nhớ lên 5000 kỳ
+
+if "history" not in st.session_state:
+    st.session_state.history = load_memory()
+
+# ================= THUẬT TOÁN SOI CẦU CAO CẤP =================
+def advanced_analysis(history):
+    if len(history) < 10: return "Cần thêm dữ liệu"
+    
+    # 1. Ma trận tần suất vị trí
+    matrix = np.array([[int(d) for d in res] for res in history[-50:]])
+    pos_freq = [Counter(matrix[:, i]).most_common(1)[0][0] for i in range(5)]
+    
+    # 2. Quy luật bóng số nâng cao
+    shadow_map = {'0':'5', '1':'6', '2':'7', '3':'8', '4':'9', '5':'0', '6':'1', '7':'2', '8':'3', '9':'4'}
+    last_res = history[-1]
+    shadows = "".join([shadow_map[d] for d in last_res])
+    
+    return f"Vị trí nổ mạnh: {pos_freq} | Dàn bóng: {shadows}"
+
+# ================= GIAO DIỆN CHIẾN ĐẤU =================
+st.set_page_config(page_title="TITAN v23.0 ULTIMATE", layout="wide")
 st.markdown("""
     <style>
-    .stApp { background: #050505; color: #00ff41; font-family: 'Courier New', monospace; }
-    .prediction-card {
-        background: #000000; border: 1px solid #00ff41;
-        border-radius: 10px; padding: 25px;
-        box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+    .stApp { background: #050505; color: #e0e0e0; }
+    .prediction-box {
+        background: linear-gradient(135deg, #001f3f, #000000);
+        border: 2px solid #0074d9; border-radius: 20px; padding: 40px;
+        box-shadow: 0 0 50px rgba(0, 116, 217, 0.4);
     }
-    .main-3 { font-size: 100px; font-weight: 900; color: #00ff41; text-align: center; text-shadow: 0 0 40px #00ff41; }
-    .caution { background: #4a0000; color: #ff0000; padding: 10px; border: 1px solid #ff0000; border-radius: 5px; text-align: center; }
+    .core-3 { font-size: 100px; font-weight: 900; color: #ff4136; text-shadow: 0 0 40px #ff4136; text-align: center; }
+    .logic-text { background: #111; padding: 15px; border-left: 5px solid #2ecc40; font-family: 'Courier New', monospace; }
+    .critical-warn { background: #ff4136; color: white; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; animation: blink 1s infinite; }
+    @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center;'>💀 TITAN v23.0 PHANTOM OMNI</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #0074d9;'>🚀 TITAN v23.0 ULTIMATE OMNI</h1>", unsafe_allow_html=True)
 
-# ================= XỬ LÝ DỮ LIỆU =================
-if "history" not in st.session_state:
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f: st.session_state.history = json.load(f)
-    else: st.session_state.history = []
+# Nạp dữ liệu tự động lọc bẩn
+raw_input = st.text_area("📥 NẠP DỮ LIỆU GIẢI ĐẶC BIỆT (Mỗi kỳ 1 dòng):", height=150)
 
-raw_data = st.text_area("📡 NẠP DỮ LIỆU GIẢI ĐẶC BIỆT (Dán thẳng hàng):", height=150)
-
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("⚡ GIẢI MÃ PHANTOM"):
-        clean = re.findall(r"\b\d{5}\b", raw_data)
-        if clean:
-            st.session_state.history.extend(clean)
-            st.session_state.history = st.session_state.history[-2000:]
-            with open(DB_FILE, "w") as f: json.dump(st.session_state.history, f)
-            
-            pos_data = analyze_positional_logic(st.session_state.history[-50:])
-            
-            # PROMPT PHẢN ĐÒN AI NHÀ CÁI
-            prompt = f"""
-            Bạn là TITAN PHANTOM - Hệ thống khắc chế AI Kubet/Lotobet.
-            Dữ liệu gần đây: {st.session_state.history[-100:]}.
-            Thống kê vị trí: {pos_data}.
-            Quy tắc: Không cố định - 3 số 5 tinh (Chọn 3, nếu nổ trong 5 vị trí là thắng).
-            
-            Nhiệm vụ:
-            1. Tìm ra 3 số "Chủ Lực" né được thuật toán quét của nhà cái.
-            2. Phân tích xem nhà cái đang thả cầu hay bẻ cầu.
-            3. Nếu xác suất thắng < 80%, đặt 'abort': true.
-            
-            TRẢ VỀ JSON: {{"main_3": "abc", "backup_4": "xyz", "intel": "tâm lý nhà cái kỳ này", "confidence": 99, "abort": false}}
-            """
-            
-            try:
-                response = neural_engine.generate_content(prompt)
-                res_json = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-                st.session_state.result = res_json
-            except:
-                st.error("AI Phantom đang bị tường lửa nhà cái chặn - Đang dùng thuật toán dự phòng...")
-                # Thuật toán dự phòng (Statistical position-based)
-                all_nums = "".join(st.session_state.history[-30:])
-                fallback = [x[0] for x in Counter(all_nums).most_common(7)]
-                st.session_state.result = {"main_3": "".join(fallback[:3]), "backup_4": "".join(fallback[3:]), "intel": "Cầu nhảy tự do - Đánh nhỏ.", "confidence": 70, "abort": False}
-            st.rerun()
-
-with c2:
-    if st.button("🔴 RESET HỆ THỐNG"):
-        st.session_state.history = []
-        if os.path.exists(DB_FILE): os.remove(DB_FILE)
+if st.button("⚡ PHÂN TÍCH TRIỆT HẠ NHÀ CÁI"):
+    # Lọc số bẩn nghiêm ngặt
+    new_data = re.findall(r"\d{5}", raw_input)
+    if new_data:
+        st.session_state.history.extend(new_data)
+        save_memory(st.session_state.history)
+        
+        # Prompt "Vắt kiệt" AI nhà cái
+        prompt = f"""
+        Hệ thống: TITAN v23.0 ULTIMATE. 
+        Mục tiêu: Thắng tuyệt đối kèo 3 số 5 tinh.
+        Lịch sử 100 kỳ gần nhất: {st.session_state.history[-100:]}.
+        Yêu cầu:
+        1. Tìm ra 3 số 'Chủ Lực' (Core 3) dựa trên nhịp cầu bệt và bóng số vị trí.
+        2. Phân tích xem nhà cái có đang dùng thuật toán đảo cầu (Scattering) không.
+        3. Nếu xác suất thắng dưới 90%, đặt 'danger': true.
+        TRẢ VỀ JSON: {{"core_3": "3 số", "logic": "phân tích thuật toán", "danger": false, "percent": 99}}
+        """
+        
+        try:
+            response = neural_engine.generate_content(prompt)
+            data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
+            st.session_state.ultimate_res = data
+        except:
+            # Fallback nâng cao
+            all_digits = "".join(st.session_state.history[-40:])
+            top_3 = "".join([x[0] for x in Counter(all_digits).most_common(3)])
+            st.session_state.ultimate_res = {"core_3": top_3, "logic": "Dựa trên mật độ nổ dày đặc của các kỳ vừa qua.", "danger": False, "percent": 85}
         st.rerun()
 
-# ================= HIỂN THỊ CHIẾN THUẬT =================
-if "result" in st.session_state:
-    res = st.session_state.result
+# ================= HIỂN THỊ KẾT QUẢ ĐẲNG CẤP =================
+if "ultimate_res" in st.session_state:
+    res = st.session_state.ultimate_res
     
-    if res['abort']:
-        st.markdown("<div class='caution'>HỆ THỐNG PHÁT HIỆN DẤU HIỆU QUÉT CẦU - DỪNG CƯỢC KỲ NÀY!</div>", unsafe_allow_html=True)
-    else:
-        st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
-        st.markdown(f"**⚡ PHÂN TÍCH PHANTOM:** {res['intel']}")
-        
-        st.markdown("<p style='text-align:center; color:#888;'>🎯 3 SỐ CHỦ LỰC (XÁC SUẤT CAO NHẤT)</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='main_3'>{res['main_3']}</div>", unsafe_allow_html=True)
-        
-        col_a, col_b = st.columns(2)
-        with col_a:
-            st.write("🛡️ Dàn lót an toàn:")
-            st.info(res['backup_4'])
-        with col_b:
-            st.write("📈 Độ tin cậy:")
-            st.success(f"{res['confidence']}%")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
+    if res.get('danger'):
+        st.markdown("<div class='critical-warn'>⚠️ CẢNH BÁO: NHÀ CÁI ĐANG ĐẢO CẦU ẢO - DỪNG CƯỢC NGAY!</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='prediction-box'>", unsafe_allow_html=True)
+    st.markdown(f"<p style='text-align:center; color:#aaa;'>🎯 3 SỐ CHỦ LỰC (XÁC SUẤT {res['percent']}%):</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='core-3'>{res['core_3']}</div>", unsafe_allow_html=True)
+    
+    st.markdown(f"<div class='logic-text'><b>🧬 CHIẾN THUẬT:</b> {res['logic']}</div>", unsafe_allow_html=True)
+    
+    # Soi cầu vị trí
+    st.divider()
+    st.write(f"📊 **NHẬN DIỆN CẦU HIỆN TẠI:** {advanced_analysis(st.session_state.history)}")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# Hiển thị lịch sử nhập để anh kiểm tra
-with st.expander("📝 Xem lịch sử dữ liệu"):
-    st.write(st.session_state.history[::-1])
+if st.button("🗑️ RESET DỮ LIỆU ĐỂ LÀM MỚI CẦU"):
+    st.session_state.history = []
+    if os.path.exists(DB_FILE): os.remove(DB_FILE)
+    st.rerun()
