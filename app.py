@@ -4,160 +4,186 @@ import numpy as np
 import plotly.express as px
 from collections import Counter
 import os
+import json
 from datetime import datetime
 
-# ================= CONFIG & STYLE =================
-st.set_page_config(page_title="LOTOBET AI PRO 2026", layout="wide", page_icon="🚀")
+# ================= CONFIG PRO =================
+st.set_page_config(page_title="LOTOBET AI PRO v3.1", layout="wide", page_icon="🚀")
 
+# Giao diện CSS
 st.markdown("""
     <style>
-    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 10px; border: 1px solid #d1d5db; }
-    .prediction-box { padding: 20px; border-radius: 15px; border: 2px solid #ff4b4b; background-color: #ffffff; text-align: center; }
+    .main { background-color: #f0f2f6; }
+    .stMetric { background: white; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
+    .prediction-card { 
+        background: #ffffff; padding: 20px; border-radius: 12px; 
+        border-left: 8px solid #FF4B4B; box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# ================= CORE ENGINE =================
-class LotobetEngine:
+DATA_FILE = "lotobet_data.csv"
+
+# ================= CORE AI ENGINE (FIXED & TUNED) =================
+class LotobetProAI:
     def __init__(self):
-        self.data_file = "lotobet_data.csv"
-        
-    def analyze_patterns(self, df):
-        """Thuật toán phân tích nhịp cầu chuyên sâu"""
+        self.config = {"min_draws": 15, "min_confidence": 65}
+
+    def analyze_deep(self, df):
+        """Phân tích dữ liệu lịch sử"""
         if len(df) < 5: return None
         
-        # Chuyển dữ liệu sang dạng matrix để xử lý nhanh (Numpy)
+        # Chuyển đổi dữ liệu sang mảng số
         try:
             matrix = np.array([list(map(int, list(str(x)))) for x in df['numbers'].values])
         except:
             return None
-
+            
         results = {}
         for num in range(10):
-            # 1. Tìm các kỳ xuất hiện
+            # Tìm vị trí xuất hiện (đảo ngược để tính từ kỳ mới nhất)
             appears = np.where(np.any(matrix == num, axis=1))[0]
+            gaps = np.diff(appears) if len(appears) > 1 else []
             
-            # 2. Tính khoảng cách (Gaps)
-            gaps = np.diff(appears) if len(appears) > 1 else [99]
-            last_appearance = (len(df) - 1) - appears[-1] if len(appears) > 0 else 99
+            # Tần suất 10 kỳ gần nhất
+            recent_window = matrix[-10:]
+            freq_recent = np.sum(np.any(recent_window == num, axis=1))
             
-            # 3. Tần suất 10 kỳ gần nhất
-            recent_freq = np.sum(np.any(matrix[-10:] == num, axis=1))
-            
-            # 4. Phân loại trạng thái chuẩn
-            if recent_freq >= 4: state = "NÓNG"
-            elif last_appearance == 0: state = "VỪA RA"
-            elif last_appearance > 8: state = "LẠNH"
-            else: state = "ỔN ĐỊNH"
+            # Phân loại trạng thái (Dùng Tiếng Việt để đồng bộ giao diện)
+            state = "ỔN ĐỊNH"
+            if freq_recent >= 5: state = "NÓNG"
+            elif freq_recent <= 1: state = "LẠNH"
+            elif len(gaps) > 0 and gaps[-1] == 1: state = "BỆT"
 
             results[num] = {
-                "freq": recent_freq,
+                "freq": int(freq_recent),
                 "state": state,
-                "gap": int(gaps[-1]) if len(gaps) > 0 else 99,
+                "last_gap": int(len(df) - 1 - appears[-1]) if len(appears) > 0 else 99,
                 "avg_gap": float(np.mean(gaps)) if len(gaps) > 0 else 0
             }
         return results
 
-    def predict_strategy(self, df):
-        """Chiến thuật ghép cặp thông minh"""
-        analysis = self.analyze_patterns(df)
-        if not analysis: return [], "THIẾU DỮ LIỆU"
-
-        # Kiểm tra điều kiện "KHÔNG ĐÁNH"
-        hot_nums = [n for n, v in analysis.items() if v['state'] == "NÓNG"]
-        if len(hot_nums) > 5:
-            return [], "SKIP: THỊ TRƯỜNG BIẾN ĐỘNG (NHIỀU SỐ NÓNG)"
+    def predict(self, df):
+        """Dự đoán cặp số"""
+        analysis = self.analyze_deep(df)
+        if not analysis: return [], {}, "INSUFFICIENT", []
+        
+        # Logic KHÔNG ĐÁNH
+        hot_count = sum(1 for v in analysis.values() if v['state'] == "NÓNG")
+        if hot_count > 6:
+            return [], {}, "SKIP", ["Thị trường loạn (Quá nhiều số NÓNG)"]
 
         scored_pairs = []
-        # Duyệt ghép cặp (Loại bỏ số chập như 11, 22...)
         for i in range(10):
             for j in range(i + 1, 10):
-                score = 60 # Điểm gốc
+                s1, s2 = analysis[i], analysis[j]
+                score = 50
                 
-                # Chiến thuật 1: Ổn định + Lạnh (Cầu hồi)
-                if analysis[i]['state'] == "ỔN ĐỊNH" and analysis[j]['state'] == "LẠNH": score += 25
-                # Chiến thuật 2: Hai số có nhịp trung bình khớp nhau
-                if abs(analysis[i]['avg_gap'] - analysis[j]['avg_gap']) < 0.5: score += 15
-                # Hình phạt: Tránh ghép 2 số đang quá nóng (Dễ gãy)
-                if analysis[i]['state'] == "NÓNG" and analysis[j]['state'] == "NÓNG": score -= 40
+                # Trọng số thuật toán
+                if s1['state'] == "ỔN ĐỊNH" and s2['state'] == "ỔN ĐỊNH": score += 25
+                if s1['state'] == "LẠNH" or s2['state'] == "LẠNH": score += 10
+                if s1['state'] == "NÓNG" and s2['state'] == "NÓNG": score -= 35
+                if abs(s1['avg_gap'] - s2['avg_gap']) < 1.2: score += 15
                 
-                scored_pairs.append({
-                    "pair": f"{i}{j}",
-                    "score": score,
-                    "desc": f"{analysis[i]['state']} + {analysis[j]['state']}"
-                })
-
+                if score >= self.config['min_confidence']:
+                    scored_pairs.append({
+                        "pair": (i, j),
+                        "score": min(95, score),
+                        "details": f"{s1['state']} + {s2['state']}"
+                    })
+        
         scored_pairs.sort(key=lambda x: x['score'], reverse=True)
-        return scored_pairs[:2], "SUCCESS"
+        return [p['pair'] for p in scored_pairs[:2]], {p['pair']: p for p in scored_pairs[:2]}, "PREDICT", []
 
-# ================= INTERFACE =================
+# ================= DATA HELPERS =================
+def load_data():
+    if os.path.exists(DATA_FILE):
+        return pd.read_csv(DATA_FILE)
+    return pd.DataFrame(columns=["numbers"])
+
+def save_data(new_numbers):
+    df = load_data()
+    valid_rows = []
+    for n in new_numbers:
+        if len(str(n).strip()) == 5:
+            valid_rows.append({"numbers": str(n).strip()})
+    
+    if valid_rows:
+        new_df = pd.concat([df, pd.DataFrame(valid_rows)], ignore_index=True)
+        new_df.to_csv(DATA_FILE, index=False)
+        return len(valid_rows)
+    return 0
+
+# ================= MAIN APP =================
 def main():
-    st.title("🎯 AI LOTOBET 2-TINH PRO v3")
-    engine = LotobetEngine()
-
-    # Load Data
-    if os.path.exists(engine.data_file):
-        df = pd.read_csv(engine.data_file)
-    else:
-        df = pd.DataFrame(columns=["time", "numbers"])
+    st.title("🎯 AI LOTOBET 2-TINH PRO v3.1")
+    ai = LotobetProAI()
+    df = load_data()
 
     tab1, tab2 = st.tabs(["📊 Dự đoán & Thống kê", "📥 Nhập liệu hệ thống"])
 
     with tab1:
-        if len(df) < 10:
-            st.info("👋 Chào anh! Hãy nhập ít nhất 10 kỳ để AI bắt đầu phân tích nhịp.")
+        if len(df) < 5:
+            st.info("👋 Chào anh! Vui lòng nhập ít nhất 5 kỳ ở Tab 'Nhập liệu' để em bắt đầu phân tích.")
         else:
-            analysis = engine.analyze_patterns(df)
-            preds, status = engine.predict_strategy(df)
-
-            # Dashboard chỉ số nhanh
+            analysis = ai.analyze_deep(df)
+            
+            # Header metrics
             c1, c2, c3 = st.columns(3)
             c1.metric("Tổng số kỳ", len(df))
-            c2.metric("Số đang NÓNG", sum(1 for v in analysis.values() if v['state'] == "NÓNG"))
-            c3.metric("Trạng thái cầu", "Ổn định" if "SKIP" not in status else "Nguy hiểm")
+            # FIX LỖI DÒNG 115:
+            nong_count = sum(1 for v in analysis.values() if v['state'] == "NÓNG")
+            c2.metric("Số đang NÓNG", nong_count)
+            c3.metric("Trạng thái AI", "Sẵn sàng" if nong_count < 7 else "Rủi ro")
 
             st.divider()
 
-            # Hiển thị dự đoán
-            if "SKIP" in status:
-                st.warning(f"⚠️ Lời khuyên AI: {status}")
-            else:
-                st.subheader("🤖 Cặp số đề xuất (Ưu tiên cao)")
-                p1, p2 = st.columns(2)
-                for idx, item in enumerate(preds):
-                    with (p1 if idx == 0 else p2):
+            # Khu vực dự đoán
+            preds, details, status, reasons = ai.predict(df)
+            if status == "PREDICT" and preds:
+                st.subheader("🚀 Cặp số AI đề xuất (2-Tỉnh)")
+                pc1, pc2 = st.columns(2)
+                for idx, p in enumerate(preds):
+                    with (pc1 if idx == 0 else pc2):
                         st.markdown(f"""
-                        <div class="prediction-box">
-                            <h1 style="color: #ff4b4b; font-size: 50px;">{item['pair']}</h1>
-                            <p>Độ tin cậy: <b>{item['score']}%</b></p>
-                            <small>Cơ sở: {item['desc']}</small>
+                        <div class="prediction-card">
+                            <h2 style='margin:0; color:#FF4B4B;'>{p[0]}{p[1]}</h2>
+                            <p style='margin:5px 0;'>Độ tin cậy: <b>{details[p]['score']}%</b></p>
+                            <p style='font-size:0.8em; color:gray;'>Cơ sở: {details[p]['details']}</p>
                         </div>
                         """, unsafe_allow_html=True)
+            elif status == "SKIP":
+                st.warning(f"⚠️ Cảnh báo: {reasons[0]}")
+            else:
+                st.info("Chưa tìm thấy cầu đẹp, anh vui lòng đợi thêm vài kỳ.")
 
-            # Biểu đồ tần suất
+            # Biểu đồ Plotly
             st.divider()
-            st.subheader("📈 Biểu đồ nhịp số (10 kỳ gần nhất)")
-            chart_data = pd.DataFrame([{"Số": k, "Tần suất": v['freq'], "Trạng thái": v['state']} for k, v in analysis.items()])
-            fig = px.bar(chart_data, x="Số", y="Tần suất", color="Trạng thái", 
-                         color_discrete_map={"NÓNG": "#ef4444", "ỔN ĐỊNH": "#10b981", "LẠNH": "#3b82f6", "VỪA RA": "#f59e0b"})
+            st.subheader("📈 Biểu đồ xu hướng số đơn")
+            chart_data = pd.DataFrame([
+                {"Số": k, "Tần suất (10 kỳ)": v['freq'], "Trạng thái": v['state']} 
+                for k, v in analysis.items()
+            ])
+            fig = px.bar(chart_data, x="Số", y="Tần suất (10 kỳ)", color="Trạng thái",
+                         color_discrete_map={"NÓNG": "#FF4B4B", "ỔN ĐỊNH": "#00CC96", "LẠNH": "#636EFA", "BỆT": "#AB63FA"})
             st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
-        st.subheader("📥 Thêm dữ liệu mới")
-        raw_input = st.text_area("Dán kết quả (Mỗi kỳ 1 dòng, chỉ lấy 5 số cuối):", height=150)
-        if st.button("💾 Lưu kết quả"):
-            if raw_input:
-                lines = raw_input.strip().split('\n')
-                new_data = []
-                for l in lines:
-                    val = l.strip()[-5:] # Lấy 5 số cuối nếu người dùng dán cả chuỗi dài
-                    if val.isdigit() and len(val) == 5:
-                        new_data.append({"time": datetime.now().strftime("%H:%M:%S"), "numbers": val})
-                
-                if new_data:
-                    new_df = pd.concat([df, pd.DataFrame(new_data)], ignore_index=True)
-                    new_df.to_csv(engine.data_file, index=False)
-                    st.success(f"✅ Đã thêm {len(new_data)} kỳ mới!")
-                    st.rerun()
+        st.subheader("📥 Nhập kết quả mới")
+        txt = st.text_area("Dán danh sách kết quả (Ví dụ: 12345, mỗi dòng 1 kỳ)", height=200)
+        if st.button("💾 Lưu dữ liệu"):
+            lines = [l.strip() for l in txt.split("\n") if l.strip()]
+            added = save_data(lines)
+            if added > 0:
+                st.success(f"✅ Đã thêm {added} kỳ thành công!")
+                st.rerun()
+            else:
+                st.error("Dữ liệu không đúng định dạng (phải là dãy 5 số).")
+        
+        if st.button("🗑 Xóa hết dữ liệu làm lại"):
+            if os.path.exists(DATA_FILE):
+                os.remove(DATA_FILE)
+                st.rerun()
 
 if __name__ == "__main__":
     main()
