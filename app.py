@@ -3,231 +3,292 @@ import google.generativeai as genai
 import re
 import json
 import os
+from collections import Counter
+import itertools
 import numpy as np
-from collections import Counter, defaultdict
-from datetime import datetime
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-import joblib
+from typing import List, Tuple, Dict
 
 # ================= CẤU HÌNH HỆ THỐNG =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_memory_v21.json"
-MODEL_FILE = "titan_ml_model.pkl"
+DB_FILE = "titan_memory_v21.json" 
 
 def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
         return genai.GenerativeModel('gemini-1.5-flash')
     except: 
-        return None
+        return None 
 
-neural_engine = setup_neural()
+neural_engine = setup_neural() 
 
 # ================= HỆ THỐNG GHI NHỚ VĨNH VIỄN =================
 def load_memory():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f: 
-            try: return json.load(f)
-            except: return []
-    return []
+            try: 
+                data = json.load(f)
+                # Chuẩn hóa dữ liệu: đảm bảo mỗi kỳ là string 5 số
+                normalized = []
+                for item in data[-1000:]:
+                    if isinstance(item, str) and len(item) == 5 and item.isdigit():
+                        normalized.append(item)
+                    elif isinstance(item, list) and len(item) == 5:
+                        normalized.append(''.join(map(str, item)))
+                return normalized
+            except: 
+                return []
+    return [] 
 
 def save_memory(data):
+    # Giữ lại 1000 kỳ gần nhất để AI có dữ liệu sâu
     with open(DB_FILE, "w") as f: 
-        json.dump(data[-2000:], f)  # Tăng lên 2000 kỳ
+        json.dump(data[-1000:], f) 
 
 if "history" not in st.session_state:
     st.session_state.history = load_memory()
-    st.session_state.patterns = {}
-    st.session_state.trap_alerts = []
+if "prediction_history" not in st.session_state:
+    st.session_state.prediction_history = []
 
-# ================= THUẬT TOÁN PHÂN TÍCH NÂNG CAO =================
+# ================= THUẬT TOÁN NÂNG CAO =================
+
 class TitanPredictor:
-    def __init__(self, history):
-        self.history = history
-        self.positions = ['Chục ngàn', 'Ngàn', 'Trăm', 'Chục', 'Đơn vị']
+    """Thuật toán dự đoán chuyên sâu cho game 5D - 3 số 5 tính"""
+    
+    def __init__(self, history: List[str]):
+        self.history = [h if isinstance(h, str) else ''.join(map(str, h)) for h in history if h]
+        self.positions = ['chuc_ngan', 'ngan', 'tram', 'chuc', 'don_vi']
         
-    def analyze_streaks(self):
-        """Phân tích số đang bệt và dự đoán số bệt tiếp theo"""
+    def analyze_position_frequency(self, window: int = 30) -> Dict:
+        """Phân tích tần suất từng vị trí"""
+        recent = self.history[-window:] if len(self.history) >= window else self.history
+        pos_freq = {pos: {str(i): 0 for i in range(10)} for pos in self.positions}
+        
+        for draw in recent:
+            for idx, pos in enumerate(self.positions):
+                if idx < len(draw):
+                    pos_freq[pos][draw[idx]] += 1
+        return pos_freq
+    
+    def detect_bong_numbers(self) -> List[str]:
+        """
+        Phát hiện số "bóng" theo quy tắc:
+        - Bóng dương: 0-5, 1-6, 2-7, 3-8, 4-9
+        - Bóng âm: 0-7, 1-4, 2-9, 3-6, 5-8
+        """
         if len(self.history) < 10:
-            return {}
+            return []
+            
+        last_draw = self.history[-1]
+        bong_candidates = set()
         
-        streaks = {}
-        for pos in range(5):
-            pos_numbers = [int(x[pos]) for x in self.history[-20:]]
-            current = pos_numbers[-1]
-            streak_count = 0
+        # Bóng dương
+        duong_map = {'0':'5', '1':'6', '2':'7', '3':'8', '4':'9', 
+                     '5':'0', '6':'1', '7':'2', '8':'3', '9':'4'}
+        
+        # Bóng âm
+        am_map = {'0':'7', '1':'4', '2':'9', '3':'6', '4':'1',
+                  '5':'8', '6':'3', '7':'0', '8':'5', '9':'2'}
+        
+        for num in last_draw:
+            bong_candidates.add(duong_map[num])
+            bong_candidates.add(am_map[num])
+        
+        return list(bong_candidates)[:5]  # Lấy tối đa 5 số
+    
+    def detect_cau_bac_thang(self) -> List[str]:
+        """Phát hiện cầu bậc thang (tăng/giảm dần)"""
+        if len(self.history) < 5:
+            return []
+        
+        candidates = []
+        for pos in range(5):  # Duyệt từng vị trí
+            values = []
+            for draw in self.history[-5:]:
+                if pos < len(draw):
+                    values.append(int(draw[pos]))
             
-            # Đếm streak hiện tại
-            for num in reversed(pos_numbers):
-                if num == current:
-                    streak_count += 1
-                else:
-                    break
-            
-            # Tính xác suất bệt tiếp theo
-            if streak_count >= 2:
-                similar_patterns = []
-                for i in range(len(self.history) - 20):
-                    pattern = [int(x[pos]) for x in self.history[i:i+streak_count]]
-                    if pattern == [current] * streak_count:
-                        next_num = int(self.history[i+streak_count][pos]) if i+streak_count < len(self.history) else None
-                        if next_num is not None:
-                            similar_patterns.append(next_num)
+            if len(values) >= 3:
+                # Kiểm tra xu hướng
+                diffs = [values[i+1] - values[i] for i in range(len(values)-1)]
                 
-                if similar_patterns:
-                    next_pred = Counter(similar_patterns).most_common(1)[0][0]
-                    probability = Counter(similar_patterns).most_common(1)[0][1] / len(similar_patterns)
-                    streaks[f"Vị trí {pos+1}"] = {
-                        "current": current,
-                        "streak": streak_count,
-                        "next_pred": next_pred,
-                        "probability": probability
-                    }
+                # Nếu các số tăng/giảm đều đặn
+                if all(d == diffs[0] for d in diffs) and abs(diffs[0]) == 1:
+                    next_val = values[-1] + diffs[0]
+                    if 0 <= next_val <= 9:
+                        candidates.append(str(next_val))
         
-        return streaks
+        return candidates
     
-    def detect_traps(self):
-        """Phát hiện bẫy nhà cái"""
-        traps = []
-        
-        if len(self.history) < 50:
-            return traps
-        
-        # 1. Phát hiện đảo cầu
-        recent = self.history[-30:]
-        frequent_nums = Counter("".join(recent)).most_common(5)
-        frequent_values = [int(x[0]) for x in frequent_nums]
-        
-        # Kiểm tra xem các số hay về có đang bị né không
-        last_10 = "".join(self.history[-10:])
-        for num in frequent_values:
-            count = last_10.count(str(num))
-            if count < 2:  # Số hay về nhưng 10 kỳ gần ít xuất hiện
-                traps.append(f"⚠️ BẪY: Số {num} đang bị né, chuẩn bị nổ")
-        
-        # 2. Phát hiện bệt giả
-        for pos in range(5):
-            pos_nums = [int(x[pos]) for x in self.history[-15:]]
-            for i in range(len(pos_nums)-3):
-                if pos_nums[i] == pos_nums[i+1] == pos_nums[i+2] != pos_nums[i+3]:
-                    traps.append(f"⚠️ BẪY VỊ TRÍ {pos+1}: Bệt 3 tay rồi đột ngột đảo")
-        
-        # 3. Phát hiện bóng số
-        bong_numbers = {0:5, 1:6, 2:7, 3:8, 4:9, 5:0, 6:1, 7:2, 8:3, 9:4}
-        last_num = int(self.history[-1][4])
-        bong = bong_numbers[last_num]
-        
-        # Kiểm tra bóng có hay về sau số vừa ra không
-        bong_count = 0
-        for i in range(len(self.history)-1):
-            if int(self.history[i][4]) == last_num:
-                if i+1 < len(self.history) and int(self.history[i+1][4]) == bong:
-                    bong_count += 1
-        
-        if bong_count > len(self.history) * 0.15:  # Trên 15% xuất hiện bóng
-            traps.append(f"🎯 CẦU BÓNG: Số {bong} có khả năng về sau {last_num}")
-        
-        return traps
-    
-    def find_3_numbers_to_exclude(self):
-        """Tìm 3 số cần loại dựa trên phân tích"""
-        if len(self.history) < 30:
-            return []
-        
-        all_nums = "".join(self.history[-30:])
-        counts = Counter(all_nums)
-        
-        # Tìm số ít xuất hiện nhất nhưng có chu kỳ
-        rare_nums = counts.most_common()[:-4:-1]  # 3 số ít nhất
-        
-        # Phân tích chu kỳ xuất hiện
-        exclude_candidates = []
-        for num, _ in rare_nums:
-            last_positions = [i for i, x in enumerate(self.history[-50:]) if str(num) in x]
-            if last_positions:
-                gap = 50 - last_positions[-1]
-                if gap > 15:  # Quá lâu chưa ra
-                    exclude_candidates.append(int(num))
-        
-        return exclude_candidates[:3]
-    
-    def generate_optimal_pairs(self, top_numbers):
-        """Ghép các số để tạo ra bộ số chính xác"""
-        if len(top_numbers) < 5:
-            return []
-        
-        combinations = []
-        positions_weights = self.analyze_position_weights()
-        
-        # Tạo tổ hợp dựa trên trọng số vị trí
-        for pos in range(5):
-            pos_pred = positions_weights[pos][:3]
-            for num in pos_pred:
-                combinations.append(str(num))
-        
-        # Thêm các tổ hợp từ top numbers
-        from itertools import combinations
-        for combo in combinations(top_numbers[:7], 5):
-            combo_str = "".join(map(str, combo))
-            combinations.append(combo_str)
-        
-        return list(set(combinations))[:10]  # Trả về 10 tổ hợp tốt nhất
-    
-    def analyze_position_weights(self):
-        """Phân tích trọng số từng vị trí"""
-        weights = []
-        for pos in range(5):
-            pos_nums = [int(x[pos]) for x in self.history[-100:]]
-            # Tính xác suất theo vị trí
-            counter = Counter(pos_nums)
-            total = len(pos_nums)
-            probs = {num: count/total for num, count in counter.items()}
-            
-            # Lấy top 5 số có xác suất cao nhất
-            top_nums = sorted(probs.items(), key=lambda x: x[1], reverse=True)[:5]
-            weights.append([x[0] for x in top_nums])
-        
-        return weights
-    
-    def predict_top_5(self):
-        """Dự đoán 5 số khả năng về cao nhất"""
+    def detect_cau_ke_1_2(self) -> List[str]:
+        """Phát hiện cầu kè 1-2 (số cách nhau 1-2 đơn vị thường về cùng nhau)"""
         if len(self.history) < 20:
-            return list(range(10))[:5]
+            return []
         
-        # Phân tích tần suất
-        all_nums = "".join(self.history[-50:])
-        freq = Counter(all_nums)
+        pair_counts = Counter()
+        for draw in self.history[-50:]:
+            nums = [int(n) for n in draw]
+            for i, j in itertools.combinations(nums, 2):
+                if abs(i - j) in [1, 2]:  # Kè 1 hoặc 2
+                    pair = tuple(sorted([i, j]))
+                    pair_counts[pair] += 1
         
-        # Phân tích xu hướng gần nhất
-        recent = "".join(self.history[-10:])
-        recent_freq = Counter(recent)
+        # Lấy các cặp hay về nhất
+        common_pairs = [p for p, c in pair_counts.most_common(5) if c >= 3]
         
-        # Kết hợp có trọng số
-        scores = {}
-        for num in range(10):
-            num_str = str(num)
-            freq_score = freq.get(num_str, 0) * 0.3
-            recent_score = recent_freq.get(num_str, 0) * 0.7
-            scores[num] = freq_score + recent_score
+        # Kết hợp với số cuối cùng
+        if self.history:
+            last_nums = [int(n) for n in self.history[-1]]
+            candidates = []
+            for pair in common_pairs:
+                for num in last_nums:
+                    if abs(num - pair[0]) in [1, 2]:
+                        candidates.append(str(pair[1]))
+                    if abs(num - pair[1]) in [1, 2]:
+                        candidates.append(str(pair[0]))
+            return list(set(candidates))[:5]
+        return []
+    
+    def detect_dao_cau(self) -> Tuple[bool, List[str]]:
+        """
+        Phát hiện nhà cái đảo cầu
+        Trả về: (có đảo cầu không, các số an toàn)
+        """
+        if len(self.history) < 20:
+            return False, []
         
-        # Thêm phân tích bệt
-        streaks = self.analyze_streaks()
-        for streak_info in streaks.values():
-            if streak_info["probability"] > 0.5:
-                scores[streak_info["next_pred"]] += 5
+        # Tính tần suất các số ở 20 kỳ gần
+        recent_20 = ''.join(self.history[-20:])
+        recent_counts = Counter(recent_20)
         
-        # Lấy top 5
-        top_5 = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:5]
-        return [x[0] for x in top_5]
+        # Tính tần suất ở 5 kỳ gần nhất
+        recent_5 = ''.join(self.history[-5:])
+        recent_5_counts = Counter(recent_5)
+        
+        # Nếu số hay về đột ngột ít về
+        hot_numbers = [n for n, c in recent_counts.most_common(5) if c >= 3]
+        cold_in_recent = [n for n in hot_numbers if recent_5_counts.get(n, 0) <= 1]
+        
+        is_dao = len(cold_in_recent) >= 2
+        
+        # Số an toàn khi đảo cầu: số lạnh (ít về) và số bóng
+        cold_numbers = [n for n in range(10) if recent_counts.get(str(n), 0) <= 2]
+        bong_numbers = self.detect_bong_numbers()
+        
+        safe_numbers = list(set(map(str, cold_numbers + bong_numbers)))
+        
+        return is_dao, safe_numbers[:7]
+    
+    def predict_3so5tinh(self) -> Dict:
+        """
+        Thuật toán chính dự đoán 3 số 5 tính
+        Trả về: {"dan4": [...], "dan3": [...], "logic": "..."}
+        """
+        if len(self.history) < 10:
+            return {
+                "dan4": ["0", "1", "2", "3"],
+                "dan3": ["4", "5", "6"],
+                "logic": "⚠️ Cần thêm dữ liệu (tối thiểu 10 kỳ)"
+            }
+        
+        logic_parts = []
+        candidates = Counter()
+        
+        # 1. Phân tích tần suất từng vị trí
+        pos_freq = self.analyze_position_frequency(30)
+        hot_by_position = []
+        for pos in self.positions:
+            sorted_nums = sorted(pos_freq[pos].items(), key=lambda x: x[1], reverse=True)
+            hot_by_position.extend([n for n, _ in sorted_nums[:2]])
+        
+        for num in hot_by_position[:8]:
+            candidates[num] += 3
+        logic_parts.append("📊 Phân tích vị trí")
+        
+        # 2. Phát hiện bóng số
+        bong_nums = self.detect_bong_numbers()
+        for num in bong_nums:
+            candidates[num] += 2
+        if bong_nums:
+            logic_parts.append(f"🔄 Bóng số: {', '.join(bong_nums)}")
+        
+        # 3. Cầu bậc thang
+        stair_nums = self.detect_cau_bac_thang()
+        for num in stair_nums:
+            candidates[num] += 4  # Ưu tiên cao
+        if stair_nums:
+            logic_parts.append(f"📈 Cầu bậc thang: {', '.join(stair_nums)}")
+        
+        # 4. Cầu kè 1-2
+        ke_nums = self.detect_cau_ke_1_2()
+        for num in ke_nums:
+            candidates[num] += 2
+        if ke_nums:
+            logic_parts.append(f"🔗 Cầu kè 1-2: {', '.join(ke_nums)}")
+        
+        # 5. Phát hiện đảo cầu
+        is_dao, safe_nums = self.detect_dao_cau()
+        if is_dao:
+            # Reset candidates, ưu tiên số an toàn
+            candidates = Counter()
+            for num in safe_nums[:7]:
+                candidates[num] += 5
+            logic_parts.append(f"⚠️ PHÁT HIỆN ĐẢO CẦU - Ưu tiên số lạnh/bóng")
+        else:
+            logic_parts.append("✅ Cầu ổn định")
+        
+        # 6. Phân tích xu hướng tổng (sum) và chẵn lẻ
+        if len(self.history) >= 10:
+            sums = [sum(int(d) for d in draw) for draw in self.history[-10:]]
+            avg_sum = np.mean(sums)
+            
+            if avg_sum > 22.5:  # Tổng cao
+                candidates.update([str(i) for i in range(5, 10)] * 2)
+                logic_parts.append("📈 Xu hướng tổng CAO")
+            else:
+                candidates.update([str(i) for i in range(0, 5)] * 2)
+                logic_parts.append("📉 Xu hướng tổng THẤP")
+        
+        # 7. Lấy top 7 số
+        top_numbers = [num for num, _ in candidates.most_common(7)]
+        
+        # Đảm bảo đủ 7 số
+        if len(top_numbers) < 7:
+            all_nums = list(map(str, range(10)))
+            for num in all_nums:
+                if num not in top_numbers:
+                    top_numbers.append(num)
+                if len(top_numbers) >= 7:
+                    break
+        
+        # Chia thành 4 số chủ lực và 3 số lót
+        dan4 = top_numbers[:4]
+        dan3 = top_numbers[4:7]
+        
+        # Logic tổng hợp
+        logic_summary = " | ".join(logic_parts[-3:])  # Lấy 3 logic gần nhất
+        
+        # Lưu lịch sử dự đoán
+        prediction_record = {
+            "dan4": dan4,
+            "dan3": dan3,
+            "logic": logic_summary,
+            "timestamp": len(self.history)
+        }
+        st.session_state.prediction_history.append(prediction_record)
+        
+        return {
+            "dan4": dan4,
+            "dan3": dan3,
+            "logic": f"📌 {logic_summary} | Dựa trên {min(50, len(self.history))} kỳ gần nhất"
+        }
 
-# ================= UI DESIGN =================
-st.set_page_config(page_title="TITAN v22.0 PRO MAX", layout="centered")
+# ================= UI DESIGN (Tối giản - Chống nhầm số) =================
+st.set_page_config(page_title="TITAN v21.0 PRO", layout="centered")
 st.markdown("""
     <style>
     .stApp { background: #010409; color: #c9d1d9; }
     .status-active { color: #238636; font-weight: bold; border-left: 3px solid #238636; padding-left: 10px; }
+    .status-warning { color: #f0883e; font-weight: bold; border-left: 3px solid #f0883e; padding-left: 10px; }
     .prediction-card {
         background: #0d1117; border: 2px solid #30363d;
         border-radius: 12px; padding: 25px; margin-top: 15px;
@@ -237,165 +298,213 @@ st.markdown("""
         font-size: 60px; font-weight: 900; color: #58a6ff; 
         text-align: center; letter-spacing: 10px; text-shadow: 0 0 25px #58a6ff;
     }
-    .logic-box { font-size: 14px; color: #8b949e; background: #161b22; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
-    .trap-alert { color: #f85149; background: #2d0a0a; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
-    .exclude-box { color: #f2cc60; background: #2d1f0a; padding: 10px; border-radius: 5px; }
+    .logic-box { 
+        font-size: 14px; color: #8b949e; background: #161b22; 
+        padding: 15px; border-radius: 8px; margin-bottom: 20px;
+        border-left: 4px solid #58a6ff;
+    }
+    .stats-box {
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 10px;
+        font-size: 13px;
+        color: #8b949e;
+    }
     </style>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True) 
 
-st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v22.0 PRO MAX</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🧬 TITAN v21.0 OMNI - 3 SỐ 5 TÍNH</h2>", unsafe_allow_html=True)
 
-if neural_engine:
-    st.markdown(f"<p class='status-active'>● NEURAL-LINK: OK | DỮ LIỆU: {len(st.session_state.history)} KỲ | ML: ACTIVE</p>", unsafe_allow_html=True)
-else:
-    st.error("LỖI KẾT NỐI API")
+# Hiển thị trạng thái kết nối
+col_status1, col_status2 = st.columns(2)
+with col_status1:
+    if neural_engine:
+        st.markdown(f"<p class='status-active'>● NEURAL: ONLINE</p>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<p class='status-warning'>● NEURAL: OFFLINE (Dùng thuật toán cục bộ)</p>", unsafe_allow_html=True)
+
+with col_status2:
+    st.markdown(f"<p class='status-active'>📊 DỮ LIỆU: {len(st.session_state.history)} KỲ</p>", unsafe_allow_html=True)
 
 # ================= XỬ LÝ DỮ LIỆU =================
-raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, placeholder="32880\n21808\n...")
+raw_input = st.text_area("📡 NẠP DỮ LIỆU (Dán các dãy 5 số):", height=100, 
+                        placeholder="32880\n21808\n12664\n... Mỗi dòng 1 kỳ") 
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3 = st.columns([1, 1, 1])
 with col1:
-    if st.button("🚀 PHÂN TÍCH CHUYÊN SÂU"):
+    if st.button("🚀 DỰ ĐOÁN NGAY"):
         new_data = re.findall(r"\d{5}", raw_input)
         if new_data:
             st.session_state.history.extend(new_data)
             save_memory(st.session_state.history)
-            
-            # Khởi tạo predictor
-            predictor = TitanPredictor(st.session_state.history)
-            
-            # Phân tích
-            streaks = predictor.analyze_streaks()
-            traps = predictor.detect_traps()
-            exclude_3 = predictor.find_3_numbers_to_exclude()
-            top_5 = predictor.predict_top_5()
-            
-            # Gửi prompt cho Gemini
+        
+        # Sử dụng thuật toán nâng cao
+        if len(st.session_state.history) >= 5:
+            predictor = TitanPredictor(st.session_state.history[-200:])  # Dùng 200 kỳ gần nhất
+            result = predictor.predict_3so5tinh()
+            st.session_state.last_result = result
+        else:
+            st.warning("⚠️ Cần ít nhất 5 kỳ dữ liệu để dự đoán")
+        st.rerun()
+
+with col2:
+    if st.button("🤖 GỌI AI (NÂNG CAO)"):
+        new_data = re.findall(r"\d{5}", raw_input)
+        if new_data:
+            st.session_state.history.extend(new_data)
+            save_memory(st.session_state.history)
+        
+        if neural_engine and len(st.session_state.history) >= 20:
+            # Gửi Prompt "Bẫy nhà cái" cho AI
+            recent_data = st.session_state.history[-100:]
             prompt = f"""
-            Bạn là AI chuyên gia xác suất 5D với khả năng phát hiện bẫy nhà cái.
+            Bạn là AI chuyên gia xác suất 5D cho trò chơi "3 số 5 tính".
             
-            Dữ liệu phân tích:
-            - Streaks: {streaks}
-            - Bẫy phát hiện: {traps}
-            - Số cần loại: {exclude_3}
-            - Top 5 dự đoán: {top_5}
+            QUY TẮC: Người chơi chọn 3 số bất kỳ từ 0-9. Thắng nếu 3 số này xuất hiện trong 5 số kết quả (không cần đúng thứ tự).
             
-            Lịch sử 50 kỳ gần nhất: {st.session_state.history[-50:]}
+            DỮ LIỆU 100 KỲ GẦN NHẤT:
+            {recent_data}
             
-            Yêu cầu:
-            1. Xác định chính xác các số đang bệt và dự đoán số bệt tiếp theo
-            2. Phân tích chi tiết bẫy nhà cái đang giăng ra
-            3. Đưa ra 3 số cần loại cụ thể và lý do
-            4. Ghép các số để tạo bộ số tối ưu
-            5. Chốt 5 số khả năng về cao nhất cho kỳ tới
-            6. Đưa ra chiến thuật vào tiền hợp lý
+            PHÂN TÍCH CHUYÊN SÂU:
+            1. Xác định các số đang "bệt" (xuất hiện liên tục)
+            2. Xác định các số "bóng" sắp nổ (theo bóng dương: 0-5,1-6,2-7,3-8,4-9 và bóng âm: 0-7,1-4,2-9,3-6,5-8)
+            3. Phát hiện "cầu kè" (các cặp số thường về cùng nhau: 1-2, 3-4, 5-6, 7-8, 8-9...)
+            4. Phát hiện nếu nhà cái đang "đảo cầu" (các số nóng bỗng dưng vắng mặt)
+            5. Dự đoán xu hướng 5-10 kỳ tới
             
-            TRẢ VỀ JSON:
+            YÊU CẦU: Trả về JSON chính xác với format:
             {{
-                "dan4": [4 số chủ lực],
-                "dan3": [3 số lót],
-                "exclude": [3 số cần loại],
-                "top5": [5 số khả năng cao],
-                "streaks": "Phân tích số bệt",
-                "traps": "Các bẫy nhà cái",
-                "strategy": "Chiến thuật vào tiền",
-                "logic": "Tổng hợp phân tích ngắn gọn"
+                "dan4": [4 số chủ lực nhất, sắp xếp theo thứ tự ưu tiên],
+                "dan3": [3 số lót, an toàn],
+                "logic": "Giải thích ngắn gọn (dưới 100 từ) về thuật toán và lý do chọn số"
             }}
+            
+            CHỈ TRẢ VỀ JSON, không thêm text khác.
             """
             
             try:
-                response = neural_engine.generate_content(prompt)
-                res_text = response.text
-                data = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
-                st.session_state.last_result = data
-                st.session_state.trap_alerts = traps
+                with st.spinner("AI đang phân tích dữ liệu..."):
+                    response = neural_engine.generate_content(prompt)
+                    res_text = response.text
+                    # Tìm JSON trong response
+                    json_match = re.search(r'(\{.*\})', res_text, re.DOTALL)
+                    if json_match:
+                        data = json.loads(json_match.group())
+                        # Đảm bảo có đủ các trường
+                        if "dan4" in data and "dan3" in data and "logic" in data:
+                            st.session_state.last_result = data
+                        else:
+                            st.error("AI trả về thiếu dữ liệu, dùng thuật toán dự phòng")
+                            predictor = TitanPredictor(st.session_state.history[-200:])
+                            st.session_state.last_result = predictor.predict_3so5tinh()
+                    else:
+                        st.error("Không parse được JSON từ AI")
+                        predictor = TitanPredictor(st.session_state.history[-200:])
+                        st.session_state.last_result = predictor.predict_3so5tinh()
             except Exception as e:
-                # Fallback
-                st.session_state.last_result = {
-                    "dan4": top_5[:4],
-                    "dan3": top_5[4:] if len(top_5) > 4 else [],
-                    "exclude": exclude_3,
-                    "top5": top_5,
-                    "streaks": str(streaks),
-                    "traps": "\n".join(traps) if traps else "Không phát hiện bẫy",
-                    "strategy": "Vào tiền đều, không all-in",
-                    "logic": "Phân tích từ thuật toán ML"
-                }
+                st.error(f"Lỗi AI: {str(e)[:50]}... Dùng thuật toán cục bộ")
+                predictor = TitanPredictor(st.session_state.history[-200:])
+                st.session_state.last_result = predictor.predict_3so5tinh()
+        else:
+            if not neural_engine:
+                st.warning("⚠️ AI chưa kết nối, dùng thuật toán cục bộ")
+            if len(st.session_state.history) < 20:
+                st.warning(f"⚠️ Cần 20 kỳ để dùng AI (hiện có {len(st.session_state.history)})")
             
-            st.rerun()
-
-with col2:
-    if st.button("🗑️ RESET BỘ NHỚ"):
-        st.session_state.history = []
-        if os.path.exists(DB_FILE): os.remove(DB_FILE)
+            predictor = TitanPredictor(st.session_state.history[-200:] if st.session_state.history else [])
+            st.session_state.last_result = predictor.predict_3so5tinh()
         st.rerun()
 
 with col3:
-    if st.button("📊 PHÂN TÍCH NHANH"):
-        if st.session_state.history:
-            predictor = TitanPredictor(st.session_state.history)
-            top_5 = predictor.predict_top_5()
-            exclude = predictor.find_3_numbers_to_exclude()
-            st.info(f"Top 5: {top_5} | Loại: {exclude}")
+    if st.button("🗑️ RESET BỘ NHỚ"):
+        st.session_state.history = []
+        st.session_state.prediction_history = []
+        if os.path.exists(DB_FILE): 
+            os.remove(DB_FILE)
+        st.rerun()
+
+# Hiển thị thống kê nhanh
+if len(st.session_state.history) > 0:
+    with st.expander("📊 Thống kê nhanh", expanded=False):
+        last_10 = st.session_state.history[-10:] if len(st.session_state.history) >= 10 else st.session_state.history
+        
+        # Tần suất các số
+        all_nums = ''.join(last_10)
+        num_counts = Counter(all_nums)
+        
+        cols = st.columns(5)
+        for i in range(5):
+            with cols[i]:
+                st.markdown(f"**Số {i}**")
+                st.progress(num_counts.get(str(i), 0) / max(1, max(num_counts.values())))
+                st.caption(f"{num_counts.get(str(i), 0)} lần")
+        
+        cols2 = st.columns(5)
+        for i in range(5, 10):
+            with cols2[i-5]:
+                st.markdown(f"**Số {i}**")
+                st.progress(num_counts.get(str(i), 0) / max(1, max(num_counts.values())))
+                st.caption(f"{num_counts.get(str(i), 0)} lần")
 
 # ================= HIỂN THỊ KẾT QUẢ =================
 if "last_result" in st.session_state:
     res = st.session_state.last_result
-    
-    # Hiển thị cảnh báo bẫy
-    if st.session_state.trap_alerts:
-        st.markdown("<div class='trap-alert'>", unsafe_allow_html=True)
-        for trap in st.session_state.trap_alerts:
-            st.markdown(f"🚨 {trap}")
-        st.markdown("</div>", unsafe_allow_html=True)
-    
     st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
     
-    # Phân tích logic
-    st.markdown(f"<div class='logic-box'><b>💡 Phân tích:</b> {res.get('logic', 'N/A')}</div>", unsafe_allow_html=True)
+    # Hiển thị phân tích
+    st.markdown(f"<div class='logic-box'><b>💡 PHÂN TÍCH THUẬT TOÁN:</b><br>{res['logic']}</div>", unsafe_allow_html=True)
     
-    # Hiển thị streaks nếu có
-    if 'streaks' in res:
-        st.markdown(f"<div class='logic-box'><b>📈 Số bệt:</b> {res['streaks']}</div>", unsafe_allow_html=True)
+    # Hiển thị 4 số chủ lực
+    st.markdown("<p style='text-align:center; font-size:14px; color:#888;'>🎯 4 SỐ CHỦ LỰC (ĐẶT CƯỢC CHÍNH)</p>", unsafe_allow_html=True)
+    dan4_str = '  '.join(map(str, res['dan4']))
+    st.markdown(f"<div class='num-display'>{dan4_str}</div>", unsafe_allow_html=True)
     
-    # Hiển thị bẫy
-    if 'traps' in res:
-        st.markdown(f"<div class='logic-box'><b>⚠️ Bẫy phát hiện:</b> {res['traps']}</div>", unsafe_allow_html=True)
+    # Giải thích cho 4 số
+    if len(res['dan4']) == 4:
+        st.caption(f"✨ Gợi ý kết hợp: {res['dan4'][0]}{res['dan4'][1]}{res['dan4'][2]}, {res['dan4'][0]}{res['dan4'][1]}{res['dan4'][3]}, {res['dan4'][0]}{res['dan4'][2]}{res['dan4'][3]}, {res['dan4'][1]}{res['dan4'][2]}{res['dan4'][3]}")
     
-    # Hiển thị số cần loại
-    if 'exclude' in res and res['exclude']:
-        st.markdown(f"<div class='exclude-box'><b>❌ Số cần loại:</b> {', '.join(map(str, res['exclude']))}</div>", unsafe_allow_html=True)
+    # Hiển thị 3 số lót
+    st.markdown("<p style='text-align:center; font-size:14px; color:#888; margin-top:25px;'>🛡️ 3 SỐ LÓT (GIỮ VỐN, BAO THÊM)</p>", unsafe_allow_html=True)
+    dan3_str = '  '.join(map(str, res['dan3']))
+    st.markdown(f"<div class='num-display' style='color:#f2cc60; text-shadow: 0 0 25px #f2cc60;'>{dan3_str}</div>", unsafe_allow_html=True)
     
-    # Dàn số chính
-    st.markdown("<p style='text-align:center; font-size:12px; color:#888;'>🎯 4 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-display'>{''.join(map(str, res.get('dan4', [])))}</div>", unsafe_allow_html=True)
+    # Tạo dàn 7 số để sao chép
+    all_numbers = res['dan4'] + res['dan3']
+    copy_val = " ".join(all_numbers)
     
-    # Dàn số lót
-    st.markdown("<p style='text-align:center; font-size:12px; color:#888; margin-top:20px;'>🛡️ 3 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
-    st.markdown(f"<div class='num-display' style='color:#f2cc60; text-shadow: 0 0 25px #f2cc60;'>{''.join(map(str, res.get('dan3', [])))}</div>", unsafe_allow_html=True)
-    
-    # Top 5 dự đoán
-    if 'top5' in res:
-        st.markdown("<p style='text-align:center; font-size:12px; color:#888; margin-top:20px;'>🔮 TOP 5 SỐ KHẢ NĂNG CAO</p>", unsafe_allow_html=True)
-        cols = st.columns(5)
-        for i, num in enumerate(res['top5']):
-            cols[i].markdown(f"<div style='text-align:center; font-size:24px; color:#58a6ff;'>{num}</div>", unsafe_allow_html=True)
-    
-    # Chiến thuật
-    if 'strategy' in res:
-        st.markdown(f"<div class='logic-box' style='margin-top:20px;'><b>💰 Chiến thuật:</b> {res['strategy']}</div>", unsafe_allow_html=True)
-    
-    # Sao chép dàn số
-    copy_val = "".join(map(str, res.get('dan4', []))) + "".join(map(str, res.get('dan3', [])))
-    st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", copy_val)
+    # Form để dễ copy
+    with st.form(key="copy_form"):
+        st.text_input("📋 DÀN 7 SỐ (copy paste):", value=copy_val, key="copy_input")
+        st.form_submit_button("📋 Copy", on_click=lambda: st.write("Đã copy!"))  # Streamlit tự xử lý copy
     
     st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Hiển thị lịch sử dự đoán
+    if st.session_state.prediction_history:
+        with st.expander("📜 Lịch sử dự đoán gần nhất", expanded=False):
+            for i, pred in enumerate(st.session_state.prediction_history[-5:]):
+                st.markdown(f"**Lần {i+1}**: {' '.join(pred['dan4'])} + {' '.join(pred['dan3'])}")
+                st.caption(f"_{pred['logic']}_")
+                st.divider()
 
-# ================= HIỂN THỊ LỊCH SỬ GẦN NHẤT =================
-if st.session_state.history:
-    with st.expander("📜 Lịch sử 20 kỳ gần nhất"):
-        recent = st.session_state.history[-20:]
-        df = pd.DataFrame(recent, columns=["Kết quả"])
-        st.dataframe(df, use_container_width=True)
+# Hiển thị hướng dẫn
+with st.expander("📖 Hướng dẫn - Quy tắc 3 số 5 tính", expanded=False):
+    st.markdown("""
+    ### 🎯 QUY TẮC "3 SỐ 5 TÍNH"
+    
+    **Cách chơi:**
+    - Chọn 3 số bất kỳ từ 0-9 (ví dụ: 1, 2, 6)
+    - Kết quả xổ 5 số (hàng Chục ngàn, Ngàn, Trăm, Chục, Đơn vị)
+    - **THẮNG** nếu 3 số bạn chọn đều xuất hiện trong 5 số kết quả (không cần đúng thứ tự)
+    
+    **Ví dụ:**
+    - ✅ Chọn: 1,2,6 - Kết quả: 12864 → THẮNG (có đủ 1,2,6)
+    - ❌ Chọn: 1,3,6 - Kết quả: 12662 → THUA (thiếu số 3)
+    
+    **Mẹo:**
+    - Đánh dàn 7 số rồi chọn 3 số bất kỳ trong dàn để tạo vé
+    - Kết hợp số chủ lực + số lót để tối ưu xác suất
+    """)
 
-st.markdown("<br><p style='text-align:center; font-size:10px; color:#444;'>TITAN v22.0 - Hệ thống tự học & phát hiện bẫy thông minh</p>", unsafe_allow_html=True)
+st.markdown("<br><p style='text-align:center; font-size:11px; color:#444;'>TITAN v21.0 OMNI - Thuật toán độc quyền | Tự động cập nhật dữ liệu</p>", unsafe_allow_html=True)
