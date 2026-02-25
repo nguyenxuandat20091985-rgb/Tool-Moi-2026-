@@ -3,11 +3,9 @@ import google.generativeai as genai
 import re
 import json
 import os
-import pandas as pd
-import numpy as np
 from collections import Counter
 
-# ================= CẤU HÌNH HỆ THỐNG TITAN v23.0 =================
+# ================= CẤU HÌNH HỆ THỐNG TITAN v23.1 =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
 DB_FILE = "titan_v23_core.json"
 
@@ -34,125 +32,73 @@ def save_memory(data):
 if "history" not in st.session_state:
     st.session_state.history = load_memory()
 
-# ================= THUẬT TOÁN BỔ SUNG (VỊ TRÍ & TÀI XỈU) =================
-def advanced_stats(data):
-    if len(data) < 10: return {}
-    matrix = np.array([[int(d) for d in s] for s in data[-20:]])
+# ================= THUẬT TOÁN NHẬN DIỆN BỆT ẢO =================
+def detect_streak_and_danger(data):
+    if len(data) < 10: return False, "Đang thu thập dữ liệu"
     
-    # Phân tích Tài (5-9) / Xỉu (0-4)
-    big_small = []
-    for row in matrix:
-        big_small.append("Tài" if np.mean(row) >= 4.5 else "Xỉu")
+    all_digits = "".join(data[-5:])
+    counts = Counter(all_digits)
     
-    # Tần suất vị trí (Hàng đơn vị)
-    pos_counts = Counter(matrix[:, -1])
-    return {
-        "trend": Counter(big_small).most_common(1)[0][0],
-        "hot_pos": pos_counts.most_common(3)
-    }
+    # Kiểm tra nếu có 1 số xuất hiện quá dày (Bệt số)
+    for num, freq in counts.items():
+        if freq >= 4: # Một số xuất hiện 4/5 kỳ gần nhất
+            return True, f"CẢNH BÁO BỆT: Số {num} đang bệt ảo. Nhà cái đang giam cầu!"
+            
+    return False, "Nhịp cầu ổn định"
 
-# ================= GIAO DIỆN TITAN v23 =================
-st.set_page_config(page_title="TITAN v23.0 - SUPREME AI", layout="wide")
+# ================= GIAO DIỆN TITAN v23.1 =================
+st.set_page_config(page_title="TITAN v23.1 - ANTI-FRAUD AI", layout="wide")
 st.markdown("""
     <style>
-    .stApp { background: #010409; color: #e6edf3; }
-    .main-card {
-        background: #0d1117; border: 1px solid #30363d;
-        border-radius: 12px; padding: 25px; margin-bottom: 20px;
-    }
-    .main-num { font-size: 90px; color: #39d353; font-weight: 900; text-align: center; text-shadow: 0 0 20px #238636; }
-    .warning-text { color: #f85149; background: #2d1616; padding: 10px; border-radius: 5px; border: 1px solid #f85149; }
-    .stat-box { background: #161b22; padding: 10px; border-radius: 8px; border: 1px solid #30363d; text-align: center; }
+    .stApp { background: #0b0e14; color: #e6edf3; }
+    .danger-zone { background: #440000; border: 2px solid #ff0000; padding: 20px; border-radius: 10px; text-align: center; font-weight: bold; }
+    .safe-zone { background: #002200; border: 2px solid #00ff00; padding: 20px; border-radius: 10px; text-align: center; }
+    .main-num { font-size: 110px; color: #00ff00; font-weight: 900; text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🧬 TITAN v23.0 - CHIẾN THẦN BẺ CẦU")
+st.title("🧬 TITAN v23.1 - HỆ THỐNG PHÒNG THỦ & BẺ CẦU")
 
-# Sidebar thông tin
-with st.sidebar:
-    st.header("📊 TRẠNG THÁI HỆ THỐNG")
-    st.write(f"Kỳ đã lưu: {len(st.session_state.history)}")
-    if st.button("🗑️ RESET DỮ LIỆU"):
-        st.session_state.history = []
-        if os.path.exists(DB_FILE): os.remove(DB_FILE)
-        st.rerun()
+raw_input = st.text_area("📥 NẠP DỮ LIỆU (5 số viết liền):", height=100)
 
-# Nhập liệu
-raw_input = st.text_area("📥 NẠP DỮ LIỆU KỲ MỚI:", height=100, placeholder="Dán dãy số 5D tại đây...")
-
-if st.button("🚀 KÍCH HOẠT PHÂN TÍCH V23"):
+if st.button("🚀 KÍCH HOẠT PHÂN TÍCH CHỐNG BỆT"):
     clean_data = re.findall(r"\d{5}", raw_input)
     if clean_data:
         st.session_state.history.extend(clean_data)
         save_memory(st.session_state.history)
         
-        # Thống kê nội bộ trước khi hỏi AI
-        internal_stats = advanced_stats(st.session_state.history)
+        is_danger, msg = detect_streak_and_danger(st.session_state.history)
         
-        # PROMPT V23.0 - NÂNG CẤP MA TRẬN VỊ TRÍ
+        # PROMPT v23.1 - YÊU CẦU KHẮT KHE
         prompt = f"""
-        Hệ thống: TITAN v23.0. Chuyên gia 3D Lotobet.
-        Dữ liệu thực tế (100 kỳ): {st.session_state.history[-100:]}
-        Thống kê nội bộ: {internal_stats}
-        
-        YÊU CẦU:
-        1. Áp dụng MA TRẬN VỊ TRÍ ĐỐI XỨNG để tìm 3 số chủ lực.
-        2. Kiểm tra chu kỳ Fibonacci để loại bỏ các số đang "ảo".
-        3. Dự đoán 3 số (Main_3) nằm trong 5 số của giải ĐB.
-        4. Trả về dự đoán với độ tin cậy thực tế (Confidence).
-        
-        TRẢ VỀ JSON:
-        {{
-            "main_3": "ABC",
-            "support_4": "DEFG",
-            "logic": "Giải thích vắn tắt",
-            "warning": false,
-            "confidence": 98
-        }}
+        Hệ thống: TITAN v23.1 PRO. 
+        Lịch sử: {st.session_state.history[-50:]}.
+        Tình trạng: {msg}.
+        Nhiệm vụ: 
+        1. Nếu 'is_danger' là True, TUYỆT ĐỐI không cho số, trả về warning: true.
+        2. Nếu an toàn, phân tích Bóng số và Ma trận vị trí để chọn 3 số chủ lực.
+        3. Phân biệt rõ cầu Bệt và cầu Nhảy. Không đánh theo cầu đã bệt quá 4 kỳ.
+        TRẢ VỀ JSON: {{"main_3": "ABC", "support_4": "DEFG", "warning": {str(is_danger).lower()}, "logic": "{msg}", "confidence": 95}}
         """
         
         try:
             response = neural_engine.generate_content(prompt)
-            data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-            st.session_state.v23_result = data
-        except Exception as e:
-            st.error("Lỗi xử lý AI - Sử dụng thuật toán dự phòng.")
-            # Fallback
-            all_n = "".join(st.session_state.history[-30:])
-            top = [x[0] for x in Counter(all_n).most_common(7)]
-            st.session_state.v23_result = {"main_3": "".join(top[:3]), "support_4": "".join(top[3:]), "logic": "Fallback Stat", "warning": False, "confidence": 60}
+            st.session_state.v23_1_res = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
+        except:
+            st.session_state.v23_1_res = {"warning": True, "logic": "Lỗi kết nối hoặc cầu quá xấu."}
         st.rerun()
 
 # ================= HIỂN THỊ KẾT QUẢ =================
-if "v23_result" in st.session_state:
-    res = st.session_state.v23_result
+if "v23_1_res" in st.session_state:
+    res = st.session_state.v23_1_res
     
-    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    
-    if res['warning'] or res['confidence'] < 80:
-        st.markdown("<div class='warning-text'>⚠️ CẢNH BÁO: Cầu đang nhiễu (Nhịp Tài/Xỉu không ổn định). ĐÁNH NHỎ HOẶC NGHỈ.</div>", unsafe_allow_html=True)
-    
-    st.write(f"🔍 **CHIẾN THUẬT v23:** {res['logic']}")
-    
-    col1, col2 = st.columns([2, 1])
-    with col1:
+    if res.get('warning'):
+        st.markdown(f"<div class='danger-zone'>🚫 KHÔNG ĐÁNH KỲ NÀY<br>{res['logic']}</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='safe-zone'>", unsafe_allow_html=True)
+        st.write(f"✅ NHỊP CẦU AN TOÀN - CHIẾN THUẬT: {res['logic']}")
         st.markdown(f"<div class='main-num'>{res['main_3']}</div>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'>🔥 3 SỐ CHỦ LỰC (98% XÁC SUẤT)</p>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<h2 style='text-align:center; color:#58a6ff;'>{res['support_4']}</h2>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center;'>🛡️ DÀN LÓT</p>", unsafe_allow_html=True)
+        st.write(f"Dàn lót: {res['support_4']} | Độ tin cậy: {res['confidence']}%")
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.divider()
-    
-    # Tính năng Copy
-    st.text_input("📋 DÀN 7 SỐ KUBET:", res['main_3'] + res['support_4'])
-    st.progress(res['confidence'] / 100)
-    st.markdown(f"<p style='text-align:right;'>Độ tin cậy AI: {res['confidence']}%</p>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Hiển thị thống kê Tài Xỉu để anh đối soát
-    if st.session_state.history:
-        st.subheader("📈 NHỊP CẦU TÀI/XỈU (Gần đây)")
-        stats = advanced_stats(st.session_state.history)
-        st.info(f"Xu hướng hiện tại: **{stats.get('trend')}** | Top vị trí hàng đơn vị: **{stats.get('hot_pos')}**")
-
+st.sidebar.write(f"Dữ liệu tích lũy: {len(st.session_state.history)} kỳ")
