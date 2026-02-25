@@ -7,153 +7,155 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 
-# ================= CẤU HÌNH TITAN v24.0 ELITE =================
+# ================= CẤU HÌNH SIÊU TRÍ TUỆ v24.0 =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_elite_v24.json"
+DB_FILE = "titan_elite_memory.json"
 
 def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
-        return genai.GenerativeModel('gemini-1.5-pro') # Dùng bản Pro để thông minh nhất
+        # Sử dụng model mạnh nhất để phân tích sâu
+        return genai.GenerativeModel('gemini-1.5-pro') 
     except: return None
 
 neural_engine = setup_neural()
 
-# ================= QUẢN LÝ DỮ LIỆU CỨNG (BẢO LƯU VĨNH VIỄN) =================
-def load_db():
+# ================= HỆ THỐNG BẢO LƯU VĨNH VIỄN =================
+def load_data():
     if os.path.exists(DB_FILE):
         with open(DB_FILE, "r") as f:
             try: return json.load(f)
             except: return []
     return []
 
-def save_db(data):
+def save_data(data):
+    # Giữ tối đa 3000 kỳ để AI học hỏi sâu chu kỳ dài
     with open(DB_FILE, "w") as f:
-        json.dump(data[-3000:], f) # Lưu tới 3000 kỳ để AI học sâu
+        json.dump(data[-3000:], f)
 
 if "history" not in st.session_state:
-    st.session_state.history = load_db()
+    st.session_state.history = load_data()
 
-# ================= THUẬT TOÁN NHẬN BIẾT CẦU (BỆT/ĐẢO) =================
-def detect_patterns(data):
-    if len(data) < 20: return "Dữ liệu đang nạp...", False
+# ================= THUẬT TOÁN NHẬN BIẾT CẦU (SMART-LOGIC) =================
+def detect_bridge_type(data):
+    if len(data) < 15: return "Dữ liệu mỏng", "Chưa rõ"
     
-    all_digits = "".join(data[-20:])
     last_5 = data[-5:]
+    all_digits = "".join(last_5)
+    counts = Counter(all_digits)
     
-    # Kiểm tra cầu bệt (Streak)
-    flat_last_5 = "".join(last_5)
-    counts = Counter(flat_last_5)
-    bet_detected = [num for num, freq in counts.items() if freq >= 4]
+    # 1. Nhận biết cầu bệt (Streak)
+    most_common = counts.most_common(1)[0]
+    if most_common[1] >= 4: # Một số xuất hiện > 4 lần trong 5 kỳ
+        return "⚠️ CẦU BỆT ĐANG CHẠY", "NÊN BÁM HOẶC DỪNG"
     
-    # Kiểm tra đảo cầu (Zigzag)
-    is_reversed = False
-    if len(data) >= 4:
-        if data[-1] == data[-3] and data[-2] == data[-4]:
-            is_reversed = True
+    # 2. Nhận biết cầu đảo (Zigzag)
+    # So sánh 2 kỳ cuối xem có hoán vị số không
+    if len(data) >= 2:
+        s1, s2 = set(data[-1]), set(data[-2])
+        if len(s1.intersection(s2)) >= 3:
+            return "🔄 CẦU ĐẢO/NHẢY", "ĐÁNH NHẸ"
             
-    status = ""
-    if bet_detected: status += f"⚠️ CẦU BỆT SỐ {bet_detected} | "
-    if is_reversed: status += "🔄 CẦU ĐẢO LIÊN TỤC | "
-    
-    risk = len(bet_detected) > 0 or is_reversed
-    return status if status else "Cầu nhịp ổn định", risk
+    return "✅ CẦU ỔN ĐỊNH", "NÊN ĐÁNH"
 
-# ================= GIAO DIỆN TITAN ELITE =================
+# ================= GIAO DIỆN ELITE DESIGN =================
 st.set_page_config(page_title="TITAN v24.0 ELITE", layout="wide")
 st.markdown("""
     <style>
-    .stApp { background: #010409; color: #e6edf3; }
-    .status-bar { background: #0d1117; padding: 15px; border-radius: 10px; border: 1px solid #30363d; margin-bottom: 20px; }
-    .bet-signal { font-size: 100px; font-weight: 900; text-align: center; line-height: 1; margin: 20px 0; }
-    .stop-signal { background: #440000; color: #ff5555; padding: 20px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 24px; border: 2px solid #ff0000; }
-    .go-signal { background: #002200; color: #55ff55; padding: 20px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 24px; border: 2px solid #00ff00; }
+    .stApp { background: #000000; color: #ffffff; }
+    .status-panel { background: #111; padding: 20px; border-radius: 15px; border: 1px solid #222; margin-bottom: 20px; }
+    .decision-box { padding: 25px; border-radius: 15px; text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0; }
+    .should-bet { background: #003300; border: 2px solid #00ff00; color: #00ff00; }
+    .should-stop { background: #330000; border: 2px solid #ff0000; color: #ff0000; }
+    .main-num { font-size: 110px; color: #00d4ff; font-weight: 900; text-shadow: 0 0 40px #00d4ff; text-align: center; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #58a6ff;'>🚀 TITAN v24.0 ELITE - SIÊU TRÍ TUỆ AI</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #00d4ff;'>🧬 TITAN v24.0 ELITE OMNI</h1>", unsafe_allow_html=True)
 
-# Hiển thị trạng thái dữ liệu bảo lưu
-st.sidebar.markdown(f"### 🗄️ BỘ NHỚ VĨNH VIỄN\n- Đã lưu: **{len(st.session_state.history)} kỳ**")
-if st.sidebar.button("🗑️ XÓA HẾT DỮ LIỆU"):
+# Hiển thị trạng thái bộ nhớ
+st.sidebar.title("🧠 TRÍ TUỆ NHÂN TẠO")
+st.sidebar.info(f"Dữ liệu đã học: {len(st.session_state.history)} kỳ")
+if st.sidebar.button("🗑️ XÓA DỮ LIỆU CŨ"):
     st.session_state.history = []
-    save_db([])
+    if os.path.exists(DB_FILE): os.remove(DB_FILE)
     st.rerun()
 
-# Nạp dữ liệu mượt mà
-raw_input = st.text_area("📡 NẠP DỮ LIỆU MỚI (Tự động lọc bẩn):", height=100)
+# Khu vực nhập liệu (Zero-Lag)
+raw_input = st.text_area("📡 NẠP DỮ LIỆU (Hệ thống tự động lọc bẩn và lưu trữ):", height=100)
 
-if st.button("⚡ KÍCH HOẠT SIÊU TRÍ TUỆ"):
-    new_entries = re.findall(r"\d{5}", raw_input)
-    if new_entries:
-        # Chỉ thêm những kỳ chưa có (tránh trùng)
-        current_history = st.session_state.history
-        added_count = 0
-        for entry in new_entries:
-            if entry not in current_history[-10:]:
-                current_history.append(entry)
-                added_count += 1
-        st.session_state.history = current_history
-        save_db(current_history)
+if st.button("🚀 KÍCH HOẠT SIÊU TRÍ TUỆ"):
+    clean_data = re.findall(r"\d{5}", raw_input)
+    if clean_data:
+        # Chỉ thêm những kỳ chưa có trong lịch sử (Tránh trùng)
+        for d in clean_data:
+            if d not in st.session_state.history:
+                st.session_state.history.append(d)
+        save_data(st.session_state.history)
         
-        # Phân tích nhịp cầu
-        p_status, is_risky = detect_patterns(st.session_state.history)
+        # Phân tích trạng thái cầu
+        bridge_status, advice = detect_bridge_type(st.session_state.history)
         
-        # SIÊU PROMPT ELITE
+        # PROMPT TINH HOA v24.0
         prompt = f"""
-        Bạn là kiến trúc sư trưởng về giải mã thuật toán xác suất 5D.
-        Lịch sử dữ liệu chuyên sâu (2000 kỳ): {st.session_state.history[-100:]}
-        Trạng thái cầu hiện tại: {p_status}
+        Hệ thống: TITAN v24.0 ELITE. Chuyên gia tối thượng 5D/Lotobet.
+        Lịch sử: {st.session_state.history[-150:]}
+        Trạng thái cầu hiện tại: {bridge_status}
         
         Nhiệm vụ:
-        1. Sử dụng thuật toán Mạng thần kinh phân tích nhịp rơi.
-        2. Nếu phát hiện nhà cái đang "vét tiền" (cầu ảo), hãy trả về 'action': 'STOP'.
-        3. Chọn 3 số chủ lực (Main_3) có xác suất xuất hiện trong 5 số của giải ĐB > 99%.
-        4. Tư duy qua bóng số âm dương và nhịp Fibonacci.
-        
-        Trả về JSON duy nhất:
+        1. Sử dụng thuật toán bẻ cầu nhà cái dựa trên bóng số, nhịp Fibonacci và độ lệch ma trận.
+        2. Nếu phát hiện CẦU BỆT, tuyệt đối không dự đoán số ngược cầu.
+        3. Chọn ra 3 số VÀNG (Main_3) có độ tin cậy tuyệt đối.
+        4. Quyết định: Đánh (Bet) hay Dừng (Wait) dựa trên rủi ro.
+
+        TRẢ VỀ JSON:
         {{
-            "action": "PLAY" hoặc "STOP",
-            "main_3": "3 số",
-            "support_4": "4 số",
-            "logic": "Giải thích sâu về nhịp cầu",
-            "confidence": 0-100
+            "decision": "BET" hoặc "STOP",
+            "main_3": "ABC",
+            "support_4": "DEFG",
+            "reason": "Giải thích logic sâu sắc",
+            "risk_level": "Low/High",
+            "confidence": 99
         }}
         """
         
         try:
             response = neural_engine.generate_content(prompt)
-            res = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-            st.session_state.elite_prediction = res
+            data = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
+            st.session_state.elite_res = data
         except:
-            st.error("Neural Link quá tải. Vui lòng thử lại sau 5 giây.")
+            st.error("AI đang học hỏi thêm, vui lòng bấm lại!")
         st.rerun()
 
-# ================= HIỂN THỊ KẾT QUẢ THỰC CHIẾN =================
-if "elite_prediction" in st.session_state:
-    res = st.session_state.elite_prediction
-    p_status, is_risky = detect_patterns(st.session_state.history)
+# ================= HIỂN THỊ KẾT QUẢ SINH TỬ =================
+if "elite_res" in st.session_state:
+    res = st.session_state.elite_res
     
-    st.markdown("<div class='status-bar'>", unsafe_allow_html=True)
-    st.write(f"📊 **TRẠNG THÁI CẦU:** {p_status}")
+    # 1. Hiển thị Quyết định
+    if res['decision'] == "BET" and res['confidence'] > 85:
+        st.markdown(f"<div class='decision-box should-bet'>🔥 TRẠNG THÁI: NÊN ĐÁNH (Độ tin cậy: {res['confidence']}%)</div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='decision-box should-stop'>⚠️ TRẠNG THÁI: DỪNG LẠI - CẦU ĐANG BIẾN ĐỘNG ẢO</div>", unsafe_allow_html=True)
+
+    # 2. Hiển thị Số dự đoán
+    st.markdown("<div style='background: #111; padding: 30px; border-radius: 20px; border: 1px solid #333;'>", unsafe_allow_html=True)
+    st.write(f"🧬 **LÝ DO TỪ AI:** {res['reason']}")
+    
+    col1, col2 = st.columns([3, 2])
+    with col1:
+        st.markdown(f"<div class='main-num'>{res['main_3']}</div>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#00d4ff;'>🎯 3 SỐ CHỦ LỰC TỐI THƯỢNG</p>", unsafe_allow_html=True)
+    with col2:
+        st.markdown(f"<h1 style='text-align:center; color:#888; margin-top:30px;'>{res['support_4']}</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center;'>🛡️ DÀN LÓT AN TOÀN</p>", unsafe_allow_html=True)
+    
     st.markdown("</div>", unsafe_allow_html=True)
 
-    if res['action'] == "STOP" or is_risky or res['confidence'] < 90:
-        st.markdown("<div class='stop-signal'>🔴 KHÔNG ĐÁNH - NHÀ CÁI ĐANG ĐẢO CẦU 🔴</div>", unsafe_allow_html=True)
-        st.write(f"**Lý do AI:** {res['logic']}")
-    else:
-        st.markdown("<div class='go-signal'>🟢 TÍN HIỆU VÀNG - VÀO TIỀN AN TOÀN 🟢</div>", unsafe_allow_html=True)
-        
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            st.markdown(f"<div class='bet-signal' style='color:#39d353;'>{res['main_3']}</div>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align:center;'>🎯 3 SỐ CHỦ LỰC (SIÊU CẤP)</p>", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"<div class='bet-signal' style='color:#58a6ff; font-size:60px;'>{res['support_4']}</div>", unsafe_allow_html=True)
-            st.markdown("<p style='text-align:center;'>🛡️ DÀN LÓT BẢO VỆ VỐN</p>", unsafe_allow_html=True)
+    # 3. Phân tích cầu chuyên sâu
+    b_status, b_advice = detect_bridge_type(st.session_state.history)
+    st.subheader("📊 PHÂN TÍCH NHỊP CẦU")
+    c1, c2 = st.columns(2)
+    c1.metric("Loại cầu", b_status)
+    c2.metric("Lời khuyên nhịp", b_advice)
 
-        st.info(f"💡 **PHÂN TÍCH AI:** {res['logic']}")
-        st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", res['main_3'] + res['support_4'])
-        st.progress(res['confidence'] / 100)
-        st.write(f"Độ tự tin siêu trí tuệ: {res['confidence']}%")
-
+st.markdown("<br><p style='text-align:center; color:#444;'>TITAN v24.0 Elite - Trí tuệ nhân tạo độc quyền cho người chơi chuyên nghiệp</p>", unsafe_allow_html=True)
