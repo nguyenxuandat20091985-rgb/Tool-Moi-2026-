@@ -3,13 +3,12 @@ import google.generativeai as genai
 import re
 import json
 import os
-import pandas as pd
 import numpy as np
 from collections import Counter
 
-# ================= CẤU HÌNH TITAN V4 SUPREME =================
+# ================= CẤU HÌNH SIÊU CẤP =================
 API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_v4_supreme.json"
+DB_FILE = "titan_elite_v24.json"
 
 def setup_neural():
     try:
@@ -19,134 +18,99 @@ def setup_neural():
 
 neural_engine = setup_neural()
 
-# ================= HỆ THỐNG XỬ LÝ DỮ LIỆU THÔNG MINH =================
-def load_memory():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            try: return json.load(f)
-            except: return []
-    return []
-
-def save_memory(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data[-2000:], f)
-
-if "history" not in st.session_state:
-    st.session_state.history = load_memory()
-
-# ================= THUẬT TOÁN NHẬN DIỆN "BẪY NHÀ CÁI" =================
-def detect_house_trap(data):
+# ================= THUẬT TOÁN ĐỐI KHÁNG NHÀ CÁI =================
+def detect_bet_bridge(data):
+    """Phát hiện cầu bệt và cảnh báo bẫy"""
     if len(data) < 15: return "Dữ liệu mỏng", 0
     
-    last_10 = data[-10:]
-    all_digits = "".join(last_10)
-    counts = Counter(all_digits)
+    all_nums = "".join(data[-15:])
+    counts = Counter(all_nums)
+    most_common = counts.most_common(1)[0] # (số, số lần)
     
-    # 1. Kiểm tra cầu bệt (Streak)
-    streak_found = False
-    for i in range(10):
-        if counts[str(i)] >= 6: # Một số xuất hiện quá 60% trong 10 kỳ
-            streak_found = True
-            break
-            
-    # 2. Kiểm tra nhịp đảo (Zigzag)
-    is_messy = len(counts) > 8 # Quá nhiều số xuất hiện rời rạc
-    
-    if streak_found: return "CẦU BỆT DỮ DỘI (RỦI RO CAO)", 85
-    if is_messy: return "NHỊP ĐẢO LIÊN TỤC (ẢO)", 40
-    return "NHỊP CẦU ỔN ĐỊNH", 100
+    # Nếu 1 số xuất hiện > 8 lần trong 15 kỳ -> Cầu bệt cực nặng
+    if most_common[1] >= 8:
+        return f"CẦU BỆT SỐ {most_common[0]} (Rủi ro bẻ cầu cao)", 2 
+    elif most_common[1] >= 5:
+        return f"Cầu đang nhen nhóm số {most_common[0]}", 1
+    return "Cầu nhảy (Biến động)", 0
 
-# ================= GIAO DIỆN TITAN V4 SUPREME =================
-st.set_page_config(page_title="TITAN V4 - SUPREME AI", layout="wide")
+def calculate_smart_money(confidence):
+    """Tính toán tỷ lệ vào tiền để bảo toàn vốn"""
+    if confidence >= 95: return "100% Vốn định mức (Đánh mạnh)"
+    if confidence >= 85: return "50% Vốn định mức (Đánh vừa)"
+    return "10% Vốn (Đánh văn nghệ hoặc BỎ)"
+
+# ================= GIAO DIỆN TINH HOA =================
+st.set_page_config(page_title="TITAN v24.0 ELITE", layout="wide")
 st.markdown("""
     <style>
     .stApp { background: #050505; color: #d1d1d1; }
-    .supreme-card {
-        background: linear-gradient(145deg, #0f0f0f, #1a1a1a);
-        border: 1px solid #d4af37; border-radius: 20px; padding: 40px;
+    .elite-card {
+        background: linear-gradient(145deg, #0f1115, #1a1d23);
+        border: 1px solid #d4af37; border-radius: 20px; padding: 35px;
         box-shadow: 0 0 50px rgba(212, 175, 55, 0.1);
     }
-    .main-number { font-size: 110px; font-weight: 900; color: #d4af37; text-align: center; text-shadow: 0 0 30px #d4af37; }
-    .status-badge { padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .main-number { font-size: 110px; font-weight: 900; color: #d4af37; text-align: center; text-shadow: 0 0 40px #d4af37; }
+    .warning-glow { color: #ff4b4b; text-shadow: 0 0 10px #ff4b4b; font-weight: bold; animation: blinker 1.5s linear infinite; }
+    @keyframes blinker { 50% { opacity: 0; } }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #d4af37;'>🔱 TITAN V4 - TINH HOA SUPREME</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #d4af37;'>🔱 TITAN v24.0 ELITE 🔱</h1>", unsafe_allow_html=True)
 
-# Input
-raw_input = st.text_area("📡 NẠP DỮ LIỆU TỔNG HỢP:", height=100, placeholder="Dán kết quả 5D tại đây...")
+# Nhập liệu thông minh
+raw_input = st.text_area("📡 HỆ THỐNG NHẬN DIỆN DỮ LIỆU:", height=120, placeholder="Dán kết quả tại đây...")
 
-if st.button("🔥 KÍCH HOẠT TRÍ TUỆ TINH HOA"):
+if st.button("⚜️ GIẢI MÃ TINH HOA ⚜️"):
     clean_data = re.findall(r"\d{5}", raw_input)
     if clean_data:
+        if "history" not in st.session_state: st.session_state.history = []
         st.session_state.history.extend(clean_data)
-        save_memory(st.session_state.history)
         
-        trap_msg, safety_score = detect_house_trap(st.session_state.history)
+        bridge_status, risk_level = detect_bet_bridge(st.session_state.history)
         
-        # PROMPT SIÊU CẤP - TỔNG HỢP TINH HOA
+        # PROMPT TINH HOA - TỔNG HỢP MỌI THUẬT TOÁN
         prompt = f"""
-        Bạn là kiến trúc sư trưởng của hệ thống TITAN V4 Supreme.
-        Dữ liệu 100 kỳ: {st.session_state.history[-100:]}
-        Trạng thái nhà cái: {trap_msg} | Điểm an toàn: {safety_score}
+        Bạn là kiến trúc sư trưởng về xác suất 5D. 
+        Lịch sử: {st.session_state.history[-100:]}
+        Trạng thái cầu: {bridge_status}
         
-        Nhiệm vụ: 
-        1. Phân tích "Bóng chồng" và "Nhịp gãy Fibonacci".
-        2. Nếu đang gặp 'CẦU BỆT', hãy đưa ra dự đoán dựa trên logic 'Đu dây' hoặc 'Bẻ cầu' tùy theo độ dài chuỗi.
-        3. Chốt 3 số CHỦ LỰC (Main_3) có xác suất nổ cao nhất trong 5 số giải ĐB.
-        4. Trả về JSON chuẩn.
+        Yêu cầu tối mật:
+        1. Sử dụng thuật toán Đối xứng Ma trận và Nhịp rơi Fibonacci.
+        2. Loại bỏ các số "ảo" nhà cái đang kìm.
+        3. Phân tích "Bóng âm dương" của 3 kỳ gần nhất.
+        4. Chốt 3 số CHỦ LỰC có tỷ lệ nổ chung giải ĐB cao nhất.
         
-        TRẢ VỀ JSON:
+        TRẢ VỀ JSON DUY NHẤT:
         {{
             "main_3": "ABC",
             "support_4": "DEFG",
-            "logic_supreme": "Phân tích cực sâu về nhịp cầu",
-            "action": "VÀO TIỀN / CHỜ ĐỢI / ĐÁNH NHỎ",
-            "confidence": 99
+            "logic": "Giải thích sắc bén",
+            "confidence": 99,
+            "action": "VÀO TIỀN/DỪNG"
         }}
         """
         
         try:
             response = neural_engine.generate_content(prompt)
             res = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-            st.session_state.v4_result = res
-            st.session_state.v4_safety = {"msg": trap_msg, "score": safety_score}
+            
+            st.markdown("<div class='elite-card'>", unsafe_allow_html=True)
+            
+            # Cảnh báo rủi ro cầu bệt
+            if risk_level == 2:
+                st.markdown("<p class='warning-glow'>⚠️ CẢNH BÁO: PHÁT HIỆN CẦU BỆT ẢO - CỰC KỲ NGUY HIỂM</p>", unsafe_allow_html=True)
+            
+            st.write(f"🔍 **CHIẾN THUẬT:** {res['logic']}")
+            st.markdown(f"<div class='main-number'>{res['main_3']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='text-align:center; color:#58a6ff;'>Lót: {res['support_4']}</h3>", unsafe_allow_html=True)
+            
+            st.divider()
+            c1, c2 = st.columns(2)
+            c1.metric("ĐỘ TỰ TIN", f"{res['confidence']}%")
+            c2.metric("KHUYẾN NGHỊ", calculate_smart_money(res['confidence']))
+            
+            st.markdown("</div>", unsafe_allow_html=True)
         except:
-            st.error("Hệ thống đang điều chỉnh thuật toán, vui lòng thử lại kỳ sau.")
-        st.rerun()
+            st.error("Hệ thống đang điều chỉnh nhịp cầu, vui lòng thử lại sau 30 giây.")
 
-# ================= HIỂN THỊ KẾT QUẢ TINH HOA =================
-if "v4_result" in st.session_state:
-    res = st.session_state.v4_result
-    safety = st.session_state.v4_safety
-    
-    st.markdown("<div class='supreme-card'>", unsafe_allow_html=True)
-    
-    # Hiển thị trạng thái an toàn
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        st.write(f"🛡️ **TRẠNG THÁI:** {safety['msg']}")
-    with c2:
-        st.write(f"⭐ **ĐỘ TIN CẬY:** {res['confidence']}%")
-
-    st.divider()
-    
-    st.markdown(f"<div class='main-number'>{res['main_3']}</div>", unsafe_allow_html=True)
-    st.markdown(f"<h3 style='text-align:center; color:#888;'>DÀN LÓT: {res['support_4']}</h3>", unsafe_allow_html=True)
-    
-    st.markdown(f"**💡 CHIẾN THUẬT SUPREME:** {res['logic_supreme']}")
-    
-    # Khuyến nghị hành động cực kỳ quan trọng
-    action_color = "#39d353" if res['action'] == "VÀO TIỀN" else "#f85149"
-    st.markdown(f"<h2 style='text-align:center; color:{action_color};'>👉 HÀNH ĐỘNG: {res['action']}</h2>", unsafe_allow_html=True)
-    
-    st.divider()
-    st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", "".join(sorted(res['main_3'] + res['support_4'])))
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# Biểu đồ trực quan để anh thấy "Bẫy"
-if len(st.session_state.history) > 10:
-    st.subheader("📊 PHÂN TÍCH NHỊP CẦU THỰC TẾ")
-    
-    last_draws = st.session_state.history[-20:]
-    st.write("20 kỳ gần nhất: " + " | ".join(last_draws))
