@@ -6,12 +6,6 @@ import os
 import pandas as pd
 import numpy as np
 from collections import Counter
-from scipy import signal
-from scipy.fft import fft, fftfreq
-from scipy.stats import entropy
-from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestClassifier
 from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
@@ -52,7 +46,7 @@ if "prediction_history" not in st.session_state:
 if "accuracy_stats" not in st.session_state:
     st.session_state.accuracy_stats = {"correct": 0, "total": 0, "last_10": []}
 
-# ================= THUẬT TOÁN CAO CẤP =================
+# ================= THUẬT TOÁN CAO CẤP (KHÔNG DÙNG SCIPY) =================
 
 class AdvancedPredictor:
     def __init__(self, history):
@@ -96,51 +90,68 @@ class AdvancedPredictor:
         
         return probabilities
     
-    def detect_cycles(self, min_cycle=3, max_cycle=20):
+    def detect_cycles_simple(self, min_cycle=3, max_cycle=20):
         """
-        Phát hiện các chu kỳ lặp lại trong dữ liệu
+        Phát hiện chu kỳ đơn giản bằng autocorrelation
+        Không dùng FFT để tránh lỗi thư viện
         """
-        if len(self.digits_sequence) < 50:
+        if len(self.history) < 30:
             return []
         
-        # Phân tích FFT
-        fft_vals = fft(self.digits_sequence)
-        freqs = fftfreq(len(self.digits_sequence))
+        # Chuyển đổi history thành mảng số
+        digits_array = []
+        for num_str in self.history[-100:]:  # Lấy 100 kỳ gần nhất
+            digits_array.extend([int(d) for d in num_str])
         
-        # Tìm các tần số dominant
-        magnitudes = np.abs(fft_vals[:len(fft_vals)//2])
-        peak_indices = signal.find_peaks(magnitudes, height=np.mean(magnitudes)*1.5)[0]
-        
+        # Tìm chu kỳ bằng phương pháp tương quan đơn giản
         cycles = []
-        for idx in peak_indices:
-            if idx > 0 and freqs[idx] != 0:
-                cycle_length = int(1/abs(freqs[idx]))
-                if min_cycle <= cycle_length <= max_cycle:
-                    cycles.append(cycle_length)
+        for period in range(min_cycle, min(max_cycle, len(digits_array)//2)):
+            correlation = 0
+            count = 0
+            for i in range(len(digits_array) - period):
+                if digits_array[i] == digits_array[i + period]:
+                    correlation += 1
+                count += 1
+            
+            if count > 0:
+                correlation_ratio = correlation / count
+                if correlation_ratio > 0.4:  # Ngưỡng tương quan
+                    cycles.append(period)
         
         return list(set(cycles[:5]))  # Trả về 5 chu kỳ phổ biến nhất
     
     def entropy_analysis(self, window=50):
         """
-        Đo lường độ hỗn loạn của dữ liệu
+        Đo lường độ hỗn loạn của dữ liệu - tự tính entropy thủ công
         """
         if len(self.history) < window:
             return {"avg_entropy": 2.0, "volatility": "CAO", "position_entropy": [2.0]*5}
+        
+        def calculate_entropy(data):
+            """Tính entropy thủ công"""
+            value_counts = {}
+            for value in data:
+                value_counts[value] = value_counts.get(value, 0) + 1
+            
+            entropy = 0
+            total = len(data)
+            for count in value_counts.values():
+                prob = count / total
+                entropy -= prob * np.log2(prob) if prob > 0 else 0
+            
+            return entropy
         
         position_entropy = []
         for pos in range(5):
             pos_digits = [int(num[pos]) for num in self.history[-window:] if len(num) > pos]
             
             if pos_digits:
-                value_counts = np.bincount(pos_digits, minlength=10)
-                probabilities = value_counts / len(pos_digits)
-                non_zero_probs = probabilities[probabilities > 0]
-                pos_entropy = entropy(non_zero_probs) if len(non_zero_probs) > 0 else 2.0
+                pos_entropy = calculate_entropy(pos_digits)
                 position_entropy.append(pos_entropy)
             else:
                 position_entropy.append(2.0)
         
-        avg_entropy = np.mean(position_entropy)
+        avg_entropy = np.mean(position_entropy) if position_entropy else 2.0
         
         # Ngưỡng entropy cho 5D Bet
         if avg_entropy < 1.2:
@@ -160,52 +171,42 @@ class AdvancedPredictor:
             'volatility': volatility
         }
     
-    def neural_pattern_recognition(self):
+    def pattern_recognition_simple(self):
         """
-        Sử dụng mạng nơ-ron để nhận dạng pattern
+        Nhận dạng pattern đơn giản bằng phân tích thống kê
         """
-        if len(self.history) < 50:
-            return None, None
+        if len(self.history) < 20:
+            return {}
         
-        # Chuẩn bị dữ liệu
-        X, y = [], []
-        window_size = 10
+        patterns = {}
         
-        for i in range(len(self.history) - window_size - 1):
-            window = self.history[i:i+window_size]
-            features = []
-            for num_str in window:
-                features.extend([int(d) for d in num_str])
-            
-            target = [int(d) for d in self.history[i+window_size]]
-            X.append(features)
-            y.append(target)
+        # 1. Pattern tăng dần / giảm dần
+        last_5 = self.history[-5:]
+        increasing = 0
+        decreasing = 0
         
-        if len(X) > 30:
-            X = np.array(X)
-            y = np.array(y)
-            
-            # Chuẩn hóa
-            scaler = StandardScaler()
-            X_scaled = scaler.fit_transform(X)
-            
-            # Random Forest cho độ chính xác cao hơn
-            rf_model = RandomForestClassifier(
-                n_estimators=100,
-                max_depth=10,
-                random_state=42,
-                n_jobs=-1
-            )
-            
-            # Train riêng cho từng vị trí
-            models = []
-            for pos in range(5):
-                y_pos = y[:, pos]
-                rf_model.fit(X_scaled[:-1], y_pos[:-1])
-                models.append(rf_model)
-            
-            return models, scaler
-        return None, None
+        for i in range(4):
+            if int(last_5[i]) < int(last_5[i+1]):
+                increasing += 1
+            elif int(last_5[i]) > int(last_5[i+1]):
+                decreasing += 1
+        
+        patterns['trend'] = 'TĂNG' if increasing > decreasing else 'GIẢM' if decreasing > increasing else 'ĐI NGANG'
+        
+        # 2. Pattern số trùng
+        duplicate_count = sum([len(num) - len(set(num)) for num in last_5])
+        patterns['duplicate_trend'] = 'NHIỀU SỐ TRÙNG' if duplicate_count > 5 else 'ÍT SỐ TRÙNG'
+        
+        # 3. Pattern chẵn lẻ
+        even_odd_ratio = []
+        for num in last_5:
+            even = sum(1 for d in num if int(d) % 2 == 0)
+            odd = 5 - even
+            even_odd_ratio.append(even / odd if odd > 0 else 5)
+        
+        patterns['even_odd'] = f"Tỷ lệ TB: {np.mean(even_odd_ratio):.2f}"
+        
+        return patterns
     
     def early_warning_system(self):
         """
@@ -224,10 +225,11 @@ class AdvancedPredictor:
             last_std = np.std(last_20_digits)
             prev_std = np.std(prev_20_digits)
             
-            if prev_std > 0 and last_std > prev_std * 1.8:
-                warnings.append("🔴 ĐỘ PHÂN TÁN TĂNG ĐỘT BIẾN - Cầu sắp đảo chiều")
-            elif prev_std > 0 and last_std > prev_std * 1.4:
-                warnings.append("🟡 ĐỘ PHÂN TÁN TĂNG - Có dấu hiệu biến động")
+            if prev_std > 0:
+                if last_std > prev_std * 1.8:
+                    warnings.append("🔴 ĐỘ PHÂN TÁN TĂNG ĐỘT BIẾN - Cầu sắp đảo chiều")
+                elif last_std > prev_std * 1.4:
+                    warnings.append("🟡 ĐỘ PHÂN TÁN TĂNG - Có dấu hiệu biến động")
         
         # 2. Kiểm tra tần suất xuất hiện số lạ (số ít về)
         all_digits = [int(d) for d in "".join(self.history[-30:])]
@@ -282,40 +284,26 @@ class AdvancedPredictor:
             "cold": sorted(cold_digits)
         }
     
-    def predict_next_number_ml(self):
+    def predict_by_ma(self, window=5):
         """
-        Dự đoán số tiếp theo bằng Machine Learning
+        Dự đoán bằng Moving Average
         """
-        if len(self.history) < 30:
+        if len(self.history) < window + 1:
             return None
         
-        # Tạo features từ lịch sử
-        features = []
-        targets = []
+        # Tính trung bình động cho từng vị trí
+        predictions = []
+        for pos in range(5):
+            pos_values = [int(num[pos]) for num in self.history[-window:]]
+            ma = np.mean(pos_values)
+            std = np.std(pos_values)
+            
+            # Dự đoán số gần với MA nhất
+            candidates = [int(round(ma)), int(round(ma)) + 1, int(round(ma)) - 1]
+            candidates = [c for c in candidates if 0 <= c <= 9]
+            predictions.append(candidates[0] if candidates else 5)
         
-        for i in range(len(self.history) - 10):
-            window = self.history[i:i+10]
-            feature_vector = []
-            for num in window:
-                feature_vector.extend([int(d) for d in num])
-            features.append(feature_vector)
-            targets.append(self.history[i+10])
-        
-        if len(features) < 20:
-            return None
-        
-        X = np.array(features)
-        y = np.array([int(t) for num in targets for t in num])  # Flatten targets
-        
-        # Train model đơn giản
-        model = RandomForestClassifier(n_estimators=50, max_depth=5, random_state=42)
-        model.fit(X[:-1], y[:-(5)])  # Bỏ sample cuối để test
-        
-        # Predict cho sample cuối
-        last_features = X[-1].reshape(1, -1)
-        prediction_proba = model.predict_proba(last_features)[0]
-        
-        return prediction_proba
+        return "".join(map(str, predictions))
 
 # ================= THIẾT KẾ GIAO DIỆN v22.0 STYLE =================
 st.set_page_config(page_title="TITAN v25.0 SUPREME AI", layout="wide")
@@ -340,8 +328,8 @@ st.markdown("""
     .status-bar { padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; font-size: 24px; margin-bottom: 20px; text-transform: uppercase; }
     .warning-box { background: #4a0e0e; color: #ff9b9b; padding: 15px; border-radius: 8px; border: 1px solid #ff4444; text-align: center; margin-top: 15px; font-weight: bold; }
     .info-box { background: #0e2a4a; color: #9bc9ff; padding: 10px; border-radius: 8px; border: 1px solid #58a6ff; margin: 5px 0; }
-    .hot-number { color: #ff5858; font-weight: bold; font-size: 20px; }
-    .cold-number { color: #58a6ff; font-weight: bold; font-size: 20px; }
+    .hot-number { color: #ff5858; font-weight: bold; font-size: 20px; display: inline-block; margin: 0 5px; }
+    .cold-number { color: #58a6ff; font-weight: bold; font-size: 20px; display: inline-block; margin: 0 5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -360,6 +348,11 @@ with st.container():
         if st.session_state.accuracy_stats["total"] > 0:
             acc = (st.session_state.accuracy_stats["correct"] / st.session_state.accuracy_stats["total"]) * 100
             st.write(f"🎯 Độ chính xác: **{acc:.1f}%** ({st.session_state.accuracy_stats['correct']}/{st.session_state.accuracy_stats['total']})")
+            
+            # Hiển thị 10 kỳ gần nhất
+            if st.session_state.accuracy_stats["last_10"]:
+                last_10_acc = sum(st.session_state.accuracy_stats["last_10"]) / len(st.session_state.accuracy_stats["last_10"]) * 100
+                st.write(f"📈 10 kỳ gần: **{last_10_acc:.1f}%**")
         
         c1, c2 = st.columns(2)
         btn_save = c1.button("🚀 KÍCH HOẠT AI")
@@ -367,20 +360,23 @@ with st.container():
         
         # Thêm nút xác nhận kết quả
         if "last_prediction" in st.session_state:
-            if st.button("✅ XÁC NHẬN KẾT QUẢ ĐÚNG", key="confirm_correct"):
-                st.session_state.accuracy_stats["correct"] += 1
-                st.session_state.accuracy_stats["total"] += 1
-                st.session_state.accuracy_stats["last_10"].append(1)
-                if len(st.session_state.accuracy_stats["last_10"]) > 10:
-                    st.session_state.accuracy_stats["last_10"].pop(0)
-                st.rerun()
+            col_confirm1, col_confirm2 = st.columns(2)
+            with col_confirm1:
+                if st.button("✅ ĐÚNG", key="confirm_correct", use_container_width=True):
+                    st.session_state.accuracy_stats["correct"] += 1
+                    st.session_state.accuracy_stats["total"] += 1
+                    st.session_state.accuracy_stats["last_10"].append(1)
+                    if len(st.session_state.accuracy_stats["last_10"]) > 10:
+                        st.session_state.accuracy_stats["last_10"].pop(0)
+                    st.rerun()
             
-            if st.button("❌ XÁC NHẬN KẾT QUẢ SAI", key="confirm_wrong"):
-                st.session_state.accuracy_stats["total"] += 1
-                st.session_state.accuracy_stats["last_10"].append(0)
-                if len(st.session_state.accuracy_stats["last_10"]) > 10:
-                    st.session_state.accuracy_stats["last_10"].pop(0)
-                st.rerun()
+            with col_confirm2:
+                if st.button("❌ SAI", key="confirm_wrong", use_container_width=True):
+                    st.session_state.accuracy_stats["total"] += 1
+                    st.session_state.accuracy_stats["last_10"].append(0)
+                    if len(st.session_state.accuracy_stats["last_10"]) > 10:
+                        st.session_state.accuracy_stats["last_10"].pop(0)
+                    st.rerun()
 
 if btn_reset:
     st.session_state.history = []
@@ -405,10 +401,12 @@ if btn_save:
         
         # Thu thập dữ liệu phân tích
         markov_probs = predictor.markov_chain_analysis()
-        cycles = predictor.detect_cycles()
+        cycles = predictor.detect_cycles_simple()
         entropy_data = predictor.entropy_analysis()
         warnings = predictor.early_warning_system()
         hot_cold = predictor.calculate_hot_cold_numbers()
+        patterns = predictor.pattern_recognition_simple()
+        ma_prediction = predictor.predict_by_ma()
         
         # Bước 3: Phân tích với Gemini
         prompt = f"""
@@ -431,7 +429,15 @@ if btn_save:
         - Số nóng (hot): {hot_cold['hot']}
         - Số lạnh (cold): {hot_cold['cold']}
         
-        5. CẢNH BÁO SỚM:
+        5. PATTERN HIỆN TẠI:
+        - Xu hướng: {patterns.get('trend', 'Không rõ')}
+        - Số trùng: {patterns.get('duplicate_trend', 'Không rõ')}
+        - Chẵn/lẻ: {patterns.get('even_odd', 'Không rõ')}
+        
+        6. DỰ ĐOÁN MA:
+        - Moving Average: {ma_prediction if ma_prediction else 'Đang học'}
+        
+        7. CẢNH BÁO SỚM:
         {chr(10).join(warnings) if warnings else '- Không phát hiện bất thường'}
         
         Dữ liệu lịch sử 120 kỳ gần nhất: {st.session_state.history[-120:]}
@@ -457,10 +463,10 @@ if btn_save:
            - THEO DÕI: Khi cầu đang hình thành
            - DỪNG: Khi phát hiện cầu lừa, entropy cao
         
-        TRẢ VỀ JSON CHÍNH XÁC:
+        TRẢ VỀ JSON CHÍNH XÁC (KHÔNG THÊM BẤT KỲ CHỮ NÀO NGOÀI JSON):
         {{
-            "main_3": "5 số dự đoán chính (phân tách bằng dấu cách nếu cần)",
-            "support_4": "5 số dự đoán phụ (phân tách bằng dấu cách nếu cần)",
+            "main_3": "3 số dự đoán chính (ví dụ: 123)",
+            "support_4": "4 số dự đoán phụ (ví dụ: 4567)",
             "decision": "ĐÁNH/DỪNG/THEO DÕI/CẢNH BÁO ĐẢO CẦU",
             "logic": "Phân tích chi tiết, có tham chiếu đến các thuật toán, lý do chốt số",
             "color": "Green/Red/Yellow",
@@ -489,15 +495,31 @@ if btn_save:
             counts = Counter(all_digits).most_common(10)
             top_nums = [x[0] for x in counts]
             
-            # Kết hợp với hot numbers
-            main_nums = list(set(top_nums[:3] + [str(x) for x in hot_cold['hot'][:2] if hot_cold['hot']]))
-            support_nums = list(set(top_nums[3:7] + [str(x) for x in hot_cold['cold'][:2] if hot_cold['cold']]))
+            # Kết hợp với hot numbers và MA
+            main_nums = []
+            if ma_prediction:
+                main_nums.extend(list(ma_prediction[:3]))
+            main_nums.extend([str(x) for x in hot_cold['hot'][:2] if hot_cold['hot']])
+            main_nums.extend(top_nums[:2])
+            
+            support_nums = []
+            support_nums.extend([str(x) for x in hot_cold['cold'][:2] if hot_cold['cold']])
+            support_nums.extend(top_nums[3:7])
+            
+            # Loại bỏ trùng và lấy đủ số
+            main_nums = list(dict.fromkeys(main_nums))[:3]
+            support_nums = list(dict.fromkeys(support_nums))[:4]
+            
+            while len(main_nums) < 3:
+                main_nums.append(str(np.random.randint(0, 10)))
+            while len(support_nums) < 4:
+                support_nums.append(str(np.random.randint(0, 10)))
             
             st.session_state.last_prediction = {
-                "main_3": "".join(main_nums[:3]).ljust(3, '0')[:3],
-                "support_4": "".join(support_nums[:4]).ljust(4, '0')[:4],
+                "main_3": "".join(main_nums),
+                "support_4": "".join(support_nums),
                 "decision": "CẢNH BÁO ĐẢO CẦU" if len(warnings) > 2 else "THEO DÕI NHỊP",
-                "logic": f"Ma trận tần suất + Phân tích entropy {entropy_data['avg_entropy']:.2f}. Cảnh báo: {len(warnings)} dấu hiệu.",
+                "logic": f"Ma trận tần suất + Phân tích entropy {entropy_data['avg_entropy']:.2f}. Cảnh báo: {len(warnings)} dấu hiệu. Pattern: {patterns.get('trend', 'Không rõ')}",
                 "color": "Yellow" if len(warnings) < 3 else "Red",
                 "confidence": 85 - len(warnings)*5,
                 "warning_level": "CAO" if len(warnings) > 2 else "TRUNG BÌNH"
@@ -529,12 +551,12 @@ if "last_prediction" in st.session_state:
     col_main, col_supp = st.columns([1.5, 1])
     with col_main:
         st.markdown(f"<p style='color:#8b949e; text-align:center; font-weight:bold;'>🎯 3 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
-        main_display = res['main_3'] if len(res['main_3']) >= 3 else res['main_3'].ljust(3, 'X')
+        main_display = res['main_3'] if len(res['main_3']) >= 3 else res['main_3'].ljust(3, '0')
         st.markdown(f"<div class='num-box'>{main_display}</div>", unsafe_allow_html=True)
     
     with col_supp:
         st.markdown(f"<p style='color:#8b949e; text-align:center; font-weight:bold;'>🛡️ 4 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
-        supp_display = res['support_4'] if len(res['support_4']) >= 4 else res['support_4'].ljust(4, 'X')
+        supp_display = res['support_4'] if len(res['support_4']) >= 4 else res['support_4'].ljust(4, '0')
         st.markdown(f"<div class='lot-box'>{supp_display}</div>", unsafe_allow_html=True)
     
     st.divider()
@@ -587,16 +609,13 @@ if st.session_state.history:
                 predictor = AdvancedPredictor(st.session_state.history)
                 hot_cold = predictor.calculate_hot_cold_numbers()
                 
-                col_hot, col_cold = st.columns(2)
-                with col_hot:
-                    st.markdown("### 🔥 Số nóng (Hot)")
-                    for num in hot_cold['hot']:
-                        st.markdown(f"<span class='hot-number'>{num}</span>", unsafe_allow_html=True)
+                st.markdown("### 🔥 Số nóng (Hot)")
+                hot_html = " ".join([f"<span class='hot-number'>{num}</span>" for num in hot_cold['hot']])
+                st.markdown(hot_html, unsafe_allow_html=True)
                 
-                with col_cold:
-                    st.markdown("### ❄️ Số lạnh (Cold)")
-                    for num in hot_cold['cold']:
-                        st.markdown(f"<span class='cold-number'>{num}</span>", unsafe_allow_html=True)
+                st.markdown("### ❄️ Số lạnh (Cold)")
+                cold_html = " ".join([f"<span class='cold-number'>{num}</span>" for num in hot_cold['cold']])
+                st.markdown(cold_html, unsafe_allow_html=True)
         
         with tab2:
             predictor = AdvancedPredictor(st.session_state.history)
@@ -617,7 +636,7 @@ if st.session_state.history:
         
         with tab3:
             predictor = AdvancedPredictor(st.session_state.history)
-            cycles = predictor.detect_cycles()
+            cycles = predictor.detect_cycles_simple()
             
             if cycles:
                 st.write("**Chu kỳ phát hiện:**")
