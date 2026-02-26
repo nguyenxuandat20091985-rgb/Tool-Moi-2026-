@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 from datetime import datetime
+import random
 
 # ================= CẤU HÌNH HỆ THỐNG TITAN v26.0 - HỌC TỪ SAI LẦM =================
 API_KEY = "AIzaSyB5PRp04XlMHKl3oGfCRbsKXjlTA-CZifc"
@@ -66,15 +67,14 @@ class RealCatchPredictor:
     
     def __init__(self, history):
         self.history = history
-        self.analyze_patterns()
+        self.patterns = self.analyze_patterns()
     
     def analyze_patterns(self):
         """Phân tích tất cả patterns có thể"""
         if len(self.history) < 10:
-            self.patterns = {}
-            return
+            return {}
         
-        self.patterns = {
+        patterns = {
             'bệt': self.detect_bet(),
             'đảo': self.detect_dao(),
             'xiên': self.detect_xien(),
@@ -84,6 +84,7 @@ class RealCatchPredictor:
             'cầu_kẹp': self.detect_cau_kep(),
             'vị_trí': self.analyze_position()
         }
+        return patterns
     
     def detect_bet(self):
         """Phát hiện cầu bệt - số về liên tiếp"""
@@ -239,93 +240,94 @@ class RealCatchPredictor:
             top_3 = [str(x[0]) for x in counts.most_common(3)]
             
             # Số vừa về
-        last_value = self.history[-1][pos] if self.history else "?"
+            last_value = self.history[-1][pos] if self.history else "?"
+            
+            position_stats[f"pos_{pos+1}"] = {
+                'top': top_3,
+                'last': last_value,
+                'counts': dict(counts.most_common(5))
+            }
         
-        position_stats[f"pos_{pos+1}"] = {
-            'top': top_3,
-            'last': last_value,
-            'counts': dict(counts.most_common(5))
+        return position_stats
+    
+    def suggest_numbers(self):
+        """Đề xuất số dựa trên patterns phát hiện"""
+        suggestions = []
+        
+        # Ưu tiên số bệt
+        if self.patterns.get('bệt'):
+            suggestions.extend(self.patterns['bệt'])
+        
+        # Thêm lô rơi
+        if self.patterns.get('lô_rơi'):
+            suggestions.extend(self.patterns['lô_rơi'])
+        
+        # Thêm số từ vị trí hot
+        pos_stats = self.patterns.get('vị_trí', {})
+        for pos_data in pos_stats.values():
+            suggestions.extend(pos_data.get('top', [])[:2])
+        
+        # Loại bỏ trùng và lấy 7 số
+        suggestions = list(dict.fromkeys(suggestions))[:7]
+        
+        # Nếu thiếu, thêm số random từ 0-9
+        while len(suggestions) < 7:
+            rand = str(random.randint(0, 9))
+            if rand not in suggestions:
+                suggestions.append(rand)
+        
+        return {
+            'main': ''.join(suggestions[:3]),
+            'support': ''.join(suggestions[3:7])
         }
     
-    return position_stats
-
-def suggest_numbers(self):
-    """Đề xuất số dựa trên patterns phát hiện"""
-    suggestions = []
-    
-    # Ưu tiên số bệt
-    if self.patterns.get('bệt'):
-        suggestions.extend(self.patterns['bệt'])
-    
-    # Thêm lô rơi
-    if self.patterns.get('lô_rơi'):
-        suggestions.extend(self.patterns['lô_rơi'])
-    
-    # Thêm số từ vị trí hot
-    pos_stats = self.patterns.get('vị_trí', {})
-    for pos_data in pos_stats.values():
-        suggestions.extend(pos_data.get('top', [])[:2])
-    
-    # Loại bỏ trùng và lấy 7 số
-    suggestions = list(dict.fromkeys(suggestions))[:7]
-    
-    # Nếu thiếu, thêm số random từ 0-9
-    while len(suggestions) < 7:
-        import random
-        rand = str(random.randint(0, 9))
-        if rand not in suggestions:
-            suggestions.append(rand)
-    
-    return {
-        'main': ''.join(suggestions[:3]),
-        'support': ''.join(suggestions[3:7])
-    }
-
-def analyze_failures(self):
-    """Phân tích lý do thất bại để học hỏi"""
-    if 'accuracy_log' not in st.session_state:
-        return {}
-    
-    log = st.session_state.accuracy_log
-    if len(log.get('predictions', [])) < 5:
-        return {}
-    
-    # Lấy 10 lần dự đoán gần nhất
-    recent = log['predictions'][-10:]
-    
-    # Phân tích pattern thất bại
-    failures = [p for p in recent if not p.get('correct', False)]
-    
-    if not failures:
-        return {"message": "Đang chạy tốt"}
-    
-    # Tìm nguyên nhân
-    reasons = []
-    for f in failures:
-        if f.get('predicted') and f.get('actual'):
-            # So sánh dự đoán vs thực tế
-            predicted = f['predicted']
-            actual = f['actual']
-            
-            # Đếm số đúng
-            correct_count = sum(1 for i in range(min(3, len(predicted))) 
-                              if i < len(actual) and predicted[i] == actual[i])
-            
-            if correct_count == 0:
-                reasons.append("Sai hoàn toàn")
-            elif correct_count == 1:
-                reasons.append("Chỉ đúng 1 số")
-            elif correct_count == 2:
-                reasons.append("Đúng 2 số")
-    
-    # Thống kê
-    reason_counts = Counter(reasons)
-    
-    return {
-        "failure_rate": len(failures)/len(recent)*100,
-        "top_reason": reason_counts.most_common(1)[0][0] if reason_counts else "Không rõ",
-        "suggestion": "Cần tập trung vào số bệt" if "Sai hoàn toàn" in reasons else "Đang cải thiện"
-    }
+    def analyze_failures(self):
+        """Phân tích lý do thất bại để học hỏi"""
+        if 'accuracy_log' not in st.session_state:
+            return {}
+        
+        log = st.session_state.accuracy_log
+        if len(log.get('predictions', [])) < 5:
+            return {}
+        
+        # Lấy 10 lần dự đoán gần nhất
+        recent = log['predictions'][-10:]
+        
+        # Phân tích pattern thất bại
+        failures = [p for p in recent if not p.get('correct', False)]
+        
+        if not failures:
+            return {"message": "Đang chạy tốt"}
+        
+        # Tìm nguyên nhân
+        reasons = []
+        for f in failures:
+            if f.get('predicted') and f.get('actual'):
+                # So sánh dự đoán vs thực tế
+                predicted = f['predicted']
+                actual = f['actual']
+                
+                # Đếm số đúng
+                correct_count = 0
+                for i in range(min(3, len(predicted))):
+                    if i < len(actual) and predicted[i] == actual[i]:
+                        correct_count += 1
+                
+                if correct_count == 0:
+                    reasons.append("Sai hoàn toàn")
+                elif correct_count == 1:
+                    reasons.append("Chỉ đúng 1 số")
+                elif correct_count == 2:
+                    reasons.append("Đúng 2 số")
+        
+        # Thống kê
+        reason_counts = Counter(reasons)
+        
+        return {
+            "failure_rate": (len(failures)/len(recent))*100 if recent else 0,
+            "top_reason": reason_counts.most_common(1)[0][0] if reason_counts else "Không rõ",
+            "suggestion": "Cần tập trung vào số bệt" if "Sai hoàn toàn" in reasons else "Đang cải thiện"
+        }
 
 # ================= GIAO DIỆN =================
 st.set_page_config(page_title="TITAN v26.0 - HỌC TỪ THẤT BẠI", layout="wide")
@@ -366,6 +368,10 @@ st.markdown("""
         background: #1a1f2e; padding: 15px; border-radius: 10px;
         border-left: 5px solid #ff5858; margin: 10px 0;
     }
+    .success-analysis {
+        background: #1a2e1a; padding: 15px; border-radius: 10px;
+        border-left: 5px solid #238636; margin: 10px 0;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -384,15 +390,16 @@ with col_stats:
     
     # Tính độ chính xác
     if st.session_state.accuracy_log.get('predictions'):
-        total = len(st.session_state.accuracy_log['predictions'])
-        correct = sum(1 for p in st.session_state.accuracy_log['predictions'] if p.get('correct', False))
+        predictions = st.session_state.accuracy_log['predictions']
+        total = len(predictions)
+        correct = sum(1 for p in predictions if p.get('correct', False))
         acc = (correct/total*100) if total > 0 else 0
         
         st.metric("🎯 Độ chính xác", f"{acc:.1f}%", 
                  delta=f"{correct}/{total}")
         
         # 5 kỳ gần nhất
-        last_5 = st.session_state.accuracy_log['predictions'][-5:]
+        last_5 = predictions[-5:]
         if last_5:
             last_5_correct = sum(1 for p in last_5 if p.get('correct', False))
             st.metric("📈 5 kỳ gần", f"{last_5_correct}/5")
@@ -406,8 +413,11 @@ with col_stats:
 if reset_btn:
     st.session_state.history = []
     st.session_state.accuracy_log = {"predictions": [], "stats": {}}
-    if os.path.exists(DB_FILE): os.remove(DB_FILE)
-    if os.path.exists(ACCURACY_FILE): os.remove(ACCURACY_FILE)
+    st.session_state.last_prediction = None
+    if os.path.exists(DB_FILE): 
+        os.remove(DB_FILE)
+    if os.path.exists(ACCURACY_FILE): 
+        os.remove(ACCURACY_FILE)
     st.success("✅ Đã reset toàn bộ dữ liệu")
     st.rerun()
 
@@ -424,23 +434,16 @@ if analyze_btn and raw_input:
         
         save_db(st.session_state.history)
         
-        # Phân tích patterns
-        predictor = RealCatchPredictor(st.session_state.history)
-        
-        # Đề xuất số
-        suggestion = predictor.suggest_numbers()
-        
-        # Phân tích thất bại
-        failure_analysis = predictor.analyze_failures()
-        
-        # Kiểm tra nếu có dự đoán trước đó để so sánh
+        # KIỂM TRA ĐỘ CHÍNH XÁC CỦA DỰ ĐOÁN TRƯỚC
         if st.session_state.last_prediction and new_numbers:
             last_pred = st.session_state.last_prediction
             actual = new_numbers[0]  # Lấy số mới nhất
             
             # Kiểm tra độ chính xác
-            main_correct = sum(1 for i in range(min(3, len(last_pred['main_3']))) 
-                             if i < len(actual) and last_pred['main_3'][i] == actual[i])
+            main_correct = 0
+            for i in range(min(3, len(last_pred['main_3']))):
+                if i < len(actual) and last_pred['main_3'][i] == actual[i]:
+                    main_correct += 1
             
             # Lưu vào log
             st.session_state.accuracy_log['predictions'].append({
@@ -449,7 +452,7 @@ if analyze_btn and raw_input:
                 'actual': actual,
                 'correct': main_correct >= 2,  # Đúng 2/3 số là tạm chấp nhận
                 'main_correct': main_correct,
-                'patterns': predictor.patterns
+                'all_correct': last_pred['main_3'] == actual[:3]
             })
             
             # Giới hạn log
@@ -459,16 +462,44 @@ if analyze_btn and raw_input:
             
             save_accuracy_log(st.session_state.accuracy_log)
         
+        # Phân tích patterns mới
+        predictor = RealCatchPredictor(st.session_state.history)
+        
+        # Đề xuất số
+        suggestion = predictor.suggest_numbers()
+        
+        # Phân tích thất bại
+        failure_analysis = predictor.analyze_failures()
+        
+        # Quyết định dựa trên patterns
+        bet_count = len(predictor.patterns.get('bệt', []))
+        lo_roi_count = len(predictor.patterns.get('lô_rơi', []))
+        
+        if bet_count >= 2:
+            decision = "ĐÁNH MẠNH"
+            color = "Green"
+            confidence = 90 + bet_count*2
+        elif bet_count >= 1 or lo_roi_count >= 2:
+            decision = "ĐÁNH"
+            color = "Green"
+            confidence = 85
+        elif len(predictor.patterns.get('cầu_kẹp', [])) > 0:
+            decision = "THEO DÕI"
+            color = "Yellow"
+            confidence = 75
+        else:
+            decision = "CẢNH BÁO - CHỜ CẦU MỚI"
+            color = "Red"
+            confidence = 50
+        
         # Lưu dự đoán mới
         st.session_state.last_prediction = {
             'main_3': suggestion['main'],
             'support_4': suggestion['support'],
-            'decision': 'ĐÁNH' if len(predictor.patterns.get('bệt', [])) > 0 else 'THEO DÕI',
-            'logic': f"Phát hiện: {len(predictor.patterns.get('bệt', []))} số bệt, "
-                    f"{len(predictor.patterns.get('lô_rơi', []))} lô rơi, "
-                    f"{len(predictor.patterns.get('cầu_kẹp', []))} cầu kẹp",
-            'color': 'Green' if len(predictor.patterns.get('bệt', [])) > 1 else 'Yellow',
-            'confidence': 85 + len(predictor.patterns.get('bệt', []))*5,
+            'decision': decision,
+            'logic': f"Phát hiện: {bet_count} số bệt, {lo_roi_count} lô rơi",
+            'color': color,
+            'confidence': min(confidence, 99),
             'patterns': predictor.patterns,
             'failure_analysis': failure_analysis
         }
@@ -536,31 +567,43 @@ if st.session_state.last_prediction:
         else:
             st.write("Không có")
     
+    # Hiển thị thêm thông tin
+    with st.expander("📊 Xem thêm phân tích"):
+        st.json(patterns)
+    
     # Phân tích thất bại
     failure = res.get('failure_analysis', {})
-    if failure and failure.get('failure_rate', 0) > 50:
-        st.markdown(f"""
-            <div class='failure-analysis'>
-                <b>⚠️ PHÂN TÍCH THẤT BẠI:</b><br>
-                Tỷ lệ sai: {failure.get('failure_rate', 0):.1f}%<br>
-                Nguyên nhân chính: {failure.get('top_reason', 'Không rõ')}<br>
-                <i>{failure.get('suggestion', 'Đang điều chỉnh...')}</i>
-            </div>
-        """, unsafe_allow_html=True)
+    if failure:
+        if failure.get('failure_rate', 0) > 50:
+            st.markdown(f"""
+                <div class='failure-analysis'>
+                    <b>⚠️ PHÂN TÍCH THẤT BẠI:</b><br>
+                    Tỷ lệ sai: {failure.get('failure_rate', 0):.1f}%<br>
+                    Nguyên nhân chính: {failure.get('top_reason', 'Không rõ')}<br>
+                    <i>{failure.get('suggestion', 'Đang điều chỉnh...')}</i>
+                </div>
+            """, unsafe_allow_html=True)
+        elif failure.get('failure_rate', 0) < 30:
+            st.markdown(f"""
+                <div class='success-analysis'>
+                    <b>✅ ĐANG CHẠY TỐT:</b><br>
+                    Tỷ lệ đúng: {100 - failure.get('failure_rate', 0):.1f}%<br>
+                </div>
+            """, unsafe_allow_html=True)
     
     st.markdown(f"**📝 Logic:** {res['logic']}")
     
     # Nút xác nhận kết quả
     st.divider()
-    st.markdown("### ✅ XÁC NHẬN KẾT QUẢ")
-    st.markdown("Sau khi có kết quả thật, hãy nhập số và nhấn **PHÂN TÍCH** để AI học từ kết quả.")
+    st.info("📌 **CÁCH DÙNG:** Sau khi có kết quả thật, nhập số vào ô trên và nhấn PHÂN TÍCH để AI học từ kết quả.")
     
     st.markdown("</div>", unsafe_allow_html=True)
 
 # HIỂN THỊ LỊCH SỬ
 if st.session_state.accuracy_log.get('predictions'):
-    with st.expander("📜 LỊCH SỬ DỰ ĐOÁN"):
+    with st.expander("📜 LỊCH SỬ DỰ ĐOÁN (10 GẦN NHẤT)"):
         for pred in st.session_state.accuracy_log['predictions'][-10:]:
             correct_icon = "✅" if pred.get('correct') else "❌"
+            stars = "⭐" * pred.get('main_correct', 0)
             st.write(f"{correct_icon} **{pred['time']}** - Dự đoán: {pred['predicted']} | "
-                    f"Thực tế: {pred['actual']} | Đúng: {pred.get('main_correct', 0)}/3 số")
+                    f"Thực tế: {pred['actual']} | Đúng: {pred.get('main_correct', 0)}/3 {stars}")
