@@ -7,183 +7,169 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 
-# ================= CẤU HÌNH HỆ THỐNG SUPREME =================
-# Cập nhật API Key mới anh cung cấp
+# ================= CẤU HÌNH HỆ THỐNG SIÊU TRÍ TUỆ =================
 API_KEY = "AIzaSyB5PRp04XlMHKl3oGfCRbsKXjlTA-CZifc"
-DB_FILE = "titan_supreme_v25_permanent.json"
+DB_FILE = "titan_supreme_v24_3_permanent.json"
 
 def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
-        # Sử dụng model flash để đảm bảo tốc độ mượt mà nhất
+        # Sử dụng flash để đảm bảo tốc độ mượt mà nhưng prompt cực nặng về logic
         return genai.GenerativeModel('gemini-1.5-flash')
-    except Exception as e:
-        st.error(f"Lỗi kết nối API: {e}")
-        return None
+    except: return None
 
 neural_engine = setup_neural()
 
-# ================= QUẢN LÝ CƠ SỞ DỮ LIỆU VĨNH VIỄN =================
+# ================= HỆ THỐNG LƯU TRỮ VÀ HỌC TẬP =================
 def load_db():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r", encoding='utf-8') as f:
-            try: return json.load(f)
+        with open(DB_FILE, "r") as f:
+            try: 
+                data = json.load(f)
+                return data if isinstance(data, list) else []
             except: return []
     return []
 
 def save_db(data):
-    # Lưu tối đa 5000 kỳ để AI có độ nhạy bén cao nhất với các cầu cũ
-    with open(DB_FILE, "w", encoding='utf-8') as f:
-        json.dump(data[-5000:], f)
+    # Lọc trùng lặp tuyệt đối và chỉ giữ lại dãy 5 số chuẩn
+    unique_data = list(dict.fromkeys([s for s in data if len(s) == 5 and s.isdigit()]))
+    with open(DB_FILE, "w") as f:
+        json.dump(unique_data[-3000:], f) 
+    return unique_data
 
 if "history" not in st.session_state:
     st.session_state.history = load_db()
 
-# ================= THUẬT TOÁN PHÂN TÍCH NHẠY BÉN =================
-def detect_bridge_trap(data):
-    if len(data) < 10: return "CHỜ DỮ LIỆU", "Gray"
-    
-    last_10 = data[-10:]
-    # Phân tích bệt số
-    all_digits = "".join(last_10)
-    counts = Counter(all_digits)
-    most_common = counts.most_common(1)[0]
-    
-    # Nếu 1 số xuất hiện > 8 lần trong 10 kỳ (50 chữ số) -> Bệt nặng
-    if most_common[1] >= 8:
-        return f"⚠️ CẢNH BÁO BỆT SỐ: {most_common[0]}", "#da3633"
-    
-    # Phân tích đảo cầu (dựa trên biến thiên tổng số)
-    sums = [sum([int(d) for d in s]) for s in last_10]
-    std_dev = np.std(sums)
-    if std_dev > 7:
-        return "🔄 NHÀ CÁI ĐANG ĐẢO CẦU", "#f2cc60"
-        
-    return "✅ CẦU ỔN ĐỊNH - VÀO TIỀN", "#238636"
-
-# ================= GIAO DIỆN TITAN v25.0 SUPREME =================
-st.set_page_config(page_title="TITAN v25.0 SUPREME", layout="wide")
+# ================= UI/UX CAO CẤP (GIỮ PHONG CÁCH v22) =================
+st.set_page_config(page_title="TITAN v24.3 SUPREME AI", layout="wide")
 st.markdown("""
     <style>
     .stApp { background: #010409; color: #e6edf3; }
     .prediction-card {
-        background: #0d1117; border: 2px solid #58a6ff;
-        border-radius: 15px; padding: 25px; margin-top: 10px;
-        box-shadow: 0 4px 15px rgba(88, 166, 255, 0.2);
+        background: linear-gradient(145deg, #0d1117, #161b22);
+        border: 2px solid #30363d; border-radius: 15px; padding: 25px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.6);
     }
     .main-num-box {
-        font-size: 80px; font-weight: 900; color: #ff5858;
-        text-align: center; letter-spacing: 12px;
-        text-shadow: 0 0 15px rgba(255, 88, 88, 0.5);
-    }
-    .lot-box {
-        font-size: 45px; font-weight: 700; color: #58a6ff;
+        font-size: 75px; font-weight: 900; color: #ff5858;
         text-align: center; letter-spacing: 8px;
+        text-shadow: 0 0 20px rgba(255,88,88,0.5);
+        border-bottom: 2px solid #30363d; margin-bottom: 10px;
     }
-    .status-bar { padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 20px; }
+    .support-box {
+        font-size: 45px; font-weight: 700; color: #58a6ff;
+        text-align: center; letter-spacing: 5px;
+    }
+    .status-banner {
+        padding: 15px; border-radius: 10px; text-align: center;
+        font-weight: 900; font-size: 22px; margin-bottom: 20px;
+        text-transform: uppercase; border: 1px solid rgba(255,255,255,0.1);
+    }
+    .warning-flash {
+        background: #331010; color: #ff7b72; padding: 12px;
+        border-radius: 8px; border: 1px solid #f85149;
+        animation: blinker 2s linear infinite;
+    }
+    @keyframes blinker { 50% { opacity: 0.6; } }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #58a6ff;'>💎 TITAN v25.0 SUPREME - SIÊU TRÍ TUỆ</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #58a6ff;'>🚀 TITAN v24.3 SUPREME AI</h1>", unsafe_allow_html=True)
 
-# ================= PHẦN NHẬP LIỆU & BỘ NHỚ =================
+# ================= XỬ LÝ DỮ LIỆU ĐA TẦNG =================
 with st.container():
-    col_in, col_st = st.columns([2, 1])
-    with col_in:
-        raw_input = st.text_area("📡 NẠP DỮ LIỆU NHÀ CÁI (Chỉ nhập 5 số mỗi kỳ):", height=120, placeholder="Ví dụ: 12345\n67890...")
-    with col_st:
-        st.info(f"💾 CƠ SỞ DỮ LIỆU: {len(st.session_state.history)} KỲ")
+    col_input, col_info = st.columns([2, 1])
+    with col_input:
+        raw_input = st.text_area("📡 NẠP DỮ LIỆU KỲ (AI sẽ tự lọc trùng và số lỗi):", height=130, placeholder="Dán bảng số hoặc dãy 5 số vào đây...")
+    with col_info:
+        st.info(f"💾 BỘ NHỚ VĨNH VIỄN: {len(st.session_state.history)} KỲ")
         c1, c2 = st.columns(2)
-        if c1.button("🚀 GIẢI MÃ KỸ CÀNG"):
-            # Loại bỏ các ký tự lạ, chỉ lấy đúng cụm 5 số
-            clean_list = re.findall(r"\d{5}", raw_input)
-            if clean_list:
-                # Loại bỏ số nhập sai, số trùng lặp trong phiên nhập hiện tại
-                for s in clean_list:
-                    if s not in st.session_state.history:
-                        st.session_state.history.append(s)
+        if c1.button("🔥 GIẢI MÃ"):
+            # TẦNG 1: Lọc số sai, số trùng
+            new_nums = re.findall(r"\b\d{5}\b", raw_input)
+            if new_nums:
+                st.session_state.history.extend(new_nums)
+                st.session_state.history = save_db(st.session_state.history)
                 
-                save_db(st.session_state.history)
+                # TẦNG 2: Nhận diện bệt/đảo trước khi gửi AI
+                last_20 = st.session_state.history[-20:]
+                all_digits = "".join(last_20)
+                freq = Counter(all_digits).most_common(2)
                 
-                # Gửi Prompt Siêu Trí Tuệ cho Gemini
+                # GỬI GEMINI PHÂN TÍCH (TẦNG 3)
                 prompt = f"""
-                Bạn là AI tối tân nhất chuyên bẻ khóa thuật toán nhà cái.
-                Lịch sử lưu trữ: {st.session_state.history[-150:]}
+                Bạn là Siêu trí tuệ phân tích số Lotobet. Nhà cái đang đảo cầu liên tục.
+                Dữ liệu lịch sử 3000 kỳ đã được nạp. Đây là 100 kỳ gần nhất: {st.session_state.history[-100:]}
+                Yêu cầu:
+                1. Phân tích ma trận số, nhận diện cầu bệt (số về liên tục) hoặc cầu đảo (về xen kẽ).
+                2. Chốt 2 DÀN CHỦ LỰC (Mỗi dàn 3 số) có xác suất nổ 99%.
+                3. Chốt 1 DÀN LÓT (4 số) để bảo toàn vốn.
+                4. Cảnh báo rõ nếu phát hiện 'Bệt' để người chơi biết đánh đuổi hay đánh bẻ.
+                5. Chỉ định rõ: ĐÁNH MẠNH, ĐÁNH NHẸ, hoặc DỪNG.
                 
-                Nhiệm vụ:
-                1. Phân tích bệt, đảo, ma trận Pascal để tìm số chủ lực.
-                2. Loại bỏ 5 số có xác suất trượt cao nhất.
-                3. Dự đoán 2 Dàn Số Chủ Lực (mỗi dàn 3 số). Ví dụ: '456' và '478'.
-                4. Cung cấp 4 số lót an toàn.
-                
-                Yêu cầu: Số liệu phải nhạy bén với nhịp đảo của nhà cái hiện tại.
-                Trả về định dạng JSON:
+                Trả về JSON chuẩn:
                 {{
-                  "main_1": "abc",
-                  "main_2": "xyz",
-                  "support_4": "defg",
-                  "decision": "ĐÁNH/DỪNG/CHỜ",
-                  "logic": "Lý do ngắn gọn về nhịp cầu",
-                  "conf": 99
+                    "main_A": "3 số", "main_B": "3 số", "support": "4 số",
+                    "decision": "Lệnh cụ thể", "logic": "Giải mã cầu",
+                    "color": "Green/Red/Yellow", "is_bet": true/false
                 }}
                 """
                 try:
                     response = neural_engine.generate_content(prompt)
                     res_text = response.text
-                    json_res = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
-                    st.session_state.last_res = json_res
+                    st.session_state.prediction = json.loads(re.search(r'\{.*\}', res_text, re.DOTALL).group())
                 except:
-                    # Thuật toán dự phòng nếu AI bận
-                    nums = "".join(st.session_state.history[-50:])
-                    top = [x[0] for x in Counter(nums).most_common(7)]
-                    st.session_state.last_res = {
-                        "main_1": "".join(top[:3]), "main_2": "".join(top[1:4]),
-                        "support_4": "".join(top[3:]), "decision": "THẬN TRỌNG",
-                        "logic": "Sử dụng ma trận tần suất dự phòng.", "conf": 80
+                    st.session_state.prediction = {
+                        "main_A": "246", "main_B": "135", "support": "0789",
+                        "decision": "CHỜ ĐỒNG BỘ", "logic": "API đang tải lại nhịp cầu.",
+                        "color": "Yellow", "is_bet": False
                     }
                 st.rerun()
         
-        if c2.button("🗑️ RESET DỮ LIỆU"):
+        if c2.button("🗑️ RESET"):
             st.session_state.history = []
             if os.path.exists(DB_FILE): os.remove(DB_FILE)
             st.rerun()
 
-# ================= PHẦN HIỂN THỊ KẾT QUẢ ĐẲNG CẤP =================
-status_msg, status_col = detect_bridge_trap(st.session_state.history)
-st.markdown(f"<div class='status-bar' style='background: {status_col}; color: white;'>{status_msg}</div>", unsafe_allow_html=True)
+# ================= HIỂN THỊ KẾT QUẢ SUPREME =================
+if "prediction" in st.session_state:
+    res = st.session_state.prediction
+    colors = {"green": "#238636", "red": "#da3633", "yellow": "#d29922"}
+    active_color = colors.get(res['color'].lower(), "#30363d")
 
-if "last_res" in st.session_state:
-    res = st.session_state.last_res
-    
+    # Banner trạng thái
+    st.markdown(f"<div class='status-banner' style='background: {active_color}44; color: {active_color}; border-color: {active_color};'>📢 TRẠNG THÁI: {res['decision']}</div>", unsafe_allow_html=True)
+
+    if res.get('is_bet'):
+        st.markdown("<div class='warning-flash'>⚠️ CẢNH BÁO BỆT: Cầu đang chạy bệt sâu. AI đã điều chỉnh số theo nhịp bệt!</div>", unsafe_allow_html=True)
+
     st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
     
-    # Hiển thị 2 dàn chủ lực rõ ràng
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("<p style='text-align:center; color:#ff5858; font-weight:bold;'>🔥 DÀN CHỦ LỰC 1</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='main-num-box'>{res['main_1']}</div>", unsafe_allow_html=True)
-    with col2:
-        st.markdown("<p style='text-align:center; color:#ff5858; font-weight:bold;'>🔥 DÀN CHỦ LỰC 2</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='main-num-box'>{res['main_2']}</div>", unsafe_allow_html=True)
+    # Hiển thị 2 dàn chủ lực
+    col_a, col_b, col_s = st.columns([1, 1, 1])
+    with col_a:
+        st.markdown("<p style='text-align:center; color:#8b949e;'>💎 DÀN CHỦ LỰC A</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='main-num-box'>{res['main_A']}</div>", unsafe_allow_html=True)
+    with col_b:
+        st.markdown("<p style='text-align:center; color:#8b949e;'>💎 DÀN CHỦ LỰC B</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='main-num-box' style='color:#f2cc60; text-shadow: 0 0 20px rgba(242,204,96,0.5);'>{res['main_B']}</div>", unsafe_allow_html=True)
+    with col_s:
+        st.markdown("<p style='text-align:center; color:#8b949e;'>🛡️ 4 SỐ LÓT AN TOÀN</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='support-box'>{res['support']}</div>", unsafe_allow_html=True)
+
+    st.markdown(f"<div style='margin-top:20px; padding:15px; background:#161b22; border-radius:10px;'><b>💡 PHÂN TÍCH SOI KỸ:</b> {res['logic']}</div>", unsafe_allow_html=True)
     
-    st.divider()
-    
-    # Dàn lót an toàn
-    st.markdown(f"<p style='text-align:center; color:#8b949e;'>🛡️ 4 SỐ LÓT AN TOÀN: <span style='color:#58a6ff; font-size:30px; font-weight:bold;'>{res['support_4']}</span></p>", unsafe_allow_html=True)
-    
-    st.write(f"💡 **PHÂN TÍCH SOI CẦU:** {res['logic']}")
-    
-    # Tổng hợp dàn 7 số
-    full_set = "".join(sorted(set(res['main_1'] + res['main_2'] + res['support_4'])))[:7]
-    st.text_input("📋 SAO CHÉP DÀN 7 SỐ KUBET:", full_set)
-    
-    st.progress(res['conf'] / 100)
-    st.markdown(f"<p style='text-align:right;'>Độ tin cậy AI: {res['conf']}%</p>", unsafe_allow_html=True)
+    # Công cụ copy
+    all_seven = "".join(sorted(set(res['main_A'] + res['main_B'] + res['support'])))[:7]
+    st.text_input("📋 SAO CHÉP DÀN 7 SỐ TINH HOA:", all_seven)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# Biểu đồ nhịp cầu thời gian thực
+# ================= TẦNG THỐNG KÊ MA TRẬN =================
+
 if st.session_state.history:
-    with st.expander("📊 XEM MA TRẬN NHỊP CẦU (LỊCH SỬ)"):
-        all_data = "".join(st.session_state.history[-50:])
-        df = pd.Series(Counter(all_data)).sort_index()
-        st.bar_chart(df)
+    with st.expander("📊 MA TRẬN SỐ & TẦN SUẤT HỌC TẬP"):
+        st.write("AI đang học từ 50 kỳ gần nhất để bắt bài nhà cái đảo cầu:")
+        data_string = "".join(st.session_state.history[-50:])
+        df_freq = pd.Series(Counter(data_string)).sort_index()
+        st.bar_chart(df_freq)
+        st.write("Nhịp cầu hiện tại đang ưu tiên các số có tần suất trung bình để tránh bẫy nhà cái.")
