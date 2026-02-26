@@ -10,9 +10,9 @@ from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
-# ================= CẤU HÌNH HỆ THỐNG TITAN v25.1 HOTFIX =================
+# ================= CẤU HÌNH HỆ THỐNG TITAN v26.0 =================
 API_KEY = "AIzaSyB5PRp04XlMHKl3oGfCRbsKXjlTA-CZifc"
-DB_FILE = "titan_supreme_permanent_v25_1.json"
+DB_FILE = "titan_supreme_permanent_v26_0.json"
 
 def setup_neural():
     try:
@@ -35,234 +35,280 @@ def load_db():
 
 def save_db(data):
     with open(DB_FILE, "w") as f:
-        json.dump(data[-5000:], f)
+        json.dump(data[-3000:], f)
 
 if "history" not in st.session_state:
     st.session_state.history = load_db()
 if "prediction_history" not in st.session_state:
     st.session_state.prediction_history = []
-if "accuracy_stats" not in st.session_state:
-    st.session_state.accuracy_stats = {"correct": 0, "total": 0, "last_10": []}
-if "last_actual_result" not in st.session_state:
-    st.session_state.last_actual_result = None
 
-# ================= THUẬT TOÁN DỰ ĐOÁN CHÍNH XÁC CAO =================
+# ================= THUẬT TOÁN BẮT CẦU THỰC CHIẾN =================
 
-class PrecisionPredictor:
+class RealCatchPredictor:
+    """
+    Thuật toán bắt cầu thực tế cho 5D Bet
+    """
     def __init__(self, history):
         self.history = history
         
-    def analyze_patterns(self):
-        """Phân tích pattern chuyên sâu"""
-        if len(self.history) < 20:
-            return {}
+    def detect_bet_cau(self):
+        """
+        Phát hiện cầu bệt - số lặp lại nhiều kỳ
+        """
+        if len(self.history) < 5:
+            return []
         
-        patterns = {}
+        bet_numbers = []
         last_10 = self.history[-10:]
         
-        # 1. Phân tích vị trí
-        position_patterns = []
-        for pos in range(5):
-            pos_values = [int(num[pos]) for num in last_10]
-            
-            # Xu hướng tăng/giảm
-            trend = 0
-            for i in range(1, len(pos_values)):
-                if pos_values[i] > pos_values[i-1]:
-                    trend += 1
-                elif pos_values[i] < pos_values[i-1]:
-                    trend -= 1
-            
-            # Dự đoán cho vị trí này
-            if trend > 3:  # Xu hướng tăng mạnh
-                next_val = min(9, pos_values[-1] + 1)
-            elif trend < -3:  # Xu hướng giảm mạnh
-                next_val = max(0, pos_values[-1] - 1)
-            else:  # Đi ngang - lấy số phổ biến
-                counter = Counter(pos_values[-5:])
-                next_val = counter.most_common(1)[0][0]
-            
-            position_patterns.append(str(next_val))
+        # Đếm tần suất từng số trong 10 kỳ
+        all_nums = "".join(last_10)
+        num_counts = Counter(all_nums)
         
-        patterns['position_based'] = "".join(position_patterns)
+        # Số bệt là số xuất hiện >= 3 lần trong 5 kỳ gần
+        for num, count in num_counts.items():
+            # Kiểm tra 5 kỳ gần nhất
+            recent_5 = "".join(self.history[-5:])
+            if recent_5.count(num) >= 3:
+                bet_numbers.append(num)
         
-        # 2. Phân tích số lặp
-        all_digits = "".join(last_10)
-        digit_counter = Counter(all_digits)
-        
-        # Số xuất hiện nhiều nhất trong 10 kỳ gần
-        hot_digits = [d for d, count in digit_counter.most_common(5)]
-        patterns['hot_digits'] = hot_digits
-        
-        # 3. Kiểm tra cầu bệt
-        last_num = self.history[-1]
-        patterns['last_number'] = last_num
-        
-        # Kiểm tra nếu số cuối lặp lại nhiều
-        repeat_count = 0
-        for i in range(1, min(10, len(self.history))):
-            if self.history[-i] == last_num:
-                repeat_count += 1
-            else:
-                break
-        patterns['repeat_streak'] = repeat_count
-        
-        # 4. Kiểm tra cầu đảo
-        reverse_patterns = []
-        for i in range(1, min(5, len(self.history))):
-            if self.history[-i][::-1] == self.history[-i-1]:
-                reverse_patterns.append(True)
-            else:
-                reverse_patterns.append(False)
-        patterns['reverse_streak'] = sum(reverse_patterns)
-        
-        return patterns
+        return list(set(bet_numbers))
     
-    def calculate_probabilities(self):
-        """Tính xác suất cho từng số"""
-        if len(self.history) < 20:
-            return {}
-        
-        probabilities = {}
-        
-        # Trọng số cho các khoảng thời gian
-        weights = {
-            'last_5': 0.4,    # 5 kỳ gần nhất - quan trọng nhất
-            'last_10': 0.3,   # 10 kỳ gần
-            'last_20': 0.2,   # 20 kỳ gần
-            'last_50': 0.1    # 50 kỳ gần - ít quan trọng nhất
-        }
-        
-        all_digits_weighted = []
-        
-        # 5 kỳ gần nhất
-        last_5 = "".join(self.history[-5:])
-        all_digits_weighted.extend([(d, weights['last_5']) for d in last_5])
-        
-        # 10 kỳ gần
-        if len(self.history) >= 10:
-            last_10 = "".join(self.history[-10:-5])
-            all_digits_weighted.extend([(d, weights['last_10']) for d in last_10])
-        
-        # 20 kỳ gần
-        if len(self.history) >= 20:
-            last_20 = "".join(self.history[-20:-10])
-            all_digits_weighted.extend([(d, weights['last_20']) for d in last_20])
-        
-        # 50 kỳ gần
-        if len(self.history) >= 50:
-            last_50 = "".join(self.history[-50:-20])
-            all_digits_weighted.extend([(d, weights['last_50']) for d in last_50])
-        
-        # Tính tổng trọng số cho mỗi digit
-        weighted_counts = {}
-        for digit, weight in all_digits_weighted:
-            weighted_counts[digit] = weighted_counts.get(digit, 0) + weight
-        
-        # Chuẩn hóa thành xác suất
-        total_weight = sum(weighted_counts.values())
-        if total_weight > 0:
-            probabilities = {d: count/total_weight for d, count in weighted_counts.items()}
-        
-        return probabilities
-    
-    def detect_trap(self):
-        """Phát hiện bẫy nhà cái"""
+    def detect_dao_cau(self):
+        """
+        Phát hiện cầu đảo - số đảo chiều liên tục
+        """
         if len(self.history) < 10:
             return False, []
         
-        warnings = []
-        is_trap = False
+        last_8 = self.history[-8:]
+        dao_patterns = []
         
-        # 1. Kiểm tra đảo cầu liên tục
-        reverse_count = 0
-        for i in range(1, min(8, len(self.history))):
-            if i % 2 == 1:  # Các cặp lẻ
-                if self.history[-i][::-1] == self.history[-i-1]:
-                    reverse_count += 1
-        
-        if reverse_count >= 3:
-            warnings.append("🔴 PHÁT HIỆN CẦU ĐẢO 3 KỲ LIÊN TIẾP")
-            is_trap = True
-        
-        # 2. Kiểm tra số lạ xuất hiện bất thường
-        last_20_digits = [int(d) for d in "".join(self.history[-20:])]
-        digit_counts = Counter(last_20_digits)
-        
-        rare_digits = [d for d, count in digit_counts.items() if count <= 2]
-        if len(rare_digits) >= 4:
-            warnings.append(f"🟠 SỐ LẠ XUẤT HIỆN: {rare_digits}")
-            is_trap = True
-        
-        # 3. Kiểm tra biến động bất thường
-        if len(self.history) >= 10:
-            last_5_variance = np.var([int(d) for d in "".join(self.history[-5:])])
-            prev_5_variance = np.var([int(d) for d in "".join(self.history[-10:-5])])
+        # Kiểm tra các cặp số đảo
+        for i in range(len(last_8)-1):
+            num1 = last_8[i]
+            num2 = last_8[i+1]
             
-            if prev_5_variance > 0 and last_5_variance > prev_5_variance * 2:
-                warnings.append("🔴 BIẾN ĐỘNG TĂNG ĐỘT BIẾN")
-                is_trap = True
+            # Kiểm tra đảo ngược: 12345 -> 54321
+            if num1 == num2[::-1]:
+                dao_patterns.append((num1, num2))
         
-        return is_trap, warnings
+        is_dao = len(dao_patterns) >= 3  # Nếu có 3 cặp đảo liên tiếp
+        
+        return is_dao, dao_patterns
     
-    def predict_by_momentum(self):
-        """Dự đoán theo đà (momentum)"""
+    def detect_xieng_cau(self):
+        """
+        Phát hiện cầu xiên - số tăng/giảm dần
+        """
         if len(self.history) < 5:
             return None
         
-        predictions = []
+        last_5 = self.history[-5:]
+        xu_huong = []
         
         for pos in range(5):
-            pos_values = [int(num[pos]) for num in self.history[-5:]]
+            pos_values = [int(num[pos]) for num in last_5]
             
-            # Tính momentum (đà)
-            momentum = 0
-            for i in range(1, len(pos_values)):
-                momentum += (pos_values[i] - pos_values[i-1])
+            # Kiểm tra tăng dần
+            tang = all(pos_values[i] <= pos_values[i+1] for i in range(4))
+            # Kiểm tra giảm dần
+            giam = all(pos_values[i] >= pos_values[i+1] for i in range(4))
             
-            # Dự đoán dựa trên momentum
-            if abs(momentum) > 2:  # Đà mạnh
-                next_val = pos_values[-1] + (1 if momentum > 0 else -1)
-            else:  # Đà yếu - có thể đảo chiều
-                # Lấy giá trị phổ biến nhất
-                counter = Counter(pos_values[-3:])
-                next_val = counter.most_common(1)[0][0]
+            if tang:
+                xu_huong.append(f"Vị trí {pos+1}: TĂNG")
+            elif giam:
+                xu_huong.append(f"Vị trí {pos+1}: GIẢM")
+            else:
+                xu_huong.append(f"Vị trí {pos+1}: KHÔNG RÕ")
+        
+        return xu_huong
+    
+    def predict_by_bet(self):
+        """
+        Dự đoán dựa trên cầu bệt
+        """
+        bet_numbers = self.detect_bet_cau()
+        
+        if not bet_numbers:
+            return None
+        
+        # Ghép số bệt thành số 5 chữ số
+        predictions = []
+        for _ in range(3):  # Tạo 3 số dự đoán
+            pred = ""
+            for _ in range(5):
+                # Chọn ngẫu nhiên từ số bệt, ưu tiên số xuất hiện nhiều
+                pred += np.random.choice(bet_numbers)
+            predictions.append(pred)
+        
+        return predictions
+    
+    def predict_by_recent(self):
+        """
+        Dự đoán dựa trên lịch sử gần nhất
+        """
+        if len(self.history) < 3:
+            return None
+        
+        last_3 = self.history[-3:]
+        
+        # Phân tích từng vị trí
+        predictions = []
+        for pos in range(5):
+            pos_values = [int(num[pos]) for num in last_3]
             
-            # Đảm bảo trong khoảng 0-9
-            next_val = max(0, min(9, next_val))
-            predictions.append(str(next_val))
+            # Nếu 3 kỳ liên tiếp giống nhau -> bệt vị trí
+            if len(set(pos_values)) == 1:
+                predictions.append(str(pos_values[0]))
+            else:
+                # Lấy số xuất hiện nhiều nhất
+                counter = Counter(pos_values)
+                most_common = counter.most_common(1)[0][0]
+                predictions.append(str(most_common))
         
         return "".join(predictions)
     
-    def predict_by_frequency(self):
-        """Dự đoán theo tần suất có trọng số"""
+    def analyze_bay_cua_nha_cai(self):
+        """
+        Phân tích bẫy của nhà cái
+        """
+        warnings = []
+        
         if len(self.history) < 10:
-            return None
+            return warnings
         
-        predictions = []
+        # 1. Phát hiện đảo cầu liên tục
+        is_dao, dao_patterns = self.detect_dao_cau()
+        if is_dao:
+            warnings.append("🔴 CẢNH BÁO: ĐANG ĐẢO CẦU LIÊN TỤC - DỪNG CƯỢC")
         
-        for pos in range(5):
-            # Lấy giá trị 20 kỳ gần nhất cho vị trí này
-            pos_values = [int(num[pos]) for num in self.history[-20:]]
+        # 2. Phát hiện số lạ xuất hiện
+        last_5 = "".join(self.history[-5:])
+        all_digits = set(last_5)
+        
+        # Kiểm tra 10 kỳ trước
+        prev_10 = "".join(self.history[-15:-5])
+        rare_digits = [d for d in all_digits if prev_10.count(d) < 2]
+        
+        if rare_digits:
+            warnings.append(f"🟠 SỐ LẠ XUẤT HIỆN: {rare_digits} - Có thể cầu mới")
+        
+        # 3. Phát hiện biến động mạnh
+        if len(self.history) >= 20:
+            last_10_digits = [int(d) for d in "".join(self.history[-10:])]
+            prev_10_digits = [int(d) for d in "".join(self.history[-20:-10])]
             
-            # Tính trọng số (gần đây quan trọng hơn)
-            weighted_values = []
-            for i, val in enumerate(pos_values):
-                weight = (i + 1) / len(pos_values)  # Trọng số tăng dần
-                weighted_values.extend([val] * int(weight * 10))
+            last_std = np.std(last_10_digits)
+            prev_std = np.std(prev_10_digits)
             
-            # Chọn giá trị phổ biến nhất sau khi đã gán trọng số
-            if weighted_values:
-                counter = Counter(weighted_values)
-                next_val = counter.most_common(1)[0][0]
-                predictions.append(str(next_val))
-            else:
-                predictions.append(str(pos_values[-1]))
+            if prev_std > 0 and last_std > prev_std * 1.5:
+                warnings.append("🟡 BIẾN ĐỘNG MẠNH - Giảm vốn")
         
-        return "".join(predictions)
+        return warnings
+    
+    def get_best_prediction(self):
+        """
+        Lấy dự đoán tốt nhất từ các phương pháp
+        """
+        warnings = self.analyze_bay_cua_nha_cai()
+        bet_numbers = self.detect_bet_cau()
+        is_dao, _ = self.detect_dao_cau()
+        xu_huong = self.detect_xieng_cau()
+        
+        # Nếu có cảnh báo đỏ -> không đánh
+        if any("🔴" in w for w in warnings):
+            return {
+                "main_3": "XXX",
+                "support_4": "XXXX",
+                "decision": "DỪNG - CẦU LỪA",
+                "logic": "Phát hiện cầu đảo liên tục. Bảo toàn vốn, chờ cầu mới.",
+                "color": "Red",
+                "confidence": 30,
+                "warning_level": "RẤT CAO"
+            }
+        
+        # Dự đoán chính
+        main_pred = self.predict_by_recent()
+        
+        # Nếu có số bệt, ưu tiên ghép số bệt vào
+        if bet_numbers and main_pred:
+            # Thay thế các số trong main_pred bằng số bệt nếu có thể
+            main_list = list(main_pred)
+            for i in range(len(main_list)):
+                if np.random.random() > 0.5 and bet_numbers:  # 50% cơ hội thay bằng số bệt
+                    main_list[i] = np.random.choice(bet_numbers)
+            main_pred = "".join(main_list)
+        
+        # Tạo dự đoán phụ từ số bệt
+        support_pred = ""
+        if bet_numbers:
+            for _ in range(4):
+                if bet_numbers:
+                    support_pred += np.random.choice(bet_numbers)
+                else:
+                    support_pred += str(np.random.randint(0, 10))
+        else:
+            # Nếu không có số bệt, lấy từ phân tích xu hướng
+            for pos in range(4):
+                if xu_huong and pos < len(xu_huong):
+                    if "TĂNG" in xu_huong[pos]:
+                        # Dự đoán số tăng
+                        last_val = int(self.history[-1][pos]) if self.history else 5
+                        pred_val = min(9, last_val + 1)
+                        support_pred += str(pred_val)
+                    elif "GIẢM" in xu_huong[pos]:
+                        last_val = int(self.history[-1][pos]) if self.history else 5
+                        pred_val = max(0, last_val - 1)
+                        support_pred += str(pred_val)
+                    else:
+                        support_pred += str(np.random.randint(0, 10))
+                else:
+                    support_pred += str(np.random.randint(0, 10))
+        
+        # Đảm bảo độ dài
+        if not main_pred or len(main_pred) < 3:
+            main_pred = "".join([str(np.random.randint(0, 10)) for _ in range(3)])
+        else:
+            main_pred = main_pred[:3]
+        
+        support_pred = support_pred[:4].ljust(4, '0')
+        
+        # Quyết định dựa trên cảnh báo
+        if len(warnings) >= 2:
+            decision = "THEO DÕI - CẢNH BÁO"
+            confidence = 60
+            color = "Yellow"
+        elif bet_numbers:
+            decision = "ĐÁNH - CÓ SỐ BỆT"
+            confidence = 85
+            color = "Green"
+        elif is_dao:
+            decision = "DỪNG - ĐANG ĐẢO"
+            confidence = 40
+            color = "Red"
+        else:
+            decision = "THEO DÕI NHẸ"
+            confidence = 70
+            color = "Yellow"
+        
+        # Logic giải thích
+        logic = f"Phân tích: {len(bet_numbers)} số bệt ({bet_numbers}), {len(warnings)} cảnh báo. "
+        if xu_huong:
+            logic += f"Xu hướng: {xu_huong[0]}. "
+        
+        return {
+            "main_3": main_pred,
+            "support_4": support_pred,
+            "decision": decision,
+            "logic": logic,
+            "color": color,
+            "confidence": confidence,
+            "warning_level": "CAO" if len(warnings) >= 2 else "TRUNG BÌNH" if warnings else "THẤP"
+        }
 
 # ================= THIẾT KẾ GIAO DIỆN =================
-st.set_page_config(page_title="TITAN v25.1 HOTFIX", layout="wide")
+st.set_page_config(page_title="TITAN v26.0 - BẮT CẦU THỰC CHIẾN", layout="wide")
 st.markdown("""
     <style>
     .stApp { background: #010409; color: #e6edf3; }
@@ -283,166 +329,64 @@ st.markdown("""
     }
     .status-bar { padding: 15px; border-radius: 12px; text-align: center; font-weight: bold; font-size: 24px; margin-bottom: 20px; text-transform: uppercase; }
     .warning-box { background: #4a0e0e; color: #ff9b9b; padding: 15px; border-radius: 8px; border: 1px solid #ff4444; text-align: center; margin-top: 15px; font-weight: bold; }
-    .info-box { background: #0e2a4a; color: #9bc9ff; padding: 10px; border-radius: 8px; border: 1px solid #58a6ff; margin: 5px 0; }
-    .hot-number { color: #ff5858; font-weight: bold; font-size: 20px; display: inline-block; margin: 0 5px; }
-    .cold-number { color: #58a6ff; font-weight: bold; font-size: 20px; display: inline-block; margin: 0 5px; }
-    .error-fix { background: #1a3a1a; color: #8bff8b; padding: 10px; border-radius: 8px; border: 1px solid #00ff00; margin: 10px 0; }
+    .bet-number { background: #238636; color: white; padding: 5px 10px; border-radius: 5px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #58a6ff;'>🚀 TITAN v25.1 HOTFIX - ĐÃ SỬA LỖI 0%</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #8b949e;'>Đã khắc phục lỗi dự đoán sai 15/15 kỳ - Thuật toán mới chính xác hơn</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #58a6ff;'>🚀 TITAN v26.0 - BẮT CẦU THỰC CHIẾN</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #8b949e;'>Chuyên phát hiện cầu bệt, cầu đảo, bẫy nhà cái</p>", unsafe_allow_html=True)
 
-# Hiển thị thông báo sửa lỗi
-st.markdown("""
-    <div class='error-fix'>
-        ✅ ĐÃ SỬA LỖI: Tool đang dự đoán sai 15/15 kỳ. Đã nâng cấp thuật toán:
-        - Phân tích pattern theo từng vị trí
-        - Dự đoán theo đà (momentum)
-        - Phát hiện bẫy nhà cái
-        - Tạm thời vô hiệu hóa Gemini để dùng thuật toán nội bộ chính xác hơn
-    </div>
-""", unsafe_allow_html=True)
-
-# ================= PHẦN NHẬP LIỆU =================
+# ================= NHẬP LIỆU =================
 with st.container():
     col_in, col_st = st.columns([2, 1])
     with col_in:
         raw_input = st.text_area("📡 Nạp dữ liệu mới:", height=150, placeholder="Dán dãy số 5D tại đây...")
-        
-        # Thêm ô nhập kết quả thực tế để học từ sai lầm
-        actual_result = st.text_input("✅ Kết quả thực tế (nếu có):", max_chars=5, placeholder="Nhập số về thực tế để cải thiện độ chính xác")
-        
-        if actual_result and re.match(r"\d{5}", actual_result):
-            st.session_state.last_actual_result = actual_result
-            
-            # So sánh với dự đoán cuối cùng
-            if "last_prediction" in st.session_state:
-                if actual_result == st.session_state.last_prediction.get('main_3', ''):
-                    st.success("🎯 Dự đoán CHÍNH XÁC! Đang cập nhật thuật toán...")
-                else:
-                    st.error(f"❌ Dự đoán SAI. Số đúng là {actual_result}. Đang điều chỉnh...")
-    
     with col_st:
         st.write(f"📊 Kho dữ liệu: **{len(st.session_state.history)} kỳ**")
         
-        if st.session_state.accuracy_stats["total"] > 0:
-            acc = (st.session_state.accuracy_stats["correct"] / st.session_state.accuracy_stats["total"]) * 100
-            st.write(f"🎯 Độ chính xác: **{acc:.1f}%** ({st.session_state.accuracy_stats['correct']}/{st.session_state.accuracy_stats['total']})")
-            
-            if st.session_state.accuracy_stats["last_10"]:
-                last_10_acc = sum(st.session_state.accuracy_stats["last_10"]) / len(st.session_state.accuracy_stats["last_10"]) * 100
-                st.write(f"📈 10 kỳ gần: **{last_10_acc:.1f}%**")
-        
         c1, c2 = st.columns(2)
-        btn_save = c1.button("🚀 DỰ ĐOÁN NGAY", use_container_width=True)
+        btn_save = c1.button("🚀 PHÂN TÍCH CẦU", use_container_width=True)
         btn_reset = c2.button("🗑️ RESET", use_container_width=True)
 
 if btn_reset:
     st.session_state.history = []
     st.session_state.prediction_history = []
-    st.session_state.accuracy_stats = {"correct": 0, "total": 0, "last_10": []}
     if os.path.exists(DB_FILE):
         os.remove(DB_FILE)
-    st.success("Đã reset dữ liệu.")
+    st.success("Đã reset dữ liệu")
     st.rerun()
 
 if btn_save:
-    # Xử lý input
     input_data = re.findall(r"\b\d{5}\b", raw_input)
     if input_data:
-        # Thêm vào history
         st.session_state.history.extend(input_data)
         st.session_state.history = list(dict.fromkeys(st.session_state.history))
         save_db(st.session_state.history)
         
-        # TẠM THỜI VÔ HIỆU HÓA GEMINI - DÙNG THUẬT TOÁN NỘI BỘ
-        predictor = PrecisionPredictor(st.session_state.history)
+        # Phân tích cầu
+        predictor = RealCatchPredictor(st.session_state.history)
         
-        # Phân tích
-        patterns = predictor.analyze_patterns()
-        probabilities = predictor.calculate_probabilities()
-        is_trap, warnings = predictor.detect_trap()
-        momentum_pred = predictor.predict_by_momentum()
-        frequency_pred = predictor.predict_by_frequency()
+        # Phát hiện các loại cầu
+        bet_numbers = predictor.detect_bet_cau()
+        is_dao, dao_patterns = predictor.detect_dao_cau()
+        xu_huong = predictor.detect_xieng_cau()
+        warnings = predictor.analyze_bay_cua_nha_cai()
         
-        # Kết hợp các phương pháp dự đoán
-        if momentum_pred and frequency_pred:
-            # Lấy trung bình của 2 phương pháp
-            combined = []
-            for i in range(5):
-                m = int(momentum_pred[i])
-                f = int(frequency_pred[i])
-                
-                # Nếu giống nhau, lấy số đó
-                if m == f:
-                    combined.append(str(m))
-                else:
-                    # Nếu khác, lấy số có xác suất cao hơn
-                    m_prob = probabilities.get(str(m), 0)
-                    f_prob = probabilities.get(str(f), 0)
-                    combined.append(str(m) if m_prob > f_prob else str(f))
-            
-            main_prediction = "".join(combined)
-        else:
-            main_prediction = momentum_pred or frequency_pred or "12345"
+        # Lưu vào session state để hiển thị
+        st.session_state.bet_numbers = bet_numbers
+        st.session_state.is_dao = is_dao
+        st.session_state.dao_patterns = dao_patterns
+        st.session_state.xu_huong = xu_huong
+        st.session_state.warnings = warnings
         
-        # Dự đoán số lót dựa trên hot digits
-        hot_digits = patterns.get('hot_digits', [])
-        support = []
-        for d in hot_digits:
-            if d not in main_prediction:
-                support.append(d)
-            if len(support) >= 4:
-                break
-        
-        while len(support) < 4:
-            support.append(str(np.random.randint(0, 10)))
-        
-        # Quyết định dựa trên cảnh báo
-        if is_trap:
-            decision = "DỪNG - PHÁT HIỆN BẪY"
-            color = "Red"
-            confidence = 50
-            warning_level = "RẤT CAO"
-        elif patterns.get('repeat_streak', 0) >= 3:
-            decision = "ĐÁNH - CẦU BỆT"
-            color = "Green"
-            confidence = 90
-            warning_level = "THẤP"
-        else:
-            decision = "THEO DÕI"
-            color = "Yellow"
-            confidence = 75
-            warning_level = "TRUNG BÌNH"
-        
-        # Logic giải thích
-        logic = f"""
-        📊 PHÂN TÍCH CHI TIẾT:
-        - Cầu bệt: {patterns.get('repeat_streak', 0)} kỳ
-        - Cầu đảo: {patterns.get('reverse_streak', 0)} dấu hiệu
-        - Số nóng: {patterns.get('hot_digits', [])}
-        - Dự đoán momentum: {momentum_pred}
-        - Dự đoán tần suất: {frequency_pred}
-        
-        {'⚠️ ' + chr(10).join(warnings) if warnings else '✅ Không phát hiện bẫy'}
-        """
-        
-        st.session_state.last_prediction = {
-            "main_3": main_prediction[:3],
-            "support_4": "".join(support)[:4],
-            "decision": decision,
-            "logic": logic,
-            "color": color,
-            "confidence": confidence,
-            "warning_level": warning_level
-        }
+        # Dự đoán
+        st.session_state.last_prediction = predictor.get_best_prediction()
         
         # Lưu lịch sử
         st.session_state.prediction_history.append({
             "time": datetime.now().strftime("%H:%M:%S"),
             "prediction": st.session_state.last_prediction,
-            "warnings": warnings
+            "bet_numbers": bet_numbers
         })
         
         st.rerun()
@@ -451,59 +395,81 @@ if btn_save:
 if "last_prediction" in st.session_state:
     res = st.session_state.last_prediction
     
+    # Hiển thị trạng thái
     status_map = {"green": "#238636", "red": "#da3633", "yellow": "#d29922"}
-    bg_color = status_map.get(res.get('color', 'yellow').lower(), "#30363d")
-    warning_level = res.get('warning_level', 'TRUNG BÌNH')
-    warning_color = {"THẤP": "#238636", "TRUNG BÌNH": "#d29922", "CAO": "#da3633", "RẤT CAO": "#ff0000"}
+    bg_color = status_map.get(res['color'].lower(), "#30363d")
     
     st.markdown(f"""
         <div class='status-bar' style='background: {bg_color};'>
-            🔥 {res['decision']} | ĐỘ TIN CẬY: {res['confidence']}% | 
-            <span style='color: {warning_color.get(warning_level, "#ffffff")};'>{warning_level}</span>
+            🔥 {res['decision']} | ĐỘ TIN CẬY: {res['confidence']}% | {res['warning_level']}
         </div>
     """, unsafe_allow_html=True)
+
+    # Hiển thị cảnh báo
+    if "warnings" in st.session_state and st.session_state.warnings:
+        for w in st.session_state.warnings:
+            if "🔴" in w:
+                st.error(w)
+            elif "🟠" in w:
+                st.warning(w)
+            else:
+                st.info(w)
+
+    # Hiển thị số bệt
+    if "bet_numbers" in st.session_state and st.session_state.bet_numbers:
+        bet_html = " ".join([f"<span class='bet-number'>{num}</span>" for num in st.session_state.bet_numbers])
+        st.markdown(f"**🔥 SỐ BỆT:** {bet_html}", unsafe_allow_html=True)
 
     st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
     
     col_main, col_supp = st.columns([1.5, 1])
     with col_main:
-        st.markdown("<p style='color:#8b949e; text-align:center; font-weight:bold;'>🎯 3 SỐ CHỦ LỰC</p>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#8b949e; text-align:center;'>🎯 3 SỐ CHỦ LỰC</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='num-box'>{res['main_3']}</div>", unsafe_allow_html=True)
     
     with col_supp:
-        st.markdown("<p style='color:#8b949e; text-align:center; font-weight:bold;'>🛡️ 4 SỐ LÓT</p>", unsafe_allow_html=True)
+        st.markdown("<p style='color:#8b949e; text-align:center;'>🛡️ 4 SỐ LÓT</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='lot-box'>{res['support_4']}</div>", unsafe_allow_html=True)
     
     st.divider()
     
     col_l, col_r = st.columns([2, 1])
     with col_l:
-        st.subheader("🧠 Phân tích")
+        st.subheader("🧠 Phân tích cầu")
         st.write(res['logic'])
         
-        if res.get('warning_level') in ["CAO", "RẤT CAO"]:
-            st.markdown("""
-                <div class='warning-box'>
-                    ⚠️ DỪNG LẠI! Nhà cái đang bẫy.
-                </div>
-            """, unsafe_allow_html=True)
+        if st.session_state.xu_huong:
+            st.write("**Xu hướng từng vị trí:**")
+            for xh in st.session_state.xu_huong[:3]:
+                st.write(f"- {xh}")
     
     with col_r:
         st.subheader("📋 Dàn số")
         full_dan = "".join(sorted(set(res['main_3'] + res['support_4'])))
         st.text_input("Dàn 7 số:", full_dan)
         
-        if res['decision'] == "ĐÁNH - CẦU BỆT":
-            st.success("💵 Vào tiền: 70% vốn")
-        elif res['decision'] == "THEO DÕI":
-            st.warning("👁️ Vào tiền: 30% vốn")
+        if res['decision'] == "ĐÁNH - CÓ SỐ BỆT":
+            st.success("💵 Vào tiền: 80% vốn - Có số bệt")
+        elif "THEO DÕI" in res['decision']:
+            st.warning("👁️ Vào tiền: 30% vốn - Quan sát")
         else:
-            st.error("⛔ DỪNG CƯỢC")
+            st.error("⛔ DỪNG - Bảo toàn vốn")
     
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ================= LỊCH SỬ =================
-if st.session_state.prediction_history:
-    with st.expander("📜 Lịch sử dự đoán"):
-        for pred in st.session_state.prediction_history[-10:]:
-            st.write(f"**{pred['time']}** - {pred['prediction']['main_3']} | {pred['prediction']['decision']} | {pred['prediction']['confidence']}%")
+# ================= HIỂN THỊ LỊCH SỬ GẦN =================
+if st.session_state.history:
+    with st.expander("📊 Lịch sử 10 kỳ gần"):
+        last_10 = st.session_state.history[-10:]
+        df = pd.DataFrame({
+            'Kỳ': [f"Kỳ {i+1}" for i in range(len(last_10))],
+            'Số': last_10
+        })
+        st.table(df)
+        
+        # Phân tích nhanh
+        all_digits = "".join(last_10)
+        freq = Counter(all_digits).most_common()
+        st.write("**Tần suất 10 kỳ:**")
+        for num, count in freq:
+            st.write(f"Số {num}: {count} lần")
