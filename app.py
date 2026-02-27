@@ -6,51 +6,51 @@ import json
 import os
 from datetime import datetime
 
-# =============================
+# =========================
 # CONFIG
-# =============================
+# =========================
 st.set_page_config(page_title="5D BET ULTRA PROMAX", layout="wide")
 
 DATA_FILE = "data.json"
 
-# =============================
-# DATA ENGINE
-# =============================
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return []
-    try:
-        with open(DATA_FILE, "r") as f:
-            return json.load(f)
-    except:
-        return []
+# =========================
+# INIT SESSION
+# =========================
+if "history" not in st.session_state:
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, "r") as f:
+                st.session_state.history = json.load(f)
+        except:
+            st.session_state.history = []
+    else:
+        st.session_state.history = []
 
-def save_data(data):
+# =========================
+# SAVE DATA
+# =========================
+def save_data():
     with open(DATA_FILE, "w") as f:
-        json.dump(data, f)
+        json.dump(st.session_state.history, f)
 
-history = load_data()
-
-# =============================
-# VALIDATION ENGINE PRO
-# =============================
+# =========================
+# VALIDATION ULTRA
+# =========================
 def validate_input(number):
-    if number is None:
-        return False, "Không được để trống"
-
-    number = number.strip()
-
-    if len(number) != 5:
-        return False, "Phải đúng 5 chữ số"
+    if number is None or number == "":
+        return False, "❌ Không được để trống"
 
     if not number.isdigit():
-        return False, "Chỉ được nhập số từ 0-9"
+        return False, "❌ Chỉ được nhập số từ 0-9"
 
-    return True, number
+    if len(number) != 5:
+        return False, "❌ Phải đúng 5 chữ số"
 
-# =============================
+    return True, ""
+
+# =========================
 # CORE ENGINE
-# =============================
+# =========================
 all_triplets = list(itertools.combinations(range(10), 3))
 
 def calculate_frequency(history):
@@ -86,116 +86,97 @@ def score_triplets(freq, matrix):
         final_score = (f_score * 0.6) + (c_score * 0.4)
 
         scores.append({
-            "triplet": "".join(map(str, triplet)),
+            "triplet": triplet,
             "score": final_score
         })
 
-    scores.sort(key=lambda x: x["score"], reverse=True)
+    scores = sorted(scores, key=lambda x: x["score"], reverse=True)
     return scores
 
-# =============================
-# UI MOBILE PRO
-# =============================
-
+# =========================
+# UI
+# =========================
 st.title("🔥 5D BET ULTRA PROMAX ENGINE")
 
-st.markdown("### ⚡ Nhập Kết Quả 5 Số (Tự động khóa ký tự sai)")
+st.markdown("### 📥 Nhập Kết Quả 5 Số")
 
 number_input = st.text_input(
-    "Nhập 5 số",
+    "Nhập 5 số (VD: 12864)",
     max_chars=5,
-    placeholder="Ví dụ: 12864"
+    placeholder="Ví dụ: 83921"
 )
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    add_btn = st.button("➕ Thêm")
+    if st.button("➕ Thêm Kỳ"):
+        valid, message = validate_input(number_input)
+
+        if not valid:
+            st.error(message)
+        else:
+            if any(h["number"] == number_input for h in st.session_state.history):
+                st.warning("⚠ Kỳ này đã tồn tại")
+            else:
+                st.session_state.history.append({
+                    "number": number_input,
+                    "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                })
+                save_data()
+                st.success("✅ Đã lưu kỳ mới")
+                st.rerun()
 
 with col2:
-    clear_btn = st.button("🗑 Xóa hết")
+    if st.button("🗑 Xóa tất cả"):
+        st.session_state.history = []
+        save_data()
+        st.rerun()
 
 with col3:
-    delete_last = st.button("↩ Xóa kỳ cuối")
+    if st.button("🔄 Reload"):
+        st.rerun()
 
-# =============================
-# ACTIONS
-# =============================
+# =========================
+# HISTORY
+# =========================
+st.markdown("### 📜 Lịch Sử")
 
-if add_btn:
-    valid, result = validate_input(number_input)
-
-    if not valid:
-        st.error(result)
-    else:
-        # kiểm tra trùng kỳ gần nhất
-        if history and history[-1]["number"] == result:
-            st.warning("Kỳ này đã nhập rồi.")
-        else:
-            history.append({
-                "number": result,
-                "time": datetime.now().strftime("%H:%M:%S")
-            })
-            save_data(history)
-            st.success("Đã lưu kỳ mới")
-            st.rerun()
-
-if clear_btn:
-    history = []
-    save_data(history)
-    st.success("Đã xóa toàn bộ dữ liệu")
-    st.rerun()
-
-if delete_last and history:
-    history.pop()
-    save_data(history)
-    st.success("Đã xóa kỳ cuối")
-    st.rerun()
-
-# =============================
-# HISTORY DISPLAY
-# =============================
-
-st.markdown("## 📜 Lịch Sử")
-
-if history:
-    df_history = pd.DataFrame(history[::-1])
+if st.session_state.history:
+    df_history = pd.DataFrame(st.session_state.history)
     st.dataframe(df_history, use_container_width=True)
 else:
-    st.info("Chưa có dữ liệu")
+    st.info("Chưa có dữ liệu.")
 
-# =============================
-# ANALYSIS ENGINE
-# =============================
+# =========================
+# ANALYSIS
+# =========================
+if len(st.session_state.history) >= 5:
 
-if len(history) >= 5:
+    st.markdown("### 🧠 Engine Phân Tích")
 
-    st.markdown("## 🧠 Phân Tích Thông Minh")
-
-    freq = calculate_frequency(history)
-    matrix = calculate_co_occurrence(history)
+    freq = calculate_frequency(st.session_state.history)
+    matrix = calculate_co_occurrence(st.session_state.history)
     scores = score_triplets(freq, matrix)
 
-    top_n = 12
+    top_n = 10
 
-    result_df = pd.DataFrame(scores[:top_n])
-    result_df.index += 1
+    result_df = pd.DataFrame([
+        {
+            "Top": i+1,
+            "Bộ 3 số": "".join(map(str, scores[i]["triplet"])),
+            "Điểm": round(scores[i]["score"], 4)
+        }
+        for i in range(top_n)
+    ])
 
     st.dataframe(result_df, use_container_width=True)
 
     st.markdown("### 🔢 Tần Suất Digit")
     freq_df = pd.DataFrame({
-        "Digit": range(10),
-        "Frequency": freq.astype(int)
+        "Digit": list(range(10)),
+        "Tần suất": freq.astype(int)
     })
     st.dataframe(freq_df, use_container_width=True)
 
 else:
-    st.warning("Cần ít nhất 5 kỳ để phân tích.")
-
-# =============================
-# FOOTER
-# =============================
-
-st.markdown("---")
-st.caption("ULTRA ENGINE • Tốc độ cao • Lưu dữ liệu vĩnh viễn • 1 phút xử lý")
+    st.warning("⚠ Cần tối thiểu 5 kỳ để phân tích.")
