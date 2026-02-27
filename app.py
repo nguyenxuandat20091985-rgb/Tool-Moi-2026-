@@ -6,15 +6,15 @@ import pandas as pd
 import numpy as np
 import itertools
 from collections import Counter
-from datetime import datetime
+import hashlib
 
-# ================= CẤU HÌNH =================
+# ================= CONFIG =================
 DB_FILE = "titan_ultra_db.json"
 MAX_HISTORY = 3000
 
-st.set_page_config(page_title="TITAN v25 ULTRA", layout="wide")
+st.set_page_config(page_title="TITAN v25.1 ULTRA", layout="wide")
 
-# ================= LOAD & SAVE =================
+# ================= LOAD =================
 def load_db():
     if os.path.exists(DB_FILE):
         try:
@@ -33,143 +33,127 @@ def save_db(data):
 if "history" not in st.session_state:
     st.session_state.history = load_db()
 
-# ================= VALIDATION =================
-def clean_input(raw_text):
-    numbers = re.findall(r"\b\d{5}\b", raw_text)
-    return numbers
+if "analysis_cache" not in st.session_state:
+    st.session_state.analysis_cache = None
 
-def validate_number(num):
-    if not num.isdigit():
-        return False
-    if len(num) != 5:
-        return False
-    return True
+if "history_hash" not in st.session_state:
+    st.session_state.history_hash = None
+
+# ================= CLEAN INPUT =================
+def clean_input(raw):
+    return re.findall(r"\b\d{5}\b", raw)
 
 # ================= CORE ENGINE =================
 all_triplets = list(itertools.combinations(range(10), 3))
 
-def build_frequency(history):
+@st.cache_data(show_spinner=False)
+def run_analysis(history):
+
     freq = np.zeros(10)
+    matrix = np.zeros((10,10))
+
     for num in history:
+        unique = set(num)
         for d in num:
             freq[int(d)] += 1
-    return freq
-
-def build_co_matrix(history):
-    matrix = np.zeros((10,10))
-    for num in history:
-        unique_digits = list(set(num))
-        for d1 in unique_digits:
-            for d2 in unique_digits:
+        for d1 in unique:
+            for d2 in unique:
                 if d1 != d2:
                     matrix[int(d1)][int(d2)] += 1
-    return matrix
 
-def score_triplets(freq, matrix):
-    scores = []
     total = np.sum(freq) + 1
+    scores = []
 
     for trip in all_triplets:
-        freq_score = sum(freq[d] for d in trip) / total
-
-        co_score = (
+        f_score = sum(freq[d] for d in trip) / total
+        c_score = (
             matrix[trip[0]][trip[1]] +
             matrix[trip[0]][trip[2]] +
             matrix[trip[1]][trip[2]]
         )
-
-        final = (freq_score * 0.6) + (co_score * 0.4)
-
+        final = (f_score * 0.6) + (c_score * 0.4)
         scores.append((trip, final))
 
     scores.sort(key=lambda x: x[1], reverse=True)
-    return scores
 
-def build_final_7digits(scores):
-    top_trip = scores[0][0]
-    all_digits = "".join(st.session_state.history[-100:])
+    main3 = scores[0][0]
+
+    all_digits = "".join(history[-100:])
     top_freq = [x[0] for x in Counter(all_digits).most_common(10)]
 
     support = []
     for d in top_freq:
-        if int(d) not in top_trip:
+        if int(d) not in main3:
             support.append(d)
         if len(support) == 4:
             break
 
-    return "".join(map(str, top_trip)), "".join(support)
+    final7 = "".join(sorted(set("".join(map(str, main3)) + "".join(support))))
+
+    confidence = round(min(scores[0][1] * 100, 99), 2)
+
+    return {
+        "main3": "".join(map(str, main3)),
+        "support4": "".join(support),
+        "final7": final7,
+        "confidence": confidence
+    }
 
 # ================= UI =================
-st.markdown("""
-<style>
-.stApp { background:#0d1117; color:#e6edf3; }
-.main-title { text-align:center; font-size:42px; font-weight:900; color:#58a6ff; }
-.card { background:#161b22; padding:20px; border-radius:10px; border:1px solid #30363d; }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown("<div class='main-title'>🚀 TITAN v25 ULTRA ENGINE</div>", unsafe_allow_html=True)
+st.title("🚀 TITAN v25.1 ULTRA ENGINE")
 
 col1, col2 = st.columns([2,1])
 
 with col1:
-    raw_input = st.text_area("📥 Dán dữ liệu 5 số (mỗi dòng 1 kỳ)", height=150)
+    raw_input = st.text_area("📥 Dán dữ liệu (mỗi dòng 1 kỳ)", height=150)
 
 with col2:
     st.metric("📊 Tổng kỳ", len(st.session_state.history))
-    btn_add = st.button("➕ Thêm Dữ Liệu")
+    btn_add = st.button("➕ Thêm")
     btn_reset = st.button("🗑 Reset")
 
 if btn_reset:
     st.session_state.history = []
-    if os.path.exists(DB_FILE):
-        os.remove(DB_FILE)
-    st.success("Đã reset sạch.")
+    save_db([])
+    st.session_state.analysis_cache = None
+    st.success("Đã reset.")
     st.rerun()
 
 if btn_add:
     new_nums = clean_input(raw_input)
-    valid_nums = []
-
-    for n in new_nums:
-        if validate_number(n):
-            valid_nums.append(n)
-
-    if not valid_nums:
-        st.error("Không có dữ liệu hợp lệ (phải đúng 5 chữ số).")
+    if not new_nums:
+        st.error("Không có dữ liệu hợp lệ.")
     else:
-        st.session_state.history.extend(valid_nums)
+        st.session_state.history.extend(new_nums)
         st.session_state.history = list(dict.fromkeys(st.session_state.history))
         save_db(st.session_state.history)
-        st.success(f"Đã thêm {len(valid_nums)} kỳ.")
+        st.success(f"Đã thêm {len(new_nums)} kỳ.")
         st.rerun()
 
-# ================= ANALYSIS =================
+# ================= SMART ANALYSIS =================
 if len(st.session_state.history) >= 10:
+
+    current_hash = hashlib.md5(
+        "".join(st.session_state.history).encode()
+    ).hexdigest()
+
+    if current_hash != st.session_state.history_hash:
+        st.session_state.analysis_cache = run_analysis(
+            st.session_state.history
+        )
+        st.session_state.history_hash = current_hash
+
+    res = st.session_state.analysis_cache
+
     st.divider()
     st.subheader("🔥 KẾT QUẢ PHÂN TÍCH")
 
-    freq = build_frequency(st.session_state.history)
-    matrix = build_co_matrix(st.session_state.history)
-    scores = score_triplets(freq, matrix)
+    st.markdown(f"### 🔥 3 SỐ CHỦ LỰC: `{res['main3']}`")
+    st.markdown(f"### 🛡 4 SỐ LÓT: `{res['support4']}`")
+    st.text_input("📋 DÀN 7 SỐ:", res["final7"])
 
-    main3, support4 = build_final_7digits(scores)
-
-    st.markdown("<div class='card'>", unsafe_allow_html=True)
-    st.markdown(f"### 🔥 3 SỐ CHỦ LỰC: `{main3}`")
-    st.markdown(f"### 🛡 4 SỐ LÓT: `{support4}`")
-
-    final7 = "".join(sorted(set(main3 + support4)))
-    st.text_input("📋 DÀN 7 SỐ:", final7)
-
-    confidence = round(min(scores[0][1] * 100, 99),2)
-    st.progress(int(confidence))
-    st.write(f"📈 Độ mạnh mô hình: {confidence}%")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    with st.expander("📊 Thống kê 50 kỳ gần nhất"):
-        last50 = "".join(st.session_state.history[-50:])
-        st.bar_chart(pd.Series(Counter(last50)).sort_index())
+    st.progress(int(res["confidence"]))
+    st.write(f"📈 Độ mạnh mô hình: {res['confidence']}%")
 
 else:
-    st.warning("Cần ít nhất 10 kỳ để phân tích chính xác.")
+    st.warning("Cần ít nhất 10 kỳ.")
