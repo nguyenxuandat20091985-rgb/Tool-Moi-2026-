@@ -6,16 +6,16 @@ import json
 import os
 from datetime import datetime
 
-# =========================
+# =============================
 # CONFIG
-# =========================
+# =============================
 st.set_page_config(page_title="5D BET ULTRA PROMAX", layout="wide")
 
 DATA_FILE = "data.json"
 
-# =========================
-# LOAD DATA
-# =========================
+# =============================
+# DATA ENGINE
+# =============================
 def load_data():
     if not os.path.exists(DATA_FILE):
         return []
@@ -31,21 +31,26 @@ def save_data(data):
 
 history = load_data()
 
-# =========================
-# VALIDATION ENGINE
-# =========================
+# =============================
+# VALIDATION ENGINE PRO
+# =============================
 def validate_input(number):
-    if not number.isdigit():
-        return False, "❌ Chỉ được nhập số 0-9"
+    if number is None:
+        return False, "Không được để trống"
+
+    number = number.strip()
+
     if len(number) != 5:
-        return False, "❌ Phải nhập đúng 5 chữ số"
-    return True, ""
+        return False, "Phải đúng 5 chữ số"
 
-# =========================
+    if not number.isdigit():
+        return False, "Chỉ được nhập số từ 0-9"
+
+    return True, number
+
+# =============================
 # CORE ENGINE
-# =========================
-
-# Generate all 120 combinations
+# =============================
 all_triplets = list(itertools.combinations(range(10), 3))
 
 def calculate_frequency(history):
@@ -67,7 +72,6 @@ def calculate_co_occurrence(history):
 
 def score_triplets(freq, matrix):
     scores = []
-
     total_freq = np.sum(freq) + 1
 
     for triplet in all_triplets:
@@ -82,80 +86,116 @@ def score_triplets(freq, matrix):
         final_score = (f_score * 0.6) + (c_score * 0.4)
 
         scores.append({
-            "triplet": triplet,
+            "triplet": "".join(map(str, triplet)),
             "score": final_score
         })
 
-    scores = sorted(scores, key=lambda x: x["score"], reverse=True)
+    scores.sort(key=lambda x: x["score"], reverse=True)
     return scores
 
-# =========================
-# UI
-# =========================
+# =============================
+# UI MOBILE PRO
+# =============================
 
 st.title("🔥 5D BET ULTRA PROMAX ENGINE")
 
-st.subheader("📥 Nhập Kết Quả 5 Số")
+st.markdown("### ⚡ Nhập Kết Quả 5 Số (Tự động khóa ký tự sai)")
 
-col1, col2 = st.columns(2)
+number_input = st.text_input(
+    "Nhập 5 số",
+    max_chars=5,
+    placeholder="Ví dụ: 12864"
+)
+
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    number_input = st.text_input("Nhập 5 số (VD: 12864)", max_chars=5)
+    add_btn = st.button("➕ Thêm")
 
 with col2:
-    if st.button("➕ Thêm Kỳ Mới"):
-        valid, message = validate_input(number_input)
+    clear_btn = st.button("🗑 Xóa hết")
 
-        if not valid:
-            st.error(message)
+with col3:
+    delete_last = st.button("↩ Xóa kỳ cuối")
+
+# =============================
+# ACTIONS
+# =============================
+
+if add_btn:
+    valid, result = validate_input(number_input)
+
+    if not valid:
+        st.error(result)
+    else:
+        # kiểm tra trùng kỳ gần nhất
+        if history and history[-1]["number"] == result:
+            st.warning("Kỳ này đã nhập rồi.")
         else:
             history.append({
-                "number": number_input,
-                "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                "number": result,
+                "time": datetime.now().strftime("%H:%M:%S")
             })
             save_data(history)
-            st.success("✅ Đã lưu kỳ mới")
+            st.success("Đã lưu kỳ mới")
+            st.rerun()
 
-# =========================
-# SHOW HISTORY
-# =========================
-st.subheader("📜 Lịch Sử")
+if clear_btn:
+    history = []
+    save_data(history)
+    st.success("Đã xóa toàn bộ dữ liệu")
+    st.rerun()
+
+if delete_last and history:
+    history.pop()
+    save_data(history)
+    st.success("Đã xóa kỳ cuối")
+    st.rerun()
+
+# =============================
+# HISTORY DISPLAY
+# =============================
+
+st.markdown("## 📜 Lịch Sử")
+
 if history:
-    df_history = pd.DataFrame(history)
+    df_history = pd.DataFrame(history[::-1])
     st.dataframe(df_history, use_container_width=True)
 else:
-    st.info("Chưa có dữ liệu.")
+    st.info("Chưa có dữ liệu")
 
-# =========================
-# ANALYSIS
-# =========================
+# =============================
+# ANALYSIS ENGINE
+# =============================
+
 if len(history) >= 5:
-    st.subheader("🧠 Phân Tích Engine")
+
+    st.markdown("## 🧠 Phân Tích Thông Minh")
 
     freq = calculate_frequency(history)
     matrix = calculate_co_occurrence(history)
     scores = score_triplets(freq, matrix)
 
-    top_n = 10
+    top_n = 12
 
-    result_df = pd.DataFrame([
-        {
-            "Top": i+1,
-            "Bộ 3 số": "".join(map(str, scores[i]["triplet"])),
-            "Điểm": round(scores[i]["score"], 4)
-        }
-        for i in range(top_n)
-    ])
+    result_df = pd.DataFrame(scores[:top_n])
+    result_df.index += 1
 
     st.dataframe(result_df, use_container_width=True)
 
-else:
-    st.warning("⚠ Cần tối thiểu 5 kỳ để phân tích.")
+    st.markdown("### 🔢 Tần Suất Digit")
+    freq_df = pd.DataFrame({
+        "Digit": range(10),
+        "Frequency": freq.astype(int)
+    })
+    st.dataframe(freq_df, use_container_width=True)
 
-# =========================
-# ERROR SAFETY
-# =========================
-try:
-    pass
-except Exception as e:
-    st.error(f"Lỗi hệ thống: {str(e)}")
+else:
+    st.warning("Cần ít nhất 5 kỳ để phân tích.")
+
+# =============================
+# FOOTER
+# =============================
+
+st.markdown("---")
+st.caption("ULTRA ENGINE • Tốc độ cao • Lưu dữ liệu vĩnh viễn • 1 phút xử lý")
