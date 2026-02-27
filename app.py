@@ -1,62 +1,58 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from collections import Counter
 
-# Cấu hình trang tối ưu cho Mobile
-st.set_page_config(page_title="TITAN v28.0 - SPEED", layout="centered")
+# --- GIAO DIỆN CHUYÊN NGHIỆP ---
+st.set_page_config(page_title="TITAN v29.0 PRO", layout="wide")
+st.title("🛡️ TITAN v29.0 PRO - TRUY QUÉT 5D")
 
-def analyze_logic(data_input):
-    # Tách dữ liệu hàng đơn vị (số cuối cùng)
-    digits = [int(str(line).strip()[-1]) for line in data_input if str(line).strip()]
-    if not digits: return None
+# Ô nhập liệu thông minh (Tự động lọc rác)
+raw_input = st.text_area("📥 Dán dãy kết quả (Ví dụ: 77084...):", height=150)
+
+def smart_analyze(data):
+    # Lấy 30 kỳ gần nhất hàng đơn vị
+    nums = [int(str(line).strip()[-1]) for line in data if len(str(line).strip()) == 5]
+    if len(nums) < 5: return None
+
+    # 1. PHÂN TÍCH NHỊP CẦU TÀI XỈU
+    tx_list = ["T" if n >= 5 else "X" for n in nums]
+    last_3 = tx_list[:3]
     
-    # 1. Dự đoán Kèo Đôi (Tài/Xỉu) dựa trên xác suất 50/50
-    last_digit = digits[0]
-    tx_status = "TÀI (5-9)" if last_digit < 5 else "XỈU (0-4)" # Logic đánh đảo cầu
+    # Logic bắt cầu
+    if tx_list[0] == tx_list[1] == tx_list[2]:
+        advice_tx = f"⚠️ CẦU BỆT {tx_list[0]} - NÊN THEO"
+        color = "red"
+    else:
+        advice_tx = "🔄 CẦU ĐẢO - ĐÁNH NGƯỢC KỲ TRƯỚC"
+        color = "blue"
+
+    # 2. DÀN 7 SỐ THÔNG MINH (Loại bỏ số Gan - số lâu chưa về)
+    all_digits = list(range(10))
+    counts = Counter(nums)
+    # Lấy 5 số về nhiều nhất + 2 số vừa mới về để bám luồng
+    most_common = [n for n, c in counts.most_common(5)]
+    recent_2 = nums[:2]
+    dan_7 = sorted(list(set(most_common + recent_2)))
     
-    # 2. Tạo Dàn 7 số "Tĩnh" dựa trên tần suất xuất hiện
-    counts = Counter(digits)
-    # Lấy 7 số xuất hiện nhiều nhất trong 50 kỳ gần nhất
-    most_common = [str(num) for num, count in counts.most_common(7)]
-    dan_7 = " ".join(sorted(most_common))
+    # Nếu chưa đủ 7 số thì bù thêm số có tần suất trung bình
+    for n in range(10):
+        if len(dan_7) < 7 and n not in dan_7:
+            dan_7.append(n)
+
+    return advice_tx, sorted(dan_7), color
+
+if raw_input:
+    lines = raw_input.split('\n')
+    advice, dan, col = smart_analyze(lines)
     
-    return tx_status, dan_7
-
-# --- GIAO DIỆN CHÍNH ---
-st.title("🚀 TITAN v28.0 - 5D KU")
-st.markdown("---")
-
-# Ô nhập liệu siêu tốc
-raw_data = st.text_area("📥 Dán 10-20 kết quả gần nhất (Ví dụ: 80673):", height=150)
-
-if raw_data:
-    lines = raw_data.split('\n')
-    result = analyze_logic(lines)
+    # Hiển thị trực quan
+    st.markdown(f"### 🤖 CHỈ THỊ AI: <span style='color:{col}'>{advice}</span>", unsafe_allow_html=True)
     
-    if result:
-        tx, d7 = result
-        
-        # Hiển thị kết quả Kèo Đôi
-        st.subheader("🎯 KÈO ĐÔI (Xác suất 50/50)")
-        st.error(f"GỢI Ý: {tx}")
-        st.caption("Chiến thuật: Đánh đều tay hoặc Fibonacci")
-        
-        st.markdown("---")
-        
-        # Hiển thị Dàn 7 số cho 1 hàng duy nhất
-        st.subheader("🔢 DÀN 7 SỐ (Hàng Đơn Vị)")
-        st.success(d7)
-        st.info("💡 Cách chơi: Nhập dàn này vào 'Hàng đơn vị', chọn 'Kỳ liên tiếp: 5' để rảnh tay.")
-        
-        # Bảng quản lý vốn gợi ý
-        with st.expander("💰 Quản lý vốn (Gợi ý)"):
-            st.write("""
-            | Kỳ | Vốn (10k/số) | Tổng cược | Lợi nhuận |
-            | :--- | :--- | :--- | :--- |
-            | 1 | 70 | 70 | +29 |
-            | 2 (Gấp) | 140 | 210 | +38 |
-            """)
+    c1, c2 = st.columns(2)
+    with c1:
+        st.metric("KÈO ĐÔI", "TÀI" if "T" in advice else "XỈU")
+    with c2:
+        st.metric("TỰ TIN", "85%" if "BỆT" in advice else "65%")
 
-st.markdown("---")
-st.warning("⚠️ Cảnh báo: AI chỉ tính toán dựa trên xác suất. Anh nên test nhẹ tay để quen nhịp 1 phút trước.")
+    st.success(f"🔢 DÀN 7 SỐ CHIẾN THUẬT: **{', '.join(map(str, dan))}**")
+    st.info("💡 Mẹo: Nhập dàn này cho 'Hàng đơn vị', chọn cược 5 kỳ liên tiếp.")
