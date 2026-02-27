@@ -4,22 +4,18 @@ import re
 import json
 import os
 import pandas as pd
-import numpy as np
 from collections import Counter, defaultdict
 import time
 
 # ================= CẤU HÌNH HỆ THỐNG TITAN v25.0 QUANTUM =================
-# Lưu ý: API Key nên được đặt trong biến môi trường hoặc Secrets của Streamlit để bảo mật
 API_KEY = "AIzaSyB5PRp04XlMHKl3oGfCRbsKXjlTA-CZifc" 
 DB_FILE = "titan_quantum_v25.json"
 
-# Cấu hình Gemini
 def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
         return genai.GenerativeModel('gemini-1.5-flash')
     except Exception as e:
-        st.error(f"Lỗi kết nối Neural Engine: {e}")
         return None
 
 neural_engine = setup_neural()
@@ -33,20 +29,17 @@ class QuantumAnalyzer:
         self._preprocess()
 
     def _preprocess(self):
-        """Tách chuỗi 5 số thành từng digit riêng lẻ để phân tích sâu"""
         for num in self.history:
             if len(num) == 5:
                 self.digits_history.extend([int(d) for d in num])
 
     def get_frequency_analysis(self, limit=100):
-        """Phân tích tần suất xuất hiện trong N kỳ gần nhất"""
         recent_data = "".join(self.history[-limit:])
         counts = Counter(recent_data)
         total = sum(counts.values())
         return {k: round(v/total * 100, 2) for k, v in counts.items()}
 
     def get_gap_analysis(self):
-        """Phân tích khoảng cách (Gap) - Số nào lâu chưa về"""
         last_indices = {}
         for i, num in enumerate(self.history):
             for d in num:
@@ -54,34 +47,16 @@ class QuantumAnalyzer:
         
         current_idx = len(self.history)
         gaps = {d: current_idx - idx for d, idx in last_indices.items()}
-        # Sort by gap descending (số lâu chưa về nhất)
         return sorted(gaps.items(), key=lambda x: x[1], reverse=True)
 
-    def get_markov_transition(self):
-        """Xác suất chuyển trạng thái (Nếu hôm nay ra số X, ngày mai thường ra số Y)"""
-        transitions = defaultdict(Counter)
-        full_str = "".join(self.history)
-        
-        for i in range(len(full_str) - 1):
-            curr = full_str[i]
-            next_d = full_str[i+1]
-            transitions[curr][next_d] += 1
-            
-        probs = {}
-        for k, v in transitions.items():
-            total = sum(v.values())
-            probs[k] = {nk: round(nv/total, 2) for nk, nv in v.most_common(3)}
-        return probs
-
     def calculate_weighted_score(self):
-        """Thuật toán chấm điểm tổng hợp: Tần suất + Độ nóng + Gap"""
         freq = self.get_frequency_analysis(200)
         gaps = dict(self.get_gap_analysis())
         
         scores = {}
         for d in "0123456789":
-            f_score = freq.get(d, 0) * 1.5  # Trọng số tần suất
-            g_score = min(gaps.get(d, 0), 20) * 2 # Trọng số gap (max 20 kỳ)
+            f_score = freq.get(d, 0) * 1.5
+            g_score = min(gaps.get(d, 0), 20) * 2
             scores[d] = f_score + g_score
             
         return sorted(scores.items(), key=lambda x: x[1], reverse=True)
@@ -103,6 +78,16 @@ def save_db(data):
 
 if "history" not in st.session_state:
     st.session_state.history = load_db()
+
+# Khởi tạo biến dự phòng ngay từ đầu
+if "math_backup" not in st.session_state:
+    st.session_state.math_backup = {
+        "main_3": "000",
+        "support_4": "0000",
+        "confidence": 75,
+        "reasoning": "Dựa trên thuật toán thống kê thuần túy.",
+        "warning": ""
+    }
 
 # ================= GIAO DIỆN TITAN v25.0 =================
 
@@ -187,7 +172,8 @@ if btn_analyze:
     with st.spinner('🔄 Đang đồng bộ dữ liệu & Chạy thuật toán lượng tử...'):
         # 1. Làm sạch dữ liệu
         new_data = re.findall(r"\b\d{5}\b", raw_input)
-        if new_data:
+        
+        if len(new_data) > 0:  # ✅ ĐÃ SỬA: Thêm điều kiện đầy đủ
             # Update history
             current_set = set(st.session_state.history)
             for item in new_data:
@@ -201,56 +187,63 @@ if btn_analyze:
             weighted_scores = analyzer.calculate_weighted_score()
             freq_data = analyzer.get_frequency_analysis(100)
             gap_data = analyzer.get_gap_analysis()
-            markov_data = analyzer.get_markov_transition()
             
             # Top 5 số nóng nhất theo tính toán
             top_5_math = [x[0] for x in weighted_scores[:5]]
             
-            # 3. Gửi dữ liệu đã xử lý cho AI (Gemini) để ra quyết định cuối cùng
+            # Tạo backup prediction từ thuật toán
+            math_prediction = {
+                "main_3": "".join(top_5_math[:3]) if len(top_5_math) >= 3 else "000",
+                "support_4": "".join(top_5_math[3:7]) if len(top_5_math) > 3 else "0000",
+                "confidence": 75,
+                "reasoning": "Dựa hoàn toàn trên thuật toán Weighted Score.",
+                "warning": "Không có cảnh báo đặc biệt."
+            }
+            
+            # 3. Gửi dữ liệu đã xử lý cho AI (Gemini)
             prompt_data = f"""
             Dữ liệu thống kê Lotobet (100 kỳ gần):
             - Tần suất cao nhất: {freq_data}
             - Số lâu chưa về (Gap): {gap_data[:5]}
             - Top 5 số tiềm năng (Toán học): {top_5_math}
-            - Quy luật chuyển đổi (Markov): {markov_data}
             
-            Nhiệm vụ của bạn (Siêu trí tuệ Titan):
-            Dựa trên dữ liệu toán học trên, hãy dự đoán 3 số chính (Main) và 4 số lót (Support) cho kỳ tiếp theo.
-            Ưu tiên các số có điểm Weighted Score cao nhưng chưa về trong 2 kỳ gần nhất.
+            Nhiệm vụ: Dự đoán 3 số chính (Main) và 4 số lót (Support) cho kỳ tiếp theo.
             
             Trả về JSON thuần túy (không markdown):
             {{
                 "main_3": "xyz",
                 "support_4": "abcd",
-                "confidence": 85-99,
-                "reasoning": "Lý do chọn dựa trên Gap hoặc Tần suất...",
-                "warning": "Cảnh báo nếu có bệt cầu"
+                "confidence": 85,
+                "reasoning": "Lý do chọn...",
+                "warning": "Cảnh báo nếu có"
             }}
             """
             
             try:
-                response = neural_engine.generate_content(prompt_data)
-                text_res = response.text
-                # Clean markdown code blocks if present
-                if "```json" in text_res:
-                    text_res = text_res.split("```json")[1].split("```")[0]
-                elif "```" in text_res:
-                    text_res = text_res.split("```")[1].split("```")[0]
-                
-                prediction = json.loads(text_res.strip())
-                st.session_state.last_prediction = prediction
-                st.session_state.math_backup = {
-                    "main_3": "".join(top_5_math[:3]),
-                    "support_4": "".join(top_5_math[3:7] if len(top_5_math) > 3 else "0000"),
-                    "confidence": 75,
-                    "reasoning": "Dựa hoàn toàn trên thuật toán Weighted Score.",
-                    "warning": "Không có cảnh báo đặc biệt."
-                }
+                if neural_engine:
+                    response = neural_engine.generate_content(prompt_data)
+                    text_res = response.text
+                    
+                    # Clean markdown code blocks
+                    if "```json" in text_res:
+                        text_res = text_res.split("```json")[1].split("```")[0]
+                    elif "```" in text_res:
+                        text_res = text_res.split("```")[1].split("```")[0]
+                    
+                    prediction = json.loads(text_res.strip())
+                    st.session_state.last_prediction = prediction
+                else:
+                    st.session_state.last_prediction = math_prediction
+                    st.session_state.last_prediction['reasoning'] += " (AI không khả dụng, dùng backup)"
+                    
             except Exception as e:
-                st.session_state.last_prediction = st.session_state.math_backup
-                st.session_state.last_prediction['reasoning'] += f" (AI Error: {str(e)})"
+                # ✅ ĐÃ SỬA: Dùng biến local thay vì session_state chưa khởi tạo
+                st.session_state.last_prediction = math_prediction
+                st.session_state.last_prediction['reasoning'] += f" (AI Error: {str(e)[:50]})"
             
             st.rerun()
+        else:
+            st.error("⚠️ Vui lòng nhập dữ liệu hợp lệ (dãy 5 chữ số)")
 
 # --- HIỂN THỊ KẾT QUẢ ---
 if "last_prediction" in st.session_state:
@@ -268,7 +261,7 @@ if "last_prediction" in st.session_state:
         st.markdown(f"<span class='status-badge {color_class}'>Độ tin cậy: {conf}%</span>", unsafe_allow_html=True)
         st.markdown(f"🧠 **Logic:** {res.get('reasoning', 'Đang phân tích...')}")
     with c_head2:
-        if 'warning' in res and res['warning']:
+        if res.get('warning'):
             st.warning(f"⚠️ {res['warning']}")
 
     st.divider()
@@ -291,7 +284,6 @@ if "last_prediction" in st.session_state:
         st.text_input("📋 Dàn 7 số tối ưu:", full_str, label_visibility="collapsed")
     
     with c_chart:
-        # Vẽ biểu đồ top số nóng
         temp_analyzer = QuantumAnalyzer(st.session_state.history)
         w_scores = temp_analyzer.calculate_weighted_score()
         df_viz = pd.DataFrame(w_scores[:5], columns=['Số', 'Điểm'])
@@ -310,7 +302,7 @@ with st.expander("📊 Chi tiết thống kê sâu (Dành cho Pro)"):
             freq = temp_analyzer.get_frequency_analysis(50)
             sorted_freq = sorted(freq.items(), key=lambda x: x[1], reverse=True)[:5]
             for k, v in sorted_freq:
-                st.progress(v/100)
+                st.progress(min(v/100, 1.0))
                 st.caption(f"Số {k}: {v}%")
         with col_s2:
             st.write("**❄️ Top 5 Số Lạnh Nhất (Gap cao - Sắp về):**")
