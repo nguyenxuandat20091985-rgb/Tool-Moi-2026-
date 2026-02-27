@@ -1,174 +1,175 @@
 import streamlit as st
-import google.generativeai as genai
 import re
 import json
 import os
 import pandas as pd
+import numpy as np
+import itertools
 from collections import Counter
+from datetime import datetime
 
-# ================= CẤU HÌNH HỆ THỐNG TITAN v24.2 =================
-# Cập nhật API KEY mới nhất từ anh
-API_KEY = "AIzaSyB5PRp04XlMHKl3oGfCRbsKXjlTA-CZifc"
-DB_FILE = "titan_supreme_v24_2.json"
+# ================= CẤU HÌNH =================
+DB_FILE = "titan_ultra_db.json"
+MAX_HISTORY = 3000
 
-def setup_neural():
-    try:
-        genai.configure(api_key=API_KEY)
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except: return None
+st.set_page_config(page_title="TITAN v25 ULTRA", layout="wide")
 
-neural_engine = setup_neural()
-
+# ================= LOAD & SAVE =================
 def load_db():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            try: 
+        try:
+            with open(DB_FILE, "r") as f:
                 data = json.load(f)
-                return data if isinstance(data, list) else []
-            except: return []
+                if isinstance(data, list):
+                    return data
+        except:
+            return []
     return []
 
 def save_db(data):
     with open(DB_FILE, "w") as f:
-        json.dump(data[-3000:], f) # Lưu tối đa 3000 kỳ để AI học sâu
+        json.dump(data[-MAX_HISTORY:], f)
 
 if "history" not in st.session_state:
     st.session_state.history = load_db()
 
-# ================= THIẾT KẾ GIAO DIỆN v22.0 STYLE =================
-st.set_page_config(page_title="TITAN v24.2 SUPREME", layout="wide")
+# ================= VALIDATION =================
+def clean_input(raw_text):
+    numbers = re.findall(r"\b\d{5}\b", raw_text)
+    return numbers
+
+def validate_number(num):
+    if not num.isdigit():
+        return False
+    if len(num) != 5:
+        return False
+    return True
+
+# ================= CORE ENGINE =================
+all_triplets = list(itertools.combinations(range(10), 3))
+
+def build_frequency(history):
+    freq = np.zeros(10)
+    for num in history:
+        for d in num:
+            freq[int(d)] += 1
+    return freq
+
+def build_co_matrix(history):
+    matrix = np.zeros((10,10))
+    for num in history:
+        unique_digits = list(set(num))
+        for d1 in unique_digits:
+            for d2 in unique_digits:
+                if d1 != d2:
+                    matrix[int(d1)][int(d2)] += 1
+    return matrix
+
+def score_triplets(freq, matrix):
+    scores = []
+    total = np.sum(freq) + 1
+
+    for trip in all_triplets:
+        freq_score = sum(freq[d] for d in trip) / total
+
+        co_score = (
+            matrix[trip[0]][trip[1]] +
+            matrix[trip[0]][trip[2]] +
+            matrix[trip[1]][trip[2]]
+        )
+
+        final = (freq_score * 0.6) + (co_score * 0.4)
+
+        scores.append((trip, final))
+
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return scores
+
+def build_final_7digits(scores):
+    top_trip = scores[0][0]
+    all_digits = "".join(st.session_state.history[-100:])
+    top_freq = [x[0] for x in Counter(all_digits).most_common(10)]
+
+    support = []
+    for d in top_freq:
+        if int(d) not in top_trip:
+            support.append(d)
+        if len(support) == 4:
+            break
+
+    return "".join(map(str, top_trip)), "".join(support)
+
+# ================= UI =================
 st.markdown("""
-    <style>
-    .stApp { background: #010409; color: #e6edf3; }
-    .prediction-card {
-        background: #0d1117; border: 1px solid #30363d;
-        border-radius: 12px; padding: 25px; margin-top: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    }
-    .num-box {
-        font-size: 80px; font-weight: 900; color: #ff5858;
-        text-align: center; letter-spacing: 12px; border-right: 2px solid #30363d;
-        text-shadow: 0 0 15px rgba(255,88,88,0.4);
-    }
-    .lot-box {
-        font-size: 55px; font-weight: 700; color: #58a6ff;
-        text-align: center; letter-spacing: 8px; padding-left: 20px;
-    }
-    .status-bar { padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 20px; margin-bottom: 15px; }
-    .warning-box { background: #331010; color: #ff7b72; padding: 10px; border-radius: 5px; border: 1px solid #6e2121; text-align: center; margin-top: 10px; }
-    </style>
+<style>
+.stApp { background:#0d1117; color:#e6edf3; }
+.main-title { text-align:center; font-size:42px; font-weight:900; color:#58a6ff; }
+.card { background:#161b22; padding:20px; border-radius:10px; border:1px solid #30363d; }
+</style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #58a6ff;'>🚀 TITAN v24.2 SUPREME AI</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #8b949e;'>Hệ thống soi cầu 3D - Khắc chế nhà cái đảo cầu</p>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>🚀 TITAN v25 ULTRA ENGINE</div>", unsafe_allow_html=True)
 
-# ================= PHẦN 1: NHẬP LIỆU & XỬ LÝ SẠCH =================
-with st.container():
-    col_in, col_st = st.columns([2, 1])
-    with col_in:
-        raw_input = st.text_area("📡 Nạp dữ liệu (Dán bảng lịch sử hoặc dãy số):", height=120, placeholder="32880\n21808...")
-    with col_st:
-        st.write(f"📊 Kho dữ liệu: **{len(st.session_state.history)} kỳ**")
-        c1, c2 = st.columns(2)
-        btn_save = c1.button("🚀 GIẢI MÃ")
-        btn_reset = c2.button("🗑️ RESET")
+col1, col2 = st.columns([2,1])
+
+with col1:
+    raw_input = st.text_area("📥 Dán dữ liệu 5 số (mỗi dòng 1 kỳ)", height=150)
+
+with col2:
+    st.metric("📊 Tổng kỳ", len(st.session_state.history))
+    btn_add = st.button("➕ Thêm Dữ Liệu")
+    btn_reset = st.button("🗑 Reset")
 
 if btn_reset:
     st.session_state.history = []
-    if os.path.exists(DB_FILE): os.remove(DB_FILE)
-    st.success("Đã xóa sạch bộ nhớ vĩnh viễn.")
+    if os.path.exists(DB_FILE):
+        os.remove(DB_FILE)
+    st.success("Đã reset sạch.")
     st.rerun()
 
-if btn_save:
-    # Bước 1: Lọc sạch dữ liệu (Chỉ lấy dãy đúng 5 chữ số)
-    new_data = re.findall(r"\b\d{5}\b", raw_input)
-    if new_data:
-        # Loại bỏ trùng lặp và giữ nguyên thứ tự
-        st.session_state.history.extend(new_data)
+if btn_add:
+    new_nums = clean_input(raw_input)
+    valid_nums = []
+
+    for n in new_nums:
+        if validate_number(n):
+            valid_nums.append(n)
+
+    if not valid_nums:
+        st.error("Không có dữ liệu hợp lệ (phải đúng 5 chữ số).")
+    else:
+        st.session_state.history.extend(valid_nums)
         st.session_state.history = list(dict.fromkeys(st.session_state.history))
         save_db(st.session_state.history)
-        
-        # Bước 2: Phân tích bệt/đảo trước khi gửi cho Gemini
-        last_nums = "".join(st.session_state.history[-10:])
-        streak_check = Counter(last_nums).most_common(1)
-        
-        # Gửi AI Phân tích chuyên sâu
-        prompt = f"""
-        Bạn là Siêu trí tuệ TITAN v24.2 chuyên soi cầu Lotobet.
-        Dữ liệu lịch sử: {st.session_state.history[-100:]}
-        Nhận diện nhanh: Số '{streak_check[0][0]}' đang có dấu hiệu bệt/về nhiều.
-        Nhiệm vụ:
-        1. Phân tích nhịp đảo cầu của nhà cái (Tài/Xỉu, Chẵn/Lẻ).
-        2. Chốt 3 số chính (Main_3) có khả năng nằm trong giải ĐB cao nhất.
-        3. Chốt 4 số lót (Support_4) tạo dàn 7 số.
-        4. Trả về kết luận 'NÊN ĐÁNH' hoặc 'DỪNG' nếu cầu đang ảo.
-        
-        TRẢ VỀ JSON:
-        {{
-            "main_3": "abc", 
-            "support_4": "defg", 
-            "decision": "ĐÁNH/DỪNG/CẢNH BÁO BỆT", 
-            "logic": "Giải thích ngắn gọn nhịp cầu", 
-            "color": "Green/Red/Yellow", 
-            "conf": 98
-        }}
-        """
-        try:
-            response = neural_engine.generate_content(prompt)
-            st.session_state.last_prediction = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
-        except:
-            # Thuật toán dự phòng nếu AI bận
-            all_n = "".join(st.session_state.history[-50:])
-            top = [x[0] for x in Counter(all_n).most_common(7)]
-            st.session_state.last_prediction = {
-                "main_3": "".join(top[:3]), 
-                "support_4": "".join(top[3:]), 
-                "decision": "THEO DÕI", 
-                "logic": "Hệ thống đang đồng bộ dữ liệu cầu.", 
-                "color": "Yellow", 
-                "conf": 65
-            }
+        st.success(f"Đã thêm {len(valid_nums)} kỳ.")
         st.rerun()
 
-# ================= PHẦN 2: KẾT QUẢ HIỂN THỊ TRỰC QUAN =================
-if "last_prediction" in st.session_state:
-    res = st.session_state.last_prediction
-    
-    # Định dạng màu sắc trạng thái
-    status_colors = {"green": "#238636", "red": "#da3633", "yellow": "#d29922"}
-    bg_color = status_colors.get(res['color'].lower(), "#30363d")
-    
-    st.markdown(f"<div class='status-bar' style='background: {bg_color};'>📢 TRẠNG THÁI: {res['decision']} ({res['conf']}%)</div>", unsafe_allow_html=True)
-
-    st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
-    
-    # Hiển thị 3 số chính và 4 số lót hàng ngang
-    c1, c2 = st.columns([1.5, 1])
-    with c1:
-        st.markdown(f"<p style='color:#8b949e; text-align:center;'>🔥 3 SỐ CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='num-box'>{res['main_3']}</div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"<p style='color:#8b949e; text-align:center;'>🛡️ 4 SỐ LÓT (AN TOÀN)</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='lot-box'>{res['support_4']}</div>", unsafe_allow_html=True)
-    
+# ================= ANALYSIS =================
+if len(st.session_state.history) >= 10:
     st.divider()
-    
-    # Phân tích chi tiết & Cảnh báo bệt
-    col_logic, col_copy = st.columns([2, 1])
-    with col_logic:
-        st.write(f"💡 **PHÂN TÍCH:** {res['logic']}")
-        if "BỆT" in res['decision'] or res['conf'] < 80:
-            st.markdown("<div class='warning-box'>⚠️ CẢNH BÁO: Cầu đang có dấu hiệu bệt sâu hoặc đảo liên tục. Đánh nhẹ hoặc dừng.</div>", unsafe_allow_html=True)
-    
-    with col_copy:
-        full_dan = "".join(sorted(set(res['main_3'] + res['support_4'])))
-        st.text_input("📋 SAO CHÉP DÀN 7 SỐ:", full_dan)
-        
+    st.subheader("🔥 KẾT QUẢ PHÂN TÍCH")
+
+    freq = build_frequency(st.session_state.history)
+    matrix = build_co_matrix(st.session_state.history)
+    scores = score_triplets(freq, matrix)
+
+    main3, support4 = build_final_7digits(scores)
+
+    st.markdown("<div class='card'>", unsafe_allow_html=True)
+    st.markdown(f"### 🔥 3 SỐ CHỦ LỰC: `{main3}`")
+    st.markdown(f"### 🛡 4 SỐ LÓT: `{support4}`")
+
+    final7 = "".join(sorted(set(main3 + support4)))
+    st.text_input("📋 DÀN 7 SỐ:", final7)
+
+    confidence = round(min(scores[0][1] * 100, 99),2)
+    st.progress(int(confidence))
+    st.write(f"📈 Độ mạnh mô hình: {confidence}%")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ================= PHẦN 3: BỘ LỌC ĐA TẦNG (HỌC KỲ) =================
-if st.session_state.history:
-    with st.expander("📊 Thống kê nhịp rơi & Logic đa tầng"):
-        st.write("Dữ liệu 50 kỳ gần nhất được AI phân tích để tìm quy luật đảo cầu:")
-        all_d = "".join(st.session_state.history[-50:])
-        st.bar_chart(pd.Series(Counter(all_d)).sort_index())
+    with st.expander("📊 Thống kê 50 kỳ gần nhất"):
+        last50 = "".join(st.session_state.history[-50:])
+        st.bar_chart(pd.Series(Counter(last50)).sort_index())
+
+else:
+    st.warning("Cần ít nhất 10 kỳ để phân tích chính xác.")
