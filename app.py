@@ -1,181 +1,161 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import itertools
-import math
-import random
-from collections import Counter
-
-st.set_page_config(page_title="5D BET PROMAX ENGINE", layout="wide")
+import json
+import os
+from itertools import combinations
+from datetime import datetime
 
 # ==============================
 # CONFIG
 # ==============================
-WINDOW_SHORT = 30
-WINDOW_MED = 60
-WINDOW_LONG = 120
-MONTE_CARLO_RUNS = 20000
+st.set_page_config(page_title="5D BET PRO MAX ULTRA", layout="wide")
+
+DATA_FILE = "history_5d.json"
 
 # ==============================
-# UTIL FUNCTIONS
+# LOAD / SAVE DATA
+# ==============================
+def load_data():
+    if os.path.exists(DATA_FILE):
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    return []
+
+def save_data(data):
+    with open(DATA_FILE, "w") as f:
+        json.dump(data, f)
+
+# ==============================
+# CORE ANALYSIS ENGINE
 # ==============================
 
-def parse_history(text):
-    lines = text.strip().split("\n")
-    data = []
-    for line in lines:
-        line = line.strip()
-        if len(line) == 5 and line.isdigit():
-            data.append(line)
-    return data
+def digit_frequency(history, window=100):
+    recent = history[-window:]
+    freq = np.zeros(10)
 
-
-def digit_frequency(history, window):
-    freq = Counter()
-    for row in history[-window:]:
-        for d in row:
+    for item in recent:
+        for d in item["digits"]:
             freq[d] += 1
-    total = sum(freq.values())
-    return {str(i): freq[str(i)] / total if total > 0 else 0 for i in range(10)}
+
+    if len(recent) > 0:
+        freq = freq / (len(recent) * 5)
+
+    return freq
 
 
-def co_occurrence_matrix(history):
+def co_occurrence_matrix(history, window=100):
+    recent = history[-window:]
     matrix = np.zeros((10, 10))
-    for row in history:
-        digits = set(row)
-        for a in digits:
-            for b in digits:
-                if a != b:
-                    matrix[int(a)][int(b)] += 1
+
+    for item in recent:
+        digits = item["digits"]
+        unique = list(set(digits))
+        for i in unique:
+            for j in unique:
+                if i != j:
+                    matrix[i][j] += 1
+
+    if len(recent) > 0:
+        matrix = matrix / len(recent)
+
     return matrix
 
 
-def entropy_score(freq_dict):
-    entropy = 0
-    for v in freq_dict.values():
-        if v > 0:
-            entropy -= v * math.log(v)
-    return entropy
+def score_combinations(freq, co_matrix):
+    combo_scores = []
 
+    for combo in combinations(range(10), 3):
+        f_score = freq[combo[0]] + freq[combo[1]] + freq[combo[2]]
 
-def monte_carlo_probability(combo, freq_dist):
-    hits = 0
-    digits = list(freq_dist.keys())
-    probs = list(freq_dist.values())
-    for _ in range(MONTE_CARLO_RUNS):
-        sample = np.random.choice(digits, 5, p=probs)
-        if all(d in sample for d in combo):
-            hits += 1
-    return hits / MONTE_CARLO_RUNS
+        c_score = (
+            co_matrix[combo[0]][combo[1]]
+            + co_matrix[combo[0]][combo[2]]
+            + co_matrix[combo[1]][combo[2]]
+        )
 
+        total_score = f_score * 0.6 + c_score * 0.4
 
-def calculate_ev(prob, payout, bet):
-    return (prob * payout) - ((1 - prob) * bet)
+        combo_scores.append((combo, total_score))
 
+    combo_scores.sort(key=lambda x: x[1], reverse=True)
 
-def kelly_criterion(prob, payout):
-    b = payout - 1
-    q = 1 - prob
-    return max((b * prob - q) / b, 0)
+    return combo_scores
 
 
 # ==============================
-# STREAMLIT UI
+# UI
 # ==============================
 
-st.title("🔥 5D BET 3 SỐ 5 TINH – PROMAX ENGINE")
+st.title("🔥 5D BET PRO MAX ULTRA ENGINE")
 
-st.markdown("Nhập lịch sử 5 số (mỗi dòng 1 kết quả, ví dụ: 12864)")
+history = load_data()
 
-history_input = st.text_area("LỊCH SỬ 5D", height=300)
+col1, col2 = st.columns(2)
 
-payout = st.number_input("TỶ LỆ TRẢ THƯỞNG (VD: 50 nếu ăn 1:50)", value=50.0)
-bet_amount = st.number_input("TIỀN MỖI LẦN ĐÁNH", value=100.0)
+with col1:
+    st.subheader("➕ Nhập Kỳ Mới (5 số)")
+    result_input = st.text_input("Nhập 5 số (vd: 12864)")
 
-if st.button("🚀 PHÂN TÍCH PROMAX"):
+    if st.button("Lưu Kỳ"):
+        if result_input.isdigit() and len(result_input) == 5:
+            digits = [int(d) for d in result_input]
+            history.append({
+                "timestamp": str(datetime.now()),
+                "digits": digits
+            })
+            save_data(history)
+            st.success("Đã lưu thành công.")
+        else:
+            st.error("Phải nhập đúng 5 chữ số.")
 
-    history = parse_history(history_input)
+with col2:
+    st.subheader("📊 Thống Kê Hiện Tại")
+    st.write(f"Tổng số kỳ đã lưu: {len(history)}")
 
-    if len(history) < 20:
-        st.warning("Cần tối thiểu 20 kỳ để phân tích.")
-        st.stop()
+# ==============================
+# ANALYSIS SECTION
+# ==============================
 
-    # Frequency multi window
-    freq_short = digit_frequency(history, min(WINDOW_SHORT, len(history)))
-    freq_med = digit_frequency(history, min(WINDOW_MED, len(history)))
-    freq_long = digit_frequency(history, min(WINDOW_LONG, len(history)))
+if len(history) >= 10:
 
-    # Weighted frequency
-    freq_final = {}
-    for i in range(10):
-        d = str(i)
-        freq_final[d] = (
-            freq_short[d] * 0.5 +
-            freq_med[d] * 0.3 +
-            freq_long[d] * 0.2
-        )
-
-    # Normalize
-    total = sum(freq_final.values())
-    for k in freq_final:
-        freq_final[k] /= total
-
-    # Co-occurrence
-    matrix = co_occurrence_matrix(history)
-
-    # Generate all 120 combinations
-    combos = list(itertools.combinations([str(i) for i in range(10)], 3))
-
-    results = []
-
-    for combo in combos:
-
-        # Frequency score
-        freq_score = sum(freq_final[d] for d in combo)
-
-        # Co-occurrence score
-        co_score = (
-            matrix[int(combo[0])][int(combo[1])] +
-            matrix[int(combo[0])][int(combo[2])] +
-            matrix[int(combo[1])][int(combo[2])]
-        )
-
-        # Monte Carlo probability
-        prob = monte_carlo_probability(combo, freq_final)
-
-        # EV
-        ev = calculate_ev(prob, payout, bet_amount)
-
-        # Kelly
-        kelly = kelly_criterion(prob, payout)
-
-        total_score = freq_score + (co_score * 0.0001) + (prob * 2)
-
-        results.append({
-            "combo": "".join(combo),
-            "probability": prob,
-            "freq_score": freq_score,
-            "co_score": co_score,
-            "EV": ev,
-            "Kelly": kelly,
-            "score": total_score
-        })
-
-    df = pd.DataFrame(results)
-    df = df.sort_values("score", ascending=False)
-
-    st.subheader("🏆 TOP 10 BỘ 3 TỐI ƯU")
-    st.dataframe(df.head(10), use_container_width=True)
-
-    best = df.iloc[0]
-
-    st.success(f"""
-    🎯 Bộ đề xuất mạnh nhất: {best['combo']}
-    📊 Xác suất mô phỏng: {round(best['probability']*100,2)}%
-    💰 EV: {round(best['EV'],2)}
-    📈 Kelly vốn đề xuất: {round(best['Kelly']*100,2)}% vốn
-    """)
+    freq = digit_frequency(history, window=100)
+    co_matrix = co_occurrence_matrix(history, window=100)
+    ranked_combos = score_combinations(freq, co_matrix)
 
     st.markdown("---")
-    st.subheader("📊 Phân phối Digit hiện tại")
-    st.json(freq_final)
+    st.subheader("🏆 TOP 10 Bộ 3 Số Đề Xuất")
+
+    top10 = ranked_combos[:10]
+
+    df_top = pd.DataFrame(
+        [{
+            "Bộ 3 Số": combo,
+            "Điểm": round(score, 5)
+        } for combo, score in top10]
+    )
+
+    st.dataframe(df_top, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("📈 Tần Suất 0-9 (100 kỳ gần nhất)")
+
+    df_freq = pd.DataFrame({
+        "Digit": range(10),
+        "Frequency": np.round(freq, 4)
+    })
+
+    st.bar_chart(df_freq.set_index("Digit"))
+
+else:
+    st.warning("Cần tối thiểu 10 kỳ để phân tích.")
+
+# ==============================
+# RESET
+# ==============================
+
+st.markdown("---")
+if st.button("⚠️ Reset toàn bộ dữ liệu"):
+    if os.path.exists(DATA_FILE):
+        os.remove(DATA_FILE)
+    st.success("Đã reset. Refresh lại trang.")
