@@ -1,107 +1,140 @@
 import streamlit as st
 from datetime import datetime
-import time
 import re
 
 st.set_page_config(page_title="TITAN v35.0 - PRO", layout="centered", page_icon="🎯")
 
-# --- CSS TỐI ƯU ---
+# --- CSS PROFESSIONAL ---
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5em;
-        font-weight: bold;
-        text-align: center;
-        color: #1E88E5;
-        margin: 20px 0;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    .main-container {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
         padding: 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 15px;
-        color: white;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-    .result-box {
-        background: white;
-        padding: 30px;
-        border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        margin: 20px 0;
-        border: 3px solid #1E88E5;
-    }
-    .position-text {
-        font-size: 1.5em;
-        font-weight: bold;
-        color: #FF6F00;
-        text-align: center;
-        margin: 15px 0;
-    }
-    .bet-text {
-        font-size: 4em;
-        font-weight: bold;
-        text-align: center;
-        margin: 20px 0;
-        text-shadow: 3px 3px 6px rgba(0,0,0,0.2);
-    }
-    .tai-text {
-        color: #E53935;
-    }
-    .xiu-text {
-        color: #1E88E5;
-    }
-    .bet-amount {
-        font-size: 2.5em;
-        font-weight: bold;
-        color: #43A047;
-        text-align: center;
-        margin: 15px 0;
-    }
-    .odds-text {
-        font-size: 1.5em;
-        color: #333;
-        text-align: center;
-        margin: 15px 0;
-        padding: 15px;
-        background: #FFF9C4;
-        border-radius: 10px;
-    }
-    .reason-box {
-        font-size: 1.3em;
-        color: #D84315;
-        font-weight: bold;
-        text-align: center;
-        margin: 20px 0;
-        padding: 15px;
-        background: #FFE0B2;
-        border-radius: 10px;
-        border-left: 5px solid #D84315;
-    }
-    .confidence-bar {
-        font-size: 1.3em;
-        color: #333;
-        text-align: center;
-        margin: 15px 0;
-    }
-    .countdown {
-        font-size: 2em;
-        font-weight: bold;
-        color: #E53935;
-        text-align: center;
-        padding: 15px;
-        background: #FFEBEE;
-        border-radius: 10px;
         margin: 10px 0;
-        animation: pulse 1s infinite;
     }
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.02); }
-        100% { transform: scale(1); }
+    
+    .recommendation-box {
+        background: white;
+        padding: 25px;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        border-left: 5px solid #667eea;
+        margin: 15px 0;
     }
-    .stButton>button {
-        font-size: 1.5em;
-        font-weight: bold;
-        padding: 15px 30px;
+    
+    .title {
+        font-size: 1.8em;
+        font-weight: 700;
+        color: #1a202c;
+        text-align: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    
+    .label {
+        font-size: 0.95em;
+        font-weight: 600;
+        color: #4a5568;
+        margin: 12px 0 5px 0;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .value {
+        font-size: 1.4em;
+        font-weight: 700;
+        margin: 5px 0;
+    }
+    
+    .position {
+        color: #ed8936;
+    }
+    
+    .tai {
+        color: #e53e3e;
+    }
+    
+    .xiu {
+        color: #3182ce;
+    }
+    
+    .bet-amount {
+        color: #38a169;
+    }
+    
+    .odds {
+        color: #2d3748;
+        font-size: 1.1em;
+    }
+    
+    .reason-box {
+        background: #fffaf0;
+        border: 1px solid #fbd38d;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 15px 0;
+        color: #c05621;
+        font-weight: 600;
+    }
+    
+    .confidence-bar {
+        background: #e2e8f0;
+        border-radius: 10px;
+        height: 25px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    
+    .confidence-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #48bb78 0%, #38a169 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 700;
+        font-size: 0.9em;
+    }
+    
+    .countdown {
+        background: #fed7d7;
+        color: #c53030;
+        padding: 12px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: 700;
+        font-size: 1.2em;
+        margin: 10px 0;
+    }
+    
+    .btn-win {
+        background: #48bb78;
+        color: white;
+        font-weight: 700;
+        padding: 12px;
+        border-radius: 8px;
+        border: none;
         width: 100%;
+        margin: 5px 0;
+    }
+    
+    .btn-lose {
+        background: #f56565;
+        color: white;
+        font-weight: 700;
+        padding: 12px;
+        border-radius: 8px;
+        border: none;
+        width: 100%;
+        margin: 5px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -115,12 +148,12 @@ if 'last_result' not in st.session_state:
     st.session_state.last_result = None
 
 # --- HÀM PHÂN TÍCH ---
-def quick_analyze(raw_text):
+def analyze_data(raw_text):
     lines = [re.sub(r'[^\d]', '', l.strip()) for l in raw_text.strip().split('\n')]
     valid = [l for l in lines if len(l) == 5]
     
     if len(valid) < 5:
-        return None
+        return None, "Cần ít nhất 5 kỳ hợp lệ"
     
     positions = ["Chục Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"]
     best_pick = None
@@ -162,32 +195,30 @@ def quick_analyze(raw_text):
             "bet_amount": min(10000, int(st.session_state.bankroll * 0.01))
         }
     
-    return best_pick
+    return best_pick, None
 
 # --- GIAO DIỆN ---
-st.markdown('<div class="main-header">🎯 TITAN v35.0 - PRO</div>', unsafe_allow_html=True)
+st.title("🎯 TITAN v35.0 - PROFESSIONAL")
 
 # Countdown
 now = datetime.now()
 seconds = now.second
 remaining = 60 - seconds if seconds < 30 else 30 - (seconds - 30)
-st.markdown(f'<div class="countdown">🕒 KỲ TIẾP THEO: {remaining:02d} GIÂY</div>', unsafe_allow_html=True)
+st.markdown(f'<div class="countdown">🕒 Kỳ tiếp theo: {remaining:02d} giây</div>', unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
-    st.header("💰 QUẢN LÝ VỐN")
+    st.header("💰 Quản lý vốn")
     st.session_state.bankroll = st.number_input(
         "Vốn hiện tại (đ)", 
         value=st.session_state.bankroll, 
-        step=10000,
-        min_value=0
+        step=10000
     )
-    
-    recommended = min(20000, int(st.session_state.bankroll * 0.02))
-    st.success(f"✅ Cược đề xuất:\n\n**{recommended:,}đ**\n\n(2% vốn)")
+    recommended_bet = min(20000, int(st.session_state.bankroll * 0.02))
+    st.info(f"✅ Cược đề xuất: {recommended_bet:,}đ (2% vốn)")
     
     st.divider()
-    st.info(f"💵 Vốn: {st.session_state.bankroll:,}đ")
+    st.metric("💵 Vốn hiện tại", f"{st.session_state.bankroll:,.0f}đ")
     
     if st.button("🔄 Reset", use_container_width=True):
         st.session_state.period_count = 690
@@ -195,135 +226,82 @@ with st.sidebar:
         st.rerun()
 
 # Form nhập liệu
-st.markdown("### 📥 NHẬP KẾT QUẢ 10 KỲ GẦN NHẤT")
-raw = st.text_area(
-    "Dán kết quả tại đây (mỗi dòng 5 số, kỳ mới nhất trên cùng):",
-    placeholder="87746\n56421\n69137\n00443\n04475\n...",
-    height=200,
-    label_visibility="collapsed"
-)
-
-col1, col2 = st.columns([3, 1])
-with col1:
-    analyze_btn = st.button("⚡ PHÂN TÍCH NGAY", type="primary", use_container_width=True)
-with col2:
-    if st.button("🗑️ XOÁ", use_container_width=True):
-        st.session_state.last_result = None
-        st.rerun()
-
-# Kết quả
-if analyze_btn and raw:
-    result = quick_analyze(raw)
+with st.form("input_form", clear_on_submit=False):
+    st.subheader("📥 Nhập kết quả")
+    raw = st.text_area(
+        "Dán 10 kỳ gần nhất (mới nhất trên cùng):",
+        placeholder="87746\n56421\n69137\n...",
+        height=150
+    )
     
-    if result:
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        submitted = st.form_submit_button("⚡ Phân tích ngay", type="primary", use_container_width=True)
+    with col2:
+        st.form_submit_button("🗑️ Xoá", use_container_width=True)
+
+# Xử lý kết quả
+if submitted and raw:
+    result, error = analyze_data(raw)
+    
+    if error:
+        st.warning(f"⚠️ {error}")
+    elif result:
         st.session_state.period_count += 1
         st.session_state.last_result = result
         
         profit = int(result['bet_amount'] * 0.985)
+        bet_class = "tai" if result['bet'] == "TÀI" else "xiu"
         
-        # HIỂN THỊ KẾT QUẢ - SỬ DỤNG STREAMLIT NATIVE
-        st.markdown("### 🎯 KHUYẾN NGHỊ KỲ " + str(st.session_state.period_count))
-        st.divider()
-        
-        # Vị trí
+        # Hiển thị kết quả chuyên nghiệp
         st.markdown(f"""
-        <div class="position-text">
-            📍 VỊ TRÍ:<br>{result['position']}
+        <div class="main-container">
+            <div class="recommendation-box">
+                <div class="title">🎯 KHUYẾN NGHỊ KỲ {st.session_state.period_count}</div>
+                
+                <div class="label">📍 Vị trí:</div>
+                <div class="value position">{result['position']}</div>
+                
+                <div class="label">🔴 Đánh:</div>
+                <div class="value {bet_class}">{result['bet']}</div>
+                
+                <div class="label">💰 Mức cược:</div>
+                <div class="value bet-amount">{result['bet_amount']:,}đ</div>
+                
+                <div class="odds">🎯 Odds: 1.985 → Thắng +{profit:,}đ</div>
+                
+                <div class="reason-box">
+                    📊 {result['reason']}
+                </div>
+                
+                <div class="label">⚡ Độ tin cậy:</div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width: {result['confidence']}%">
+                        {result['confidence']}%
+                    </div>
+                </div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # ĐÁNH GÌ - CHỮ TO SIÊU RÕ
-        bet_class = "tai-text" if result['bet'] == "TÀI" else "xiu-text"
-        st.markdown(f"""
-        <div class="bet-text {bet_class}">
-            🔴 {result['bet']}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Mức cược
-        st.markdown(f"""
-        <div class="bet-amount">
-            💰 CƯỢC: {result['bet_amount']:,}đ
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Odds
-        st.markdown(f"""
-        <div class="odds-text">
-            🎯 Odds: 1.985<br>
-            👉 Thắng: +{profit:,}đ
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Lý do
-        st.markdown(f"""
-        <div class="reason-box">
-            📊 {result['reason']}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Độ tin cậy
-        bars = "🟩" * (result['confidence'] // 10) + "⬜" * (10 - result['confidence'] // 10)
-        st.markdown(f"""
-        <div class="confidence-bar">
-            ⚡ Độ tin cậy:<br>{bars}<br>{result['confidence']}%
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.divider()
         
         # Nút kết quả
-        st.markdown("### ✅ KẾT QUẢ THỰC TẾ:")
         c1, c2 = st.columns(2)
-        
         with c1:
-            if st.button(" THẮNG", type="primary", use_container_width=True, key="win_btn"):
+            if st.button("✅ Thắng", type="primary", use_container_width=True, key="win_btn"):
                 st.session_state.bankroll += profit
                 st.balloons()
-                st.success(f"🎉 Chúc mừng! +{profit:,}đ")
-                st.info(f"💵 Vốn mới: {st.session_state.bankroll:,}đ")
+                st.success(f"🎉 +{profit:,}đ")
                 st.rerun()
-        
         with c2:
-            if st.button("🔴 THUA", type="secondary", use_container_width=True, key="lose_btn"):
+            if st.button("❌ Thua", type="secondary", use_container_width=True, key="lose_btn"):
                 st.session_state.bankroll -= result['bet_amount']
-                st.error(f"💸 Thua: -{result['bet_amount']:,}đ")
-                st.info(f"💵 Vốn mới: {st.session_state.bankroll:,}đ")
+                st.error(f"💸 -{result['bet_amount']:,}đ")
                 st.rerun()
         
-        # Cảnh báo stop-loss
+        # Cảnh báo
         if st.session_state.bankroll < 400000:
-            st.error("🛑 **DỪNG NGAY!** Đã mất >20% vốn. Nghỉ ngơi và quay lại sau!")
-        
-        if st.session_state.bankroll > 575000:
-            st.success("🎉 **TUYỆT VỜI!** Đã thắng >15%. Nên chốt lời!")
-
-    else:
-        st.warning("⚠️ Dữ liệu chưa đủ 5 kỳ hợp lệ! Vui lòng nhập ít nhất 5 dòng 5 chữ số.")
+            st.error("🛑 Dừng ngay! Đã mất >20% vốn.")
 
 # Footer
 st.markdown("---")
-st.caption("""
-**🎯 TITAN v35.0 - PROFESSIONAL**  
-⚡ Phân tích nhanh - Chữ to rõ ràng - Dễ sử dụng  
-⚠️ Chơi có trách nhiệm - Biết dừng đúng lúc 🙏
-""")
-
-# Hướng dẫn
-with st.expander("📖 HƯỚNG DẪN SỬ DỤNG"):
-    st.markdown("""
-    **Bước 1:** Copy 10 kỳ kết quả gần nhất từ 5D KU
-    
-    **Bước 2:** Dán vào ô text above (kỳ mới nhất ở TRÊN cùng)
-    
-    **Bước 3:** Bấm "⚡ PHÂN TÍCH NGAY"
-    
-    **Bước 4:** Nhìn dòng chữ TO nhất → Đó là khuyến nghị:
-    - 📍 VỊ TRÍ: Đánh ở cột nào (Chục Ngàn/Ngàn/Trăm/Chục/Đơn Vị)
-    - 🔴 ĐÁNH: TÀI (màu đỏ) hoặc XỈU (màu xanh)
-    - 💰 CƯỢC: Số tiền nên đánh
-    
-    **Bước 5:** Vào game 5D KU → Kèo Đôi → Đơn Thức → Chọn vị trí và Tài/Xỉu → Nhập tiền → Xác nhận
-    
-    **Bước 6:** Sau khi có kết quả, bấm "🟢 THẮNG" hoặc "🔴 THUA" để cập nhật vốn
-    """)
+st.caption("🎯 TITAN v35.0 | Phân tích chuyên nghiệp | Chơi có trách nhiệm 🙏")
