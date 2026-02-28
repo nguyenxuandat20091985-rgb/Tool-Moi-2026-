@@ -1,244 +1,131 @@
 import streamlit as st
-from datetime import datetime
+import google.generativeai as genai
 import re
-import time
+import json
+import os
+import pandas as pd
+from collections import Counter
 
-st.set_page_config(page_title="TITAN v39.0 - 5 HÀNG", layout="wide", initial_sidebar_state="collapsed")
+# ================= CẤU HÌNH HỆ THỐNG =================
+API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
+DB_FILE = "titan_permanent_v24.json"
 
-# --- CSS TỐI ƯU MOBILE ---
+def setup_neural():
+    try:
+        genai.configure(api_key=API_KEY)
+        return genai.GenerativeModel('gemini-1.5-flash')
+    except: return None
+
+neural_engine = setup_neural()
+
+def load_db():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, "r") as f:
+            try: return json.load(f)
+            except: return []
+    return []
+
+def save_db(data):
+    with open(DB_FILE, "w") as f:
+        json.dump(data[-3000:], f)
+
+if "history" not in st.session_state:
+    st.session_state.history = load_db()
+
+# ================= THIẾT KẾ GIAO DIỆN v22.0 STYLE =================
+st.set_page_config(page_title="TITAN v24.1 OMNI", layout="wide")
 st.markdown("""
-<style>
-    .main > div {padding-top: 1rem;}
-    .stAlert {padding: 0.5rem;}
-    div[data-testid="stMetricValue"] {font-size: 1.2rem;}
-    .tai {color: #FF4444; font-weight: bold;}
-    .xiu {color: #4444FF; font-weight: bold;}
-    .bet-box {
-        background: white;
-        border: 2px solid #ddd;
-        border-radius: 8px;
-        padding: 8px;
-        margin: 2px;
-        text-align: center;
+    <style>
+    .stApp { background: #010409; color: #e6edf3; }
+    .prediction-card {
+        background: #0d1117; border: 1px solid #30363d;
+        border-radius: 12px; padding: 20px; margin-top: 20px;
     }
-    .position-name {
-        font-size: 0.85em;
-        color: #666;
-        font-weight: 600;
+    .num-box {
+        font-size: 70px; font-weight: 900; color: #ff5858;
+        text-align: center; letter-spacing: 10px; border-right: 2px solid #30363d;
     }
-    .prediction {
-        font-size: 1.5em;
-        font-weight: bold;
-        margin: 5px 0;
+    .lot-box {
+        font-size: 50px; font-weight: 700; color: #58a6ff;
+        text-align: center; letter-spacing: 5px; padding-left: 20px;
     }
-    .confidence {
-        font-size: 0.8em;
-        color: #28a745;
-    }
-    .reason {
-        font-size: 0.75em;
-        color: #dc3545;
-        font-weight: 600;
-    }
-    .quick-input {
-        font-size: 1.1em;
-    }
-</style>
+    .status-bar { padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 10px; }
+    </style>
 """, unsafe_allow_html=True)
 
-# --- SESSION STATE ---
-if 'bankroll' not in st.session_state:
-    st.session_state.bankroll = 500000
-if 'last_results' not in st.session_state:
-    st.session_state.last_results = []
-if 'auto_analyze' not in st.session_state:
-    st.session_state.auto_analyze = True
+st.markdown("<h2 style='text-align: center; color: #58a6ff;'>🎯 TITAN v24.1 - SIÊU TRÍ TUỆ (GIAO DIỆN v22)</h2>", unsafe_allow_html=True)
 
-# --- HÀM PHÂN TÍCH THÔNG MINH ---
-def smart_analyze(raw_text):
-    lines = [re.sub(r'[^\d]', '', l.strip()) for l in raw_text.strip().split('\n')]
-    valid = [l for l in lines if len(l) == 5 and l.isdigit()]
-    
-    if len(valid) < 5:
-        return None, f"Cần ít nhất 5 kỳ (hiện có: {len(valid)})"
-    
-    positions = ["C.Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"]
-    predictions = []
-    
-    for pos_idx, pos_name in enumerate(positions):
-        # Lấy 15 kỳ gần nhất
-        digits = [int(line[pos_idx]) for line in valid[:15]]
-        total = len(digits)
-        
-        # Tính thống kê
-        tai_count = sum(1 for d in digits if d >= 5)
-        xiu_count = total - tai_count
-        tai_rate = tai_count / total
-        
-        # Phân tích xu hướng 5 kỳ gần nhất
-        last_5 = digits[:5]
-        last_5_tai = sum(1 for d in last_5 if d >= 5)
-        
-        # AI LOGIC - Phát hiện mẫu
-        prediction = ""
-        confidence = 50
-        reason = ""
-        bet_type = "TÀI/XỈU"
-        
-        # 1. Cầu bệt (4-5 kỳ cùng 1 bên) → Đánh bẻ
-        if last_5_tai >= 4:
-            prediction = "XỈU"
-            confidence = 70 + (last_5_tai - 4) * 10
-            reason = f"🔥 Bệt TÀI {last_5_tai}/5 → BẺ"
-        elif last_5_tai <= 1:
-            prediction = "TÀI"
-            confidence = 70 + (1 - last_5_tai) * 10
-            reason = f"🔥 Bệt XỈU {5-last_5_tai}/5 → BẺ"
-        
-        # 2. Độ lệch thống kê (>70% hoặc <30%)
-        elif tai_rate >= 0.7:
-            prediction = "XỈU"
-            confidence = int(tai_rate * 100)
-            reason = f"📊 Lệch TÀI {tai_count}/{total} → BÙ"
-        elif tai_rate <= 0.3:
-            prediction = "TÀI"
-            confidence = int((1-tai_rate) * 100)
-            reason = f"📊 Lệch XỈU {xiu_count}/{total} → BÙ"
-        
-        # 3. Cầu nhảy (3-2) → Theo kỳ gần nhất
-        elif last_5_tai == 3:
-            # Kiểm tra xu hướng giảm
-            if sum(last_5[:3]) >= 15:  # 3 kỳ đầu Tài mạnh
-                prediction = "XỈU"
-                confidence = 60
-                reason = "📉 Cầu nhảy → Giảm"
-            else:
-                prediction = "TÀI"
-                confidence = 55
-                reason = "📈 Cầu nhảy → Tăng"
-        elif last_5_tai == 2:
-            # Kiểm tra kỳ gần nhất
-            if digits[0] >= 5:
-                prediction = "TÀI"
-                confidence = 55
-                reason = "⚡ Theo kỳ mới"
-            else:
-                prediction = "XỈU"
-                confidence = 55
-                reason = "⚡ Theo kỳ mới"
-        
-        # 4. Mặc định - Theo thống kê
-        else:
-            if tai_rate > 0.5:
-                prediction = "XỈU"
-                confidence = 52
-                reason = "📊 Thống kê nghiêng TÀI"
-            else:
-                prediction = "TÀI"
-                confidence = 52
-                reason = "📊 Thống kê nghiêng XỈU"
-        
-        # Tính số kỳ liên tiếp hiện tại
-        current = digits[0] >= 5
-        streak = 1
-        for i in range(1, len(digits)):
-            if (digits[i] >= 5) == current:
-                streak += 1
-            else:
-                break
-        
-        predictions.append({
-            'position': pos_name,
-            'prediction': prediction,
-            'confidence': min(confidence, 90),  # Max 90%
-            'reason': reason,
-            'tai_rate': tai_rate,
-            'streak': streak,
-            'current': 'TÀI' if current else 'XỈU'
-        })
-    
-    return predictions, None
+# ================= PHẦN 1: NHẬP LIỆU (NẰM TRÊN) =================
+with st.container():
+    col_in, col_st = st.columns([2, 1])
+    with col_in:
+        raw_input = st.text_area("📡 Dán dữ liệu (5 số mỗi kỳ):", height=100, placeholder="32880\n21808...")
+    with col_st:
+        st.write(f"📊 Dữ liệu: **{len(st.session_state.history)} kỳ**")
+        c1, c2 = st.columns(2)
+        btn_save = c1.button("🚀 GIẢI MÃ")
+        btn_reset = c2.button("🗑️ RESET")
 
-# --- GIAO DIỆN ---
-st.title("🎯 TITAN v39.0 - 5 HÀNG SIÊU TỐC")
+if btn_reset:
+    st.session_state.history = []
+    if os.path.exists(DB_FILE): os.remove(DB_FILE)
+    st.rerun()
 
-# Countdown
-now = datetime.now()
-seconds = now.second
-remaining = 60 - seconds if seconds < 30 else 30 - (seconds - 30)
-st.info(f"🕒 **Kỳ tiếp sau: {remaining:02d}s** | 💰 Vốn: {st.session_state.bankroll:,}đ")
-
-# Input - AUTO ANALYZE
-st.subheader("📥 DÁN KẾT QUẢ (Tự động phân tích)")
-raw = st.text_area(
-    "",
-    placeholder="Dán 10-15 kỳ mới nhất vào đây...\nMỗi dòng 5 số\nKỳ mới nhất ở TRÊN CÙNG",
-    height=120,
-    key="auto_input",
-    help="Tool sẽ tự động phân tích ngay khi bạn dán số!"
-)
-
-# Nút điều khiển
-col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([2, 1, 1])
-with col_ctrl1:
-    if st.button("🔄 LÀM MỚI", use_container_width=True):
+if btn_save:
+    clean = re.findall(r"\d{5}", raw_input)
+    if clean:
+        st.session_state.history.extend(clean)
+        st.session_state.history = list(dict.fromkeys(st.session_state.history))
+        save_db(st.session_state.history)
+        
+        # Gửi AI Phân tích
+        prompt = f"""
+        Hệ thống: TITAN v24.1 ELITE. 
+        Phân tích 100 kỳ gần đây: {st.session_state.history[-100:]}
+        Nhiệm vụ: 
+        1. Nhận diện cầu Bệt/Đảo. 
+        2. Chốt 3 số chủ lực + 4 số lót. 
+        3. Phân tích rõ 'NÊN ĐÁNH' hay 'DỪNG'.
+        Trả về JSON: {{"main_3": "abc", "support_4": "defg", "decision": "ĐÁNH/DỪNG", "logic": "...", "color": "Green/Red", "conf": 98}}
+        """
+        try:
+            response = neural_engine.generate_content(prompt)
+            st.session_state.last_prediction = json.loads(re.search(r'\{.*\}', response.text, re.DOTALL).group())
+        except:
+            all_n = "".join(st.session_state.history[-40:])
+            top = [x[0] for x in Counter(all_n).most_common(7)]
+            st.session_state.last_prediction = {"main_3": "".join(top[:3]), "support_4": "".join(top[3:]), "decision": "ĐÁNH", "logic": "Dùng thống kê tần suất.", "color": "Green", "conf": 75}
         st.rerun()
-with col_ctrl2:
-    if st.button("🗑️ XÓA", use_container_width=True):
-        st.session_state.last_results = []
-        st.rerun()
-with col_ctrl3:
-    bet_amount = st.number_input("💵 Mức cược", min_value=1000, value=10000, step=1000)
 
-# AUTO ANALYZE
-if raw and len([l for l in raw.split('\n') if l.strip() and len(re.sub(r'[^\d]', '', l.strip())) == 5]) >= 5:
-    predictions, error = smart_analyze(raw)
+# ================= PHẦN 2: KẾT QUẢ (DÀN HÀNG NGANG - DỄ NHÌN) =================
+if "last_prediction" in st.session_state:
+    res = st.session_state.last_prediction
     
-    if error:
-        st.warning(f"⚠️ {error}")
-    else:
-        st.success(f"✅ ĐÃ PHÂN TÍCH {len([l for l in raw.split('\n') if l.strip()])} KỲ")
-        
-        # HIỂN THỊ 5 VỊ TRÍ - 1 HÀNG NGANG
-        st.subheader("🎯 DỰ ĐOÁN 5 VỊ TRÍ")
-        
-        cols = st.columns(5)
-        for idx, pred in enumerate(predictions):
-            with cols[idx]:
-                is_tai = pred['prediction'] == "TÀI"
-                color_class = "tai" if is_tai else "xiu"
-                
-                st.markdown(f"""
-                <div class="bet-box" style="border-color: {'#FF4444' if is_tai else '#4444FF'}">
-                    <div class="position-name">{pred['position']}</div>
-                    <div class="prediction {color_class}">{pred['prediction']}</div>
-                    <div class="confidence">⚡ {pred['confidence']}%</div>
-                    <div class="reason">{pred['reason']}</div>
-                    <div style="font-size:0.7em; margin-top:5px; color:#666">
-                        streak: {pred['streak']} | {pred['current']}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Nút đánh nhanh
-                if st.button(f"✅ ĐÁNH {pred['position']}", key=f"bet_{idx}", use_container_width=True):
-                    profit = int(bet_amount * 0.985)
-                    st.session_state.bankroll += profit
-                    st.success(f"🎉 +{profit:,}đ")
-                    st.rerun()
-        
-        # Gợi ý vị trí tốt nhất
-        best = max(predictions, key=lambda x: x['confidence'])
-        st.info(f"💡 **Vị trí tốt nhất:** {best['position']} → {best['prediction']} ({best['confidence']}%) - {best['reason']}")
-        
-        # Thống kê tổng
-        st.divider()
-        st.caption("📊 **Thống kê nhanh:** " + " | ".join([f"{p['position']}: T{int(p['tai_rate']*100)}%" for p in predictions]))
+    # Thanh trạng thái Đánh/Dừng
+    bg_color = "#238636" if res['color'].lower() == "green" else "#da3633"
+    st.markdown(f"<div class='status-bar' style='background: {bg_color};'>📢 TRẠNG THÁI: {res['decision']} ({res['conf']}%)</div>", unsafe_allow_html=True)
 
-# Footer cố định
-st.markdown("---")
-st.caption("⚡ TITAN v39.0 | Auto-analyze | 5D KU 1 phút | Chơi có trách nhiệm 🙏")
+    st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
+    
+    # Hiển thị 3 số chính và 4 số lót trên cùng 1 hàng
+    c1, c2 = st.columns([1.5, 1])
+    with c1:
+        st.markdown(f"<p style='color:#8b949e; margin-bottom:0;'>🔥 3 SỐ CHÍNH (VÀO TIỀN)</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='num-box'>{res['main_3']}</div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown(f"<p style='color:#8b949e; margin-bottom:0;'>🛡️ 4 SỐ LÓT (GIỮ VỐN)</p>", unsafe_allow_html=True)
+        st.markdown(f"<div class='lot-box'>{res['support_4']}</div>", unsafe_allow_html=True)
+    
+    st.divider()
+    st.write(f"💡 **LOGIC AI:** {res['logic']}")
+    
+    # Copy dàn cho Kubet
+    full_dan = "".join(sorted(set(res['main_3'] + res['support_4'])))
+    st.text_input("📋 DÀN 7 SỐ KUBET (Copy tại đây):", full_dan)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-# Auto-refresh hint
-if not raw:
-    st.info("👉 **Mẹo:** Copy kết quả từ nhà cái → Dán vào ô trên → Tool tự động phân tích trong 1 giây!")
+# Thống kê nhịp rơi dưới cùng
+if st.session_state.history:
+    with st.expander("📊 Thống kê tần suất số đơn (0-9)"):
+        all_d = "".join(st.session_state.history[-50:])
+        st.bar_chart(pd.Series(Counter(all_d)).sort_index())
