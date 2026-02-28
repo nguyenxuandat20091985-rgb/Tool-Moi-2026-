@@ -1,58 +1,24 @@
-import streamlit as st
-import pandas as pd
-from collections import Counter
+# ================= TITAN v30.0: THE WEAKNESS EXPLOITER =================
 
-# --- GIAO DIỆN CHUYÊN NGHIỆP ---
-st.set_page_config(page_title="TITAN v29.0 PRO", layout="wide")
-st.title("🛡️ TITAN v29.0 PRO - TRUY QUÉT 5D")
-
-# Ô nhập liệu thông minh (Tự động lọc rác)
-raw_input = st.text_area("📥 Dán dãy kết quả (Ví dụ: 77084...):", height=150)
-
-def smart_analyze(data):
-    # Lấy 30 kỳ gần nhất hàng đơn vị
-    nums = [int(str(line).strip()[-1]) for line in data if len(str(line).strip()) == 5]
-    if len(nums) < 5: return None
-
-    # 1. PHÂN TÍCH NHỊP CẦU TÀI XỈU
-    tx_list = ["T" if n >= 5 else "X" for n in nums]
-    last_3 = tx_list[:3]
+def analyze_xien_2(history_data):
+    # Lấy 2 hàng có nhịp ổn định nhất: Hàng Chục và Hàng Đơn Vị
+    h_chuc = [int(str(line)[-2]) for line in history_data if len(str(line)) == 5]
+    h_donvi = [int(str(line)[-1]) for line in history_data if len(str(line)) == 5]
     
-    # Logic bắt cầu
-    if tx_list[0] == tx_list[1] == tx_list[2]:
-        advice_tx = f"⚠️ CẦU BỆT {tx_list[0]} - NÊN THEO"
-        color = "red"
-    else:
-        advice_tx = "🔄 CẦU ĐẢO - ĐÁNH NGƯỢC KỲ TRƯỚC"
-        color = "blue"
+    # Tính toán xác suất Kèo Đôi cho từng hàng
+    def get_binary_trend(digits):
+        last_5 = ["T" if d >= 5 else "X" for d in digits[:5]]
+        if last_5.count("T") >= 4: return "XỈU" # Bắt hồi quy
+        if last_5.count("X") >= 4: return "TÀI" # Bắt hồi quy
+        return "TÀI" if digits[0] < 5 else "XỈU" # Đánh đảo
 
-    # 2. DÀN 7 SỐ THÔNG MINH (Loại bỏ số Gan - số lâu chưa về)
-    all_digits = list(range(10))
-    counts = Counter(nums)
-    # Lấy 5 số về nhiều nhất + 2 số vừa mới về để bám luồng
-    most_common = [n for n, c in counts.most_common(5)]
-    recent_2 = nums[:2]
-    dan_7 = sorted(list(set(most_common + recent_2)))
+    trend_chuc = get_binary_trend(h_chuc)
+    trend_donvi = get_binary_trend(h_donvi)
     
-    # Nếu chưa đủ 7 số thì bù thêm số có tần suất trung bình
-    for n in range(10):
-        if len(dan_7) < 7 and n not in dan_7:
-            dan_7.append(n)
+    return trend_chuc, trend_donvi
 
-    return advice_tx, sorted(dan_7), color
-
-if raw_input:
-    lines = raw_input.split('\n')
-    advice, dan, col = smart_analyze(lines)
-    
-    # Hiển thị trực quan
-    st.markdown(f"### 🤖 CHỈ THỊ AI: <span style='color:{col}'>{advice}</span>", unsafe_allow_html=True)
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        st.metric("KÈO ĐÔI", "TÀI" if "T" in advice else "XỈU")
-    with c2:
-        st.metric("TỰ TIN", "85%" if "BỆT" in advice else "65%")
-
-    st.success(f"🔢 DÀN 7 SỐ CHIẾN THUẬT: **{', '.join(map(str, dan))}**")
-    st.info("💡 Mẹo: Nhập dàn này cho 'Hàng đơn vị', chọn cược 5 kỳ liên tiếp.")
+# --- HIỂN THỊ CHIẾN THUẬT XIÊN 2 ---
+st.title("🎯 TITAN v30.0 - KHAI THÁC ĐIỂM YẾU 5D")
+# Gợi ý cược Xiên 2 (Ví dụ: Chục Tài + Đơn vị Xỉu)
+st.error(f"🔥 XIÊN 2 GỢI Ý: HÀNG CHỤC [{trend_chuc}] + HÀNG ĐƠN VỊ [{trend_donvi}]")
+st.success("💰 Tỉ lệ ăn cực cao - Vốn chỉ cần 1/10 so với dàn số")
