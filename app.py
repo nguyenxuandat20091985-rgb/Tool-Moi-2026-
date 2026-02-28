@@ -1,21 +1,14 @@
 import streamlit as st
 from datetime import datetime
 import time
-import re
 
-st.set_page_config(page_title="TITAN v30.5 - REALTIME", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="TITAN v30.6 - PRO", layout="wide", page_icon="🎯")
 
-# --- CSS TÙY CHỈNH ---
-st.markdown("""
-<style>
-    .stApp { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); }
-    .big-font { font-size: 28px !important; font-weight: bold; }
-    .tai { color: #FF4B4B !important; }
-    .xiu { color: #4CAF50 !important; }
-    .note { font-style: italic; color: #aaa; font-size: 12px; }
-    div.stButton > button { width: 100%; border-radius: 8px; }
-</style>
-""", unsafe_allow_html=True)
+# --- SESSION STATE ---
+if 'analysis_result' not in st.session_state:
+    st.session_state.analysis_result = None
+if 'last_input' not in st.session_state:
+    st.session_state.last_input = ""
 
 # --- HÀM VALIDATE INPUT ---
 def validate_input(lines):
@@ -27,189 +20,186 @@ def validate_input(lines):
         if len(clean) == 5 and clean.isdigit():
             valid_lines.append(clean)
         elif clean:  # Bỏ qua dòng trống
-            errors.append(f"Dòng {idx}: '{clean}' ❌ (cần đúng 5 chữ số)")
+            errors.append(f"Dòng {idx}: '{clean}' ❌ (cần 5 chữ số)")
     return valid_lines, errors
 
-# --- HÀM PHÂN TÍCH LOGIC (ĐÃ FIX) ---
+# --- HÀM TÍNH STATISTICS ---
+def calculate_stats(history, position_idx):
+    """Tính thống kê cho 1 vị trí"""
+    digits = [int(line[position_idx]) for line in history]
+    return {
+        'total': len(digits),
+        'tai': sum(1 for d in digits if d >= 5),
+        'xiu': sum(1 for d in digits if d < 5),
+        'avg': sum(digits) / len(digits) if digits else 0,
+        'last_3_trend': "TÀI" if sum(int(h[position_idx]) for h in history[:3]) >= 8 else "XỈU"
+    }
+
+# --- HÀM PHÂN TÍCH LOGIC (ĐÃ CẢI TIẾN) ---
 def analyze_all_positions(data_input):
-    history, errs = validate_input(data_input)
+    history, errors = validate_input(data_input)
+    
     if len(history) < 5:
-        return None, errs
+        return None, "Cần ít nhất 5 kỳ hợp lệ!", errors
     
     labels = ["Chục Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"]
     results = {}
     
     for i in range(5):
-        digits = [int(line[i]) for line in history[:10]]  # Phân tích 10 kỳ gần nhất
+        digits = [int(line[i]) for line in history]
         last_5 = digits[:5]
-        tai_count = sum(1 for d in last_5 if d >= 5)
+        last_3 = digits[:3]
         
-        # Logic dự đoán + tính confidence
-        if tai_count >= 4: 
-            pred, note, confidence = "XỈU", "🔥 Cầu bệt Tài -> Đánh Bẻ", 85
-        elif tai_count <= 1:
-            pred, note, confidence = "TÀI", "🔥 Cầu bệt Xỉu -> Đánh Bẻ", 85
+        tai_count_5 = sum(1 for d in last_5 if d >= 5)
+        tai_count_3 = sum(1 for d in last_3 if d >= 5)
+        
+        # Logic nâng cấp: kết hợp xu hướng ngắn + dài
+        if tai_count_5 >= 4: 
+            pred, note, confidence = "XỈU", "🔥 Cầu bệt Tài -> Bẻ cầu", "85%"
+        elif tai_count_5 <= 1:
+            pred, note, confidence = "TÀI", "🔥 Cầu bệt Xỉu -> Bẻ cầu", "85%"
+        elif tai_count_3 == 3:
+            pred, note, confidence = "XỈU", "📈 3 Tài liên tiếp -> Giảm", "70%"
+        elif tai_count_3 == 0:
+            pred, note, confidence = "TÀI", "📉 3 Xỉu liên tiếp -> Tăng", "70%"
         else:
-            pred = "TÀI" if digits[0] >= 5 else "XỈU"
-            note, confidence = "🛡 Cầu nhảy -> Đánh Thuận", 65
+            # Xu hướng trung bình
+            avg = sum(last_5) / 5
+            pred = "TÀI" if avg >= 4.5 else "XỈU"
+            note = "🛡 Cầu nhảy -> Theo xu hướng"
+            confidence = "60%"
             
-        # Thống kê tần suất
-        tai_rate = sum(1 for d in digits if d >= 5) / len(digits) * 100
         results[labels[i]] = {
             "pred": pred, 
             "note": note,
             "confidence": confidence,
-            "tai_rate": tai_rate,
-            "hot_cold": "🔥 Nóng" if tai_rate > 60 else "❄️ Lạnh" if tai_rate < 40 else "⚖️ Ổn định"
+            "stats": calculate_stats(history, i)
         }
     
-    return results, history[:5], errs
+    return results, history[:5], errors
 
 # --- GIAO DIỆN CHÍNH ---
-st.title("🎯 TITAN v30.5 - FIX ĐỨNG HÌNH + PRO FEATURES")
-
-# Auto-refresh time
-time_placeholder = st.empty()
-def update_time():
-    time_placeholder.write(f"🕒 Thời gian hệ thống: **{datetime.now().strftime('%H:%M:%S')}**")
-update_time()
+st.title("🎯 TITAN v30.6 - PRO EDITION")
+st.write(f"🕒 Cập nhật: {datetime.now().strftime('%H:%M:%S %d/%m/%Y')}")
 
 # Sidebar: Hướng dẫn
 with st.sidebar:
     st.header("📖 Hướng dẫn sử dụng")
     st.info("""
-    **Format input chuẩn:**
-    ```
-    12345
-    67890
-    11223
-    44556
-    78901
-    ```
-    ✅ Mỗi dòng 5 chữ số  
-    ✅ Dòng mới nhất dán **TRÊN CÙNG**  
-    ✅ Dán tối thiểu 5 dòng, tối đa 15 dòng
+    1. Dán 10-15 kỳ mới nhất  
+    2. **Kỳ mới nhất ở TRÊN CÙNG**  
+    3. Mỗi dòng = 5 chữ số (VD: 12345)  
+    4. Bấm "🚀 QUÉT & PHÂN TÍCH"
     """)
-    st.divider()
-    st.subheader("⚙️ Tùy chọn")
-    show_stats = st.checkbox("📊 Hiển thị thống kê chi tiết", value=True)
-    auto_copy = st.checkbox("📋 Auto-copy kết quả", value=False)
+    st.markdown("---")
+    st.subheader("⚙️ Tuỳ chọn")
+    auto_clear = st.checkbox("🗑️ Tự động xoá sau khi phân tích", value=False)
 
-# Form input
-with st.form("input_form", clear_on_submit=True):
+# Form nhập liệu
+with st.form("input_form", clear_on_submit=auto_clear):
     raw_data = st.text_area(
-        "📥 Dán 10-15 kỳ mới nhất (Dòng mới nhất ở TRÊN CÙNG):", 
-        height=180,
-        placeholder="12345\n67890\n11223\n44556\n78901\n..."
+        "📥 Dán dữ liệu tại đây:", 
+        value=st.session_state.last_input,
+        placeholder="95231\n18472\n03659\n...\n(Nhớ: kỳ mới nhất ở trên)",
+        height=200
     )
-    col_btn1, col_btn2 = st.columns([3,1])
+    
+    col_btn1, col_btn2 = st.columns([2, 1])
     with col_btn1:
-        submitted = st.form_submit_button("🚀 QUÉT & PHÂN TÍCH NGAY", type="primary")
+        submitted = st.form_submit_button("🚀 QUÉT & PHÂN TÍCH NGAY", type="primary", use_container_width=True)
     with col_btn2:
-        reset = st.form_submit_button("🔄 Reset")
+        cleared = st.form_submit_button("🗑️ XOÁ TRỐNG", use_container_width=True)
 
-if reset:
+# Xử lý clear
+if cleared:
+    st.session_state.last_input = ""
+    st.session_state.analysis_result = None
     st.rerun()
 
+# Xử lý phân tích
 if submitted and raw_data:
-    lines = raw_data.strip().split('\n')
-    analysis_result = analyze_all_positions(lines)
+    st.session_state.last_input = raw_data
+    lines = raw_data.split('\n')
     
-    if analysis_result[0] is None:
-        errs = analysis_result[1]
-        st.error("❌ Dữ liệu không đủ điều kiện phân tích!")
-        if errs:
-            with st.expander("🔍 Chi tiết lỗi"):
-                for e in errs:
-                    st.warning(e)
-        st.info("💡 Anh kiểm tra lại: dán đủ 5 dòng, mỗi dòng đúng 5 chữ số nhé!")
-    else:
-        analysis, last_nums, errs = analysis_result
+    with st.spinner("🔍 Đang phân tích dữ liệu..."):
+        time.sleep(0.5)  # Hiệu ứng loading
+        analysis_data, last_nums, errors = analyze_all_positions(lines)
+    
+    # Hiển thị warning nếu có lỗi input
+    if errors:
+        with st.expander("⚠️ Cảnh báo dữ liệu không hợp lệ", expanded=False):
+            for err in errors:
+                st.warning(err)
+    
+    if analysis_data:
+        analysis, last_nums = analysis_data, last_nums
+        st.session_state.analysis_result = analysis
         
-        # Cảnh báo lỗi nhỏ (nếu có dòng invalid nhưng vẫn đủ data để chạy)
-        if errs:
-            with st.expander("⚠️ Có một số dòng bị bỏ qua"):
-                for e in errs:
-                    st.caption(e)
+        # ✅ Success message
+        st.success(f"✅ Phân tích xong! Kỳ mới nhất: `{last_nums[0]}`")
         
-        st.success(f"✅ Đã cập nhật dữ liệu kỳ mới nhất: **{last_nums[0]}**")
-        
-        # === BẢNG SOI CẦU ĐA ĐIỂM ===
-        st.subheader("📊 BẢNG SOI CẦU ĐA ĐIỂM")
+        # 📊 BẢNG SOI CẦU
+        st.subheader("📊 BẢNG DỰ ĐOÁN ĐA VỊ TRÍ")
         cols = st.columns(5)
-        prediction_summary = []
         
         for idx, name in enumerate(analysis):
             with cols[idx]:
-                data = analysis[name]
-                color_class = "tai" if data['pred'] == "TÀI" else "xiu"
-                st.info(f"**{name}**")
+                item = analysis[name]
+                is_tai = item['pred'] == "TÀI"
+                color = "#FF4B4B" if is_tai else "#1F77B4"
+                bg_color = "#FFE5E5" if is_tai else "#E5F0FF"
+                
                 st.markdown(f"""
-                    <div style='text-align: center;'>
-                        <span class='big-font {color_class}'>{data['pred']}</span><br>
-                        <small>🎯 {data['confidence']}%</small><br>
-                        <span class='note'>{data['note']}</span><br>
-                        <small>{data['hot_cold']} • Tài: {data['tai_rate']:.1f}%</small>
-                    </div>
+                <div style='background:{bg_color}; padding:10px; border-radius:8px; text-align:center; border:1px solid {color}'>
+                    <b>{name}</b><br>
+                    <h2 style='color:{color}; margin:5px 0'>{item['pred']}</h2>
+                    <small>🎯 Độ tin cậy: {item['confidence']}</small>
+                </div>
                 """, unsafe_allow_html=True)
-                prediction_summary.append(f"{name}: {data['pred']}")
-        
-        # === XIÊN 2 CHIẾN THUẬT ===
+                st.caption(f"_{item['note']}_")
+                
+                # Mini stats
+                stats = item['stats']
+                st.progress(int(stats['tai'] / stats['total'] * 100) if stats['total'] > 0 else 0)
+                st.caption(f"Tài: {stats['tai']}/{stats['total']} | TB: {stats['avg']:.1f}")
+
         st.divider()
-        st.subheader("🚀 KÈO XIÊN 2 CHIẾN THUẬT")
+        
+        # 🚀 KÈO XIÊN 2
+        st.subheader("🚀 GỢI Ý XIÊN 2 CHIẾN THUẬT")
         c1, c2 = st.columns(2)
         
         with c1:
             pair1_pred = f"{analysis['Chục Ngàn']['pred']} + {analysis['Ngàn']['pred']}"
             conf1 = min(analysis['Chục Ngàn']['confidence'], analysis['Ngàn']['confidence'])
-            st.warning(f"""
-            **CẶP 1 (H.Chục Ngàn + H.Ngàn)**\n\n
-            👉 {pair1_pred}\n\n
-            🎯 Độ tin cậy trung bình: **{conf1}%**
-            """)
-        
+            st.metric(label="💎 CẶP 1: Chục Ngàn + Ngàn", value=pair1_pred, delta=f"🎯 {conf1}")
+            st.info("👉 Phù hợp đánh lót ngược nếu cầu đang bệt")
+            
         with c2:
             pair2_pred = f"{analysis['Chục']['pred']} + {analysis['Đơn Vị']['pred']}"
             conf2 = min(analysis['Chục']['confidence'], analysis['Đơn Vị']['confidence'])
-            st.warning(f"""
-            **CẶP 2 (H.Chục + H.Đơn Vị)**\n\n
-            👉 {pair2_pred}\n\n
-            🎯 Độ tin cậy trung bình: **{conf2}%**
-            """)
+            st.metric(label="💎 CẶP 2: Chục + Đơn Vị", value=pair2_pred, delta=f"🎯 {conf2}")
+            st.info("👉 Phù hợp đánh theo xu hướng khi cầu nhảy")
         
-        # === THỐNG KÊ CHI TIẾT (TÙY CHỌN) ===
-        if show_stats:
-            st.divider()
-            st.subheader("📈 THỐNG KÊ TẦN SUẤT 10 KỲ GẦN NHẤT")
-            stats_cols = st.columns(5)
-            for idx, name in enumerate(analysis):
-                with stats_cols[idx]:
-                    data = analysis[name]
-                    st.metric(
-                        label=name,
-                        value=f"{data['tai_rate']:.1f}% Tài",
-                        delta=f"{data['hot_cold']}"
-                    )
+        # 📈 Pattern Visualization
+        st.subheader("📈 BIỂU ĐỒ XU HƯỚNG 5 KỲ GẦN")
+        pattern_data = {name: [int(line[i] if line[i].isdigit() else 0) for line in last_nums] for i, name in enumerate(analysis)}
         
-        # === NÚT COPY KẾT QUẢ ===
-        st.divider()
-        result_text = "TITAN v30.5 - Kết quả phân tích:\n" + "\n".join(prediction_summary) + f"\nXiên 2: {pair1_pred} | {pair2_pred}"
-        
-        col_copy1, col_copy2 = st.columns([4,1])
-        with col_copy1:
-            st.code(result_text, language="text")
-        with col_copy2:
-            if st.button("📋 Copy", type="secondary"):
-                st.toast("✅ Đã copy kết quả vào clipboard!", icon="✅")
-                # Lưu ý: Streamlit không copy trực tiếp được, người dùng cần bôi đen + copy
-                st.info("💡 Anh bôi đen đoạn trên + Ctrl+C để copy nhé!")
-        
-        # Auto-refresh time sau khi phân tích
-        update_time()
+        for name in analysis:
+            digits = pattern_data[name]
+            trend_str = " → ".join([f"{'🔴' if d>=5 else '🔵'}{d}" for d in digits])
+            st.caption(f"**{name}**: {trend_str}")
 
-elif submitted and not raw_data:
-    st.warning("⚠️ Anh chưa dán số kìa! Dán vào khung trên rồi bấm nút lại nhé!")
+    else:
+        st.error("❌ Dữ liệu không đủ điều kiện phân tích!")
+        if errors:
+            with st.expander("Xem chi tiết lỗi"):
+                for e in errors:
+                    st.write(f"• {e}")
+
+elif not raw_data and submitted:
+    st.warning("⚠️ Anh chưa dán số! Dán dữ liệu vào ô trên rồi bấm nút nhé 🔼")
 
 # Footer
-st.divider()
-st.caption("🔐 TITAN v30.5 • Phân tích theo thuật toán cầu bệt/cầu nhảy • Kết quả mang tính tham khảo")
+st.markdown("---")
+st.caption("🔐 TITAN v30.6 | Phân tích theo thuật toán bẻ cầu + xu hướng | Kết quả mang tính tham khảo")
