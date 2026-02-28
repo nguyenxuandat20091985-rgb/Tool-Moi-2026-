@@ -1,74 +1,83 @@
 import streamlit as st
-import pandas as pd
 
-# Cấu hình giao diện Full HD
-st.set_page_config(page_title="TITAN v30.3 - ANTI-LAG", layout="wide")
+st.set_page_config(page_title="TITAN v30.4 - ĐA ĐIỂM", layout="wide")
 
-# Hàm xử lý dữ liệu tỉ mỉ
-def clean_and_analyze(raw_text):
-    # Tách dòng và dọn dẹp khoảng trắng dư thừa
-    lines = [l.strip() for l in raw_text.split('\n') if len(l.strip()) == 5]
-    if len(lines) < 5:
+def analyze_all_positions(data_input):
+    # Lọc dữ liệu chuẩn: lấy 15 kỳ để soi cầu dài hơn cho chắc
+    history = [str(line).strip() for line in data_input if len(str(line).strip()) == 5]
+    if len(history) < 10:
         return None
-    
-    # Lấy 10 kỳ gần nhất để soi độ dài cầu bệt
-    latest_10 = lines[:10]
-    h_chuc = [int(line[-2]) for line in latest_10]
-    h_donvi = [int(line[-1]) for line in latest_10]
-    
-    def predict(digits):
-        # Đếm 5 kỳ gần nhất
+
+    # Danh sách các vị trí
+    labels = ["Chục Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"]
+    results = {}
+
+    for i in range(5):
+        # Tách số của từng hàng (từ trái qua phải 0 -> 4)
+        digits = [int(line[i]) for line in history]
+        
+        # SOI CẦU: Lấy 5 kỳ gần nhất
         last_5 = digits[:5]
         tai_count = sum(1 for d in last_5 if d >= 5)
+        xiu_count = 5 - tai_count
         
-        # Chỉ số tin cậy (Confidence)
-        if tai_count >= 4: return "XỈU", "🔥 Bẻ Cầu (90%)"
-        if tai_count <= 1: return "TÀI", "🔥 Bẻ Cầu (90%)"
-        return ("TÀI" if digits[0] >= 5 else "XỈU"), "🛡 Bám Cầu (70%)"
-
-    res_c, conf_c = predict(h_chuc)
-    res_dv, conf_dv = predict(h_donvi)
-    
-    return {
-        "chuc": res_c, "conf_c": conf_c,
-        "dv": res_dv, "conf_dv": conf_dv,
-        "history": latest_10
-    }
-
-# --- GIAO DIỆN CHÍNH ---
-st.title("🎯 TITAN v30.3 - ĐIỂM YẾU 5D")
-st.markdown("---")
-
-# Ô nhập liệu thông minh
-input_data = st.text_area("📥 Dán lịch sử (Mới nhất ở trên):", height=150)
-
-if st.button("🔄 PHÂN TÍCH NGAY"):
-    if input_data:
-        result = clean_and_analyze(input_data)
-        if result:
-            st.success("✅ Dữ liệu đã được cập nhật!")
-            
-            # Hiển thị kết quả chính
-            c1, c2 = st.columns(2)
-            with c1:
-                st.subheader("📍 HÀNG CHỤC")
-                st.header(result['chuc'])
-                st.caption(result['conf_c'])
-            with c2:
-                st.subheader("📍 ĐƠN VỊ")
-                st.header(result['dv'])
-                st.caption(result['conf_dv'])
-            
-            st.divider()
-            st.error(f"🚀 KÈO XIÊN 2 ĐỀ XUẤT: {result['chuc']} + {result['dv']}")
-            
-            # Bảng lịch sử để anh kiểm tra xem tool có đọc đúng số không
-            with st.expander("📊 Kiểm tra dữ liệu nguồn (10 kỳ)"):
-                st.write(result['history'])
+        # Dự đoán dựa trên xu hướng
+        if tai_count >= 4: 
+            pred = "XỈU"
+            note = "🔥 Cầu bệt Tài -> Đánh Bẻ"
+        elif xiu_count >= 4:
+            pred = "TÀI"
+            note = "🔥 Cầu bệt Xỉu -> Đánh Bẻ"
         else:
-            st.error("Dữ liệu không đủ hoặc sai định dạng (mỗi dòng phải 5 số).")
+            # Nếu cầu đang nhảy 1-1 hoặc 2-1, đánh thuận theo con vừa về
+            pred = "TÀI" if digits[0] >= 5 else "XỈU"
+            note = "🛡 Cầu nhảy -> Đánh Thuận"
+            
+        results[labels[i]] = {"pred": pred, "note": note}
+    
+    return results, history[:5]
+
+# --- GIAO DIỆN ---
+st.title("🎯 TITAN v30.4 - SOI CẦU ĐA ĐIỂM")
+st.write("Sửa lỗi: Phân tích toàn bộ 5 hàng số để anh chọn cặp Xiên khớp với trang cược.")
+
+raw_data = st.text_area("📥 Dán 10-15 kỳ mới nhất (Số mới nhất ở trên cùng):", height=200)
+
+if raw_data:
+    lines = raw_data.split('\n')
+    analysis, last_nums = analyze_all_positions(lines)
+    
+    if analysis:
+        st.success(f"✅ Đã phân tích 5 kỳ gần nhất: {', '.join(last_nums)}")
+        
+        # Hiển thị dạng bảng cho anh dễ so sánh
+        st.subheader("📊 BẢNG SOI CẦU TOÀN DIỆN")
+        
+        # Tạo 5 cột cho 5 hàng số
+        cols = st.columns(5)
+        for idx, name in enumerate(analysis):
+            with cols[idx]:
+                st.markdown(f"### {name}")
+                color = "red" if analysis[name]['pred'] == "TÀI" else "blue"
+                st.markdown(f"<h2 style='color:{color};'>{analysis[name]['pred']}</h2>", unsafe_allow_html=True)
+                st.caption(analysis[name]['note'])
+
+        st.divider()
+        
+        # GỢI Ý XIÊN 2 DỰA TRÊN ẢNH ANH GỬI (H.Chục Ngàn & H.Ngàn)
+        st.subheader("🚀 GỢI Ý XIÊN 2 CHIẾN THUẬT")
+        c1, c2 = st.columns(2)
+        
+        with c1:
+            st.info(f"**CẶP 1 (H.Chục Ngàn + H.Ngàn):**\n\n {analysis['Chục Ngàn']['pred']} + {analysis['Ngàn']['pred']}")
+            st.caption("Khớp với mục anh đang chọn trong ảnh!")
+            
+        with c2:
+            st.warning(f"**CẶP 2 (H.Chục + H.Đơn Vị):**\n\n {analysis['Chục']['pred']} + {analysis['Đơn Vị']['pred']}")
+            st.caption("Cặp dự phòng nếu cặp 1 đang biến động.")
+
     else:
-        st.info("Vui lòng dán dữ liệu để bắt đầu.")
+        st.error("Anh dán thêm dữ liệu đi, ít nhất 10 dòng nhé!")
 
 st.markdown("---")
-st.write("💡 **Mẹo thực chiến:** Nếu cả 2 hàng cùng báo 'Bẻ Cầu (90%)', anh có thể tự tin tăng mức cược lên 1.5 lần.")
+st.write("⚠️ **Lưu ý cực quan trọng:** Anh nhìn vào bảng trên, nếu thấy hàng nào báo **'🔥 Đánh Bẻ'** thì tỷ lệ thắng Xiên khi ghép hàng đó sẽ cao hơn rất nhiều.")
