@@ -1,87 +1,74 @@
 import streamlit as st
-import time
+import pandas as pd
 
-# Cấu hình trang chuyên nghiệp
-st.set_page_config(page_title="TITAN v30.2 - SUPREME", layout="centered")
+# Cấu hình giao diện Full HD
+st.set_page_config(page_title="TITAN v30.3 - ANTI-LAG", layout="wide")
 
-def analyze_logic(data_input):
-    # 1. Lọc dữ liệu: Chỉ lấy các dòng có đúng 5 chữ số
-    # Đảo ngược danh sách để dòng mới nhập nằm ở đầu (index 0)
-    history = [str(line).strip() for line in data_input if len(str(line).strip()) == 5]
-    
-    if len(history) < 5:
+# Hàm xử lý dữ liệu tỉ mỉ
+def clean_and_analyze(raw_text):
+    # Tách dòng và dọn dẹp khoảng trắng dư thừa
+    lines = [l.strip() for l in raw_text.split('\n') if len(l.strip()) == 5]
+    if len(lines) < 5:
         return None
-
-    # LẤY 5 KỲ MỚI NHẤT ĐỂ PHÂN TÍCH (Cực kỳ quan trọng)
-    latest_5 = history[:5] 
-
-    # Tách dữ liệu Hàng Chục (-2) và Hàng Đơn Vị (-1)
-    h_chuc = [int(line[-2]) for line in latest_5]
-    h_donvi = [int(line[-1]) for line in latest_5]
-
-    def get_binary_prediction(digits):
-        # Đếm số lượng Tài trong 5 kỳ gần nhất
-        tai_count = sum(1 for d in digits if d >= 5)
-        
-        # Logic bẻ cầu: Nếu bệt quá dài (4/5 hoặc 5/5) -> Dự đoán bẻ
-        if tai_count >= 4: return "XỈU"
-        if tai_count <= 1: return "TÀI"
-        
-        # Logic bám cầu: Nếu cầu đang 2-2 hoặc 1-2 -> Đánh theo con vừa về
-        return "TÀI" if digits[0] >= 5 else "XỈU"
-
-    res_chuc = get_binary_prediction(h_chuc)
-    res_donvi = get_binary_prediction(h_donvi)
     
-    return res_chuc, res_donvi, latest_5
+    # Lấy 10 kỳ gần nhất để soi độ dài cầu bệt
+    latest_10 = lines[:10]
+    h_chuc = [int(line[-2]) for line in latest_10]
+    h_donvi = [int(line[-1]) for line in latest_10]
+    
+    def predict(digits):
+        # Đếm 5 kỳ gần nhất
+        last_5 = digits[:5]
+        tai_count = sum(1 for d in last_5 if d >= 5)
+        
+        # Chỉ số tin cậy (Confidence)
+        if tai_count >= 4: return "XỈU", "🔥 Bẻ Cầu (90%)"
+        if tai_count <= 1: return "TÀI", "🔥 Bẻ Cầu (90%)"
+        return ("TÀI" if digits[0] >= 5 else "XỈU"), "🛡 Bám Cầu (70%)"
 
-# --- GIAO DIỆN ---
-st.title("🎯 TITAN v30.2 - SUPREME")
-st.subheader("Hệ thống khai thác Xiên 2 & Kèo Đôi")
+    res_c, conf_c = predict(h_chuc)
+    res_dv, conf_dv = predict(h_donvi)
+    
+    return {
+        "chuc": res_c, "conf_c": conf_c,
+        "dv": res_dv, "conf_dv": conf_dv,
+        "history": latest_10
+    }
+
+# --- GIAO DIỆN CHÍNH ---
+st.title("🎯 TITAN v30.3 - ĐIỂM YẾU 5D")
 st.markdown("---")
 
-# Hướng dẫn nhanh cho anh
-st.sidebar.header("🕹 HƯỚNG DẪN")
-st.sidebar.info("1. Copy 5-10 kết quả mới nhất.\n2. Dán vào ô bên phải.\n3. Dòng mới nhất phải nằm ở trên cùng.")
+# Ô nhập liệu thông minh
+input_data = st.text_area("📥 Dán lịch sử (Mới nhất ở trên):", height=150)
 
-raw_data = st.text_area("📥 Dán kết quả 5D (Mới nhất ở trên cùng):", height=200, placeholder="Ví dụ:\n80673\n64061\n...")
-
-if raw_data:
-    with st.spinner('🔄 Đang quét cầu và phân tích...'):
-        time.sleep(0.5) # Tạo độ trễ giả lập để anh thấy tool có loading
-        lines = raw_data.split('\n')
-        analysis = analyze_logic(lines)
-    
-    if analysis:
-        trend_c, trend_dv, history_view = analysis
-        
-        # Hiển thị trạng thái dữ liệu
-        st.success(f"✅ Đã nhận diện {len(history_view)} kỳ gần nhất.")
-        
-        # Hiển thị khu vực XIÊN 2
-        st.markdown("### 🔥 KẾT QUẢ PHÂN TÍCH THỰC CHIẾN")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric(label="📍 DỰ ĐOÁN HÀNG CHỤC", value=trend_c)
-        with col2:
-            st.metric(label="📍 DỰ ĐOÁN ĐƠN VỊ", value=trend_dv)
+if st.button("🔄 PHÂN TÍCH NGAY"):
+    if input_data:
+        result = clean_and_analyze(input_data)
+        if result:
+            st.success("✅ Dữ liệu đã được cập nhật!")
             
-        st.warning(f"🚀 **CƯỢC XIÊN CHIẾN THUẬT:** Hàng Chục **{trend_c}** + Hàng Đơn Vị **{trend_dv}**")
-        
-        # Công thức vào tiền thông minh
-        st.markdown("---")
-        st.markdown("#### 💰 QUẢN LÝ VỐN XIÊN 2 (Tỷ lệ 1 ăn 3.9)")
-        st.write("Đánh Xiên 2 giúp anh chịu được nhiệt nếu gãy cầu lẻ.")
-        
-        data_money = [
-            {"Kỳ": 1, "Vào tiền": "10k", "Vốn tích lũy": "10k", "Thắng nhận": "39k", "Lợi nhuận": "+29k"},
-            {"Kỳ": 2, "Vào tiền": "15k", "Vốn tích lũy": "25k", "Thắng nhận": "58k", "Lợi nhuận": "+33k"},
-            {"Kỳ": 3, "Vào tiền": "30k", "Vốn tích lũy": "55k", "Thắng nhận": "117k", "Lợi nhuận": "+62k"},
-        ]
-        st.table(data_money)
+            # Hiển thị kết quả chính
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader("📍 HÀNG CHỤC")
+                st.header(result['chuc'])
+                st.caption(result['conf_c'])
+            with c2:
+                st.subheader("📍 ĐƠN VỊ")
+                st.header(result['dv'])
+                st.caption(result['conf_dv'])
+            
+            st.divider()
+            st.error(f"🚀 KÈO XIÊN 2 ĐỀ XUẤT: {result['chuc']} + {result['dv']}")
+            
+            # Bảng lịch sử để anh kiểm tra xem tool có đọc đúng số không
+            with st.expander("📊 Kiểm tra dữ liệu nguồn (10 kỳ)"):
+                st.write(result['history'])
+        else:
+            st.error("Dữ liệu không đủ hoặc sai định dạng (mỗi dòng phải 5 số).")
     else:
-        st.error("⚠️ LỖI: Cần tối thiểu 5 dòng số (mỗi dòng 5 chữ số) để tính toán!")
+        st.info("Vui lòng dán dữ liệu để bắt đầu.")
 
 st.markdown("---")
-st.caption("Phiên bản v30.2 tối ưu cho cược Xiên trên giao diện KU. Chúc anh thắng lớn!")
+st.write("💡 **Mẹo thực chiến:** Nếu cả 2 hàng cùng báo 'Bẻ Cầu (90%)', anh có thể tự tin tăng mức cược lên 1.5 lần.")
