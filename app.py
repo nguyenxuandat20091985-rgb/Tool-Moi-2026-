@@ -3,143 +3,214 @@ from datetime import datetime
 import time
 import re
 
-st.set_page_config(page_title="TITAN v30.7 - STABLE", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="TITAN v32.0 - XIÊN 2 PRO", layout="wide", page_icon="🎯")
 
 # --- SESSION STATE ---
-if 'analysis_result' not in st.session_state:
-    st.session_state.analysis_result = None
-if 'raw_input' not in st.session_state:
-    st.session_state.raw_input = ""
-if 'period_order' not in st.session_state:
-    st.session_state.period_order = "newest_top"  # "newest_top" hoặc "newest_bottom"
+if 'bankroll' not in st.session_state:
+    st.session_state.bankroll = 500000  # Vốn gốc 500k
+if 'bet_history' not in st.session_state:
+    st.session_state.bet_history = []
+if 'analysis_cache' not in st.session_state:
+    st.session_state.analysis_cache = None
+if 'daily_profit' not in st.session_state:
+    st.session_state.daily_profit = 0
+if 'stop_loss_reached' not in st.session_state:
+    st.session_state.stop_loss_reached = False
 
 # --- HÀM CLEAN & VALIDATE INPUT ---
-def clean_and_parse_input(raw_text, order="newest_top"):
-    """
-    Làm sạch input và trả về list số + info lỗi
-    order: "newest_top" = kỳ mới nhất ở dòng đầu tiên
-    """
+def clean_input(raw_text):
+    """Làm sạch input, chỉ giữ 5 chữ số mỗi dòng"""
     lines = raw_text.strip().split('\n')
-    valid_periods = []
+    valid = []
     errors = []
-    
     for idx, line in enumerate(lines, 1):
-        # Remove ký tự không phải số hoặc khoảng trắng
         clean = re.sub(r'[^\d]', '', line.strip())
-        
         if len(clean) == 5:
-            period_num = len(valid_periods) + 1
-            valid_periods.append({
-                'period': period_num,
-                'value': clean,
-                'original_line': idx,
-                'digits': [int(d) for d in clean]
-            })
-        elif clean:  # Có nội dung nhưng không đúng format
-            errors.append(f"Dòng {idx}: '{line.strip()}' → Cần đúng 5 chữ số")
-    
-    # Đảo ngược nếu người dùng chọn newest ở dưới
-    if order == "newest_bottom":
-        valid_periods.reverse()
-        for i, p in enumerate(valid_periods):
-            p['period'] = i + 1  # Re-number sau khi đảo
-    
-    return valid_periods, errors
+            valid.append({'period': len(valid)+1, 'value': clean, 'digits': [int(d) for d in clean]})
+        elif clean:
+            errors.append(f"Dòng {idx}: '{line.strip()}' ❌")
+    return valid, errors
 
-# --- HÀM TÍNH STATISTICS ---
-def calculate_stats(periods, position_idx):
+# --- HÀM TÍNH THỐNG KÊ TỪNG VỊ TRÍ ---
+def calculate_position_stats(periods, pos_idx):
     if not periods:
-        return {'tai': 0, 'xiu': 0, 'total': 0, 'avg': 0, 'trend': 'N/A'}
+        return None
+    digits = [p['digits'][pos_idx] for p in periods]
+    tai = sum(1 for d in digits if d >= 5)
+    xiu = len(digits) - tai
+    chan = sum(1 for d in digits if d % 2 == 0)
+    le = len(digits) - chan
+    to = sum(1 for d in digits if d in [1,2,3,5,7])
+    hop = len(digits) - to
     
-    digits = [p['digits'][position_idx] for p in periods]
+    # Tính xu hướng 5 kỳ gần
+    last_5 = digits[:5]
+    last_5_tai = sum(1 for d in last_5 if d >= 5)
+    
+    # Phát hiện bệt (4-5 kỳ cùng 1 bên)
+    is_tai_bet = last_5_tai >= 4
+    is_xiu_bet = last_5_tai <= 1
+    
     return {
         'total': len(digits),
-        'tai': sum(1 for d in digits if d >= 5),
-        'xiu': sum(1 for d in digits if d < 5),
-        'avg': sum(digits) / len(digits),
-        'trend': '📈 TĂNG' if digits[0] > digits[-1] else '📉 GIẢM' if digits[0] < digits[-1] else '➡️ ỔN ĐỊNH'
+        'tai': tai, 'xiu': xiu, 'tai_rate': tai/len(digits) if digits else 0,
+        'chan': chan, 'le': le,
+        'to': to, 'hop': hop,
+        'last_5_tai': last_5_tai,
+        'is_tai_bet': is_tai_bet,
+        'is_xiu_bet': is_xiu_bet,
+        'avg': sum(digits)/len(digits) if digits else 0,
+        'trend': '📈 TĂNG' if digits[0] > digits[-1] else '📉 GIẢM' if digits[0] < digits[-1] else '➡️ ỔN'
     }
 
-# --- HÀM PHÂN TÍCH LOGIC ---
-def analyze_positions(periods):
-    if len(periods) < 5:
-        return None
+# --- HÀM PHÂN TÍCH XIÊN 2 ---
+def analyze_xien2(periods):
+    """Phân tích và gợi ý kèo Xiên 2 tối ưu"""
+    if len(periods) < 10:
+        return None, "Cần ít nhất 10 kỳ để phân tích"
     
     labels = ["Chục Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"]
-    results = {}
+    stats = {}
     
-    for i in range(5):
-        digits = [p['digits'][i] for p in periods]
-        last_5 = digits[:5]
-        last_3 = digits[:3]
-        
-        tai_5 = sum(1 for d in last_5 if d >= 5)
-        tai_3 = sum(1 for d in last_3 if d >= 5)
-        
-        # Logic phân tích nâng cao
-        if tai_5 >= 4:
-            pred, note, conf = "XỈU", "🔥 Bệt Tài → Bẻ cầu", "85%"
-        elif tai_5 <= 1:
-            pred, note, conf = "TÀI", "🔥 Bệt Xỉu → Bẻ cầu", "85%"
-        elif tai_3 == 3:
-            pred, note, conf = "XỈU", "📈 3 Tài → Giảm nhiệt", "70%"
-        elif tai_3 == 0:
-            pred, note, conf = "TÀI", "📉 3 Xỉu → Bật tăng", "70%"
-        else:
-            avg = sum(last_5) / 5
-            pred = "TÀI" if avg >= 4.5 else "XỈU"
-            note = "🛡 Cầu nhảy → Theo xu hướng"
-            conf = "60%"
-        
-        results[labels[i]] = {
-            "pred": pred, "note": note, "confidence": conf,
-            "stats": calculate_stats(periods, i)
-        }
+    for i, name in enumerate(labels):
+        stats[name] = calculate_position_stats(periods, i)
     
-    return results
+    # Tìm cặp vị trí có tín hiệu mạnh nhất cho Xiên 2
+    recommendations = []
+    
+    # Cặp 1: Chục Ngàn + Ngàn (vị trí 0 + 1)
+    pos0 = stats["Chục Ngàn"]
+    pos1 = stats["Ngàn"]
+    
+    if pos0['is_xiu_bet'] and pos1['is_xiu_bet']:
+        rec = {"pair": "Chục Ngàn + Ngàn", "bet": "XỈU + XỈU", "confidence": "85%", 
+               "reason": "Cả 2 vị trí đang bệt Xỉu → Đánh bẻ cầu", "risk": "CAO"}
+        recommendations.append(rec)
+    elif pos0['is_tai_bet'] and pos1['is_tai_bet']:
+        rec = {"pair": "Chục Ngàn + Ngàn", "bet": "TÀI + TÀI", "confidence": "85%",
+               "reason": "Cả 2 vị trí đang bệt Tài → Đánh bẻ cầu", "risk": "CAO"}
+        recommendations.append(rec)
+    
+    # Cặp 2: Chục + Đơn Vị (vị trí 3 + 4) - Thường ổn định hơn
+    pos3 = stats["Chục"]
+    pos4 = stats["Đơn Vị"]
+    
+    if pos3['tai_rate'] > 0.6 and pos4['tai_rate'] > 0.6:
+        rec = {"pair": "Chục + Đơn Vị", "bet": "XỈU + XỈU", "confidence": "75%",
+               "reason": "Tài xuất hiện >60% → Theo luật bù trừ, Xỉu sẽ về", "risk": "TRUNG BÌNH"}
+        recommendations.append(rec)
+    elif pos3['tai_rate'] < 0.4 and pos4['tai_rate'] < 0.4:
+        rec = {"pair": "Chục + Đơn Vị", "bet": "TÀI + TÀI", "confidence": "75%",
+               "reason": "Xỉu xuất hiện >60% → Theo luật bù trừ, Tài sẽ về", "risk": "TRUNG BÌNH"}
+        recommendations.append(rec)
+    
+    # Cặp 3: Kèo an toàn - 1 Tài 1 Xỉu (giảm variance)
+    if pos0['tai_rate'] > 0.5 and pos4['tai_rate'] < 0.5:
+        rec = {"pair": "Chục Ngàn + Đơn Vị", "bet": "TÀI + XỈU", "confidence": "65%",
+               "reason": "Đa dạng hóa rủi ro, xác suất thắng ~30%", "risk": "THẤP"}
+        recommendations.append(rec)
+    
+    # Luôn có gợi ý Tài/Xỉu 1 vị trí làm nền tảng
+    recommendations.append({
+        "pair": "BẤT KỲ 1 VỊ TRÍ", 
+        "bet": "TÀI/XỈU ĐƠN", 
+        "confidence": "50%+", 
+        "reason": "Edge nhà cái thấp nhất (~2.5-5%) → Nuôi vốn an toàn",
+        "risk": "THẤP"
+    })
+    
+    return recommendations, stats
+
+# --- HÀM TÍNH MỨC CƯỢC ---
+def calculate_bet_amount(bankroll, bet_type, martingale_level=0):
+    """Tính mức cược theo % vốn và cấp độ gấp thếp"""
+    base_pct = 0.02 if bet_type == "ĐƠN" else 0.01  # Đơn: 2%, Xiên: 1%
+    base_bet = int(bankroll * base_pct)
+    
+    if martingale_level > 0:
+        bet = base_bet * (2 ** martingale_level)
+        max_bet = int(bankroll * 0.1)  # Max 10% vốn
+        bet = min(bet, max_bet)
+    else:
+        bet = base_bet
+    
+    return bet
 
 # --- GIAO DIỆN ---
-st.title("🎯 TITAN v30.7 - FIX NHẢY KỲ")
+st.title("🎯 TITAN v32.0 - KÈO ĐÔI XIÊN 2 CHUYÊN BIỆT")
 st.write(f"🕒 {datetime.now().strftime('%H:%M:%S | %d/%m/%Y')}")
 
-# Sidebar: Cài đặt
+# Cảnh báo quan trọng
+st.warning("""
+⚠️ **LƯU Ý QUAN TRỌNG**: 
+- 5D KU dùng RNG (ngẫu nhiên), không có công thức thắng 100%
+- Tool hỗ trợ ra quyết định nhanh, quản lý vốn thông minh
+- **LUÔN DỪNG KHI THUA 20% VỐN/NGÀY** hoặc **THẮNG 15% VỐN/NGÀY**
+- Chơi có trách nhiệm, coi đây là giải trí
+""")
+
+# Sidebar: Quản lý vốn
 with st.sidebar:
-    st.header("⚙️ Cài đặt nhập liệu")
+    st.header("💰 QUẢN LÝ VỐN")
     
-    st.session_state.period_order = st.radio(
-        "📌 Thứ tự kỳ:",
-        options=["newest_top", "newest_bottom"],
-        format_func=lambda x: "✅ Mới nhất ở TRÊN" if x == "newest_top" else "✅ Mới nhất ở DƯỚI",
-        index=0 if st.session_state.period_order == "newest_top" else 1
+    st.session_state.bankroll = st.number_input(
+        "Vốn hiện tại (đ)", 
+        min_value=0, 
+        value=st.session_state.bankroll,
+        step=10000
     )
     
-    st.info("""
-    💡 Mẹo nhập nhanh:
-    - Copy từ bảng kết quả
-    - Mỗi dòng 1 kỳ (5 chữ số)
-    - Ký tự khác số sẽ tự động lọc
+    bet_type = st.radio(
+        "Loại cược:",
+        ["Xiên 2", "Tài/Xỉu Đơn"],
+        index=0
+    )
+    
+    martingale = st.slider("Cấp độ gấp thếp", 0, 3, 0)
+    
+    st.divider()
+    
+    # Tính mức cược gợi ý
+    recommended_bet = calculate_bet_amount(st.session_state.bankroll, "ĐƠN" if bet_type == "Tài/Xỉu Đơn" else "XIÊN", martingale)
+    st.metric("Mức cược gợi ý", f"{recommended_bet:,}đ")
+    
+    # Stop-loss calculator
+    stop_loss = int(st.session_state.bankroll * 0.2)
+    take_profit = int(st.session_state.bankroll * 0.15)
+    
+    st.info(f"""
+    🛑 **Stop-loss**: -{stop_loss:,}đ (20%)
+    ✅ **Take-profit**: +{take_profit:,}đ (15%)
     """)
     
-    if st.button("🗑️ Reset toàn bộ", use_container_width=True):
-        st.session_state.raw_input = ""
-        st.session_state.analysis_result = None
+    st.divider()
+    
+    # Lịch sử cược
+    st.subheader("📜 Lịch sử 5 ván gần")
+    if st.session_state.bet_history:
+        for h in st.session_state.bet_history[-5:]:
+            icon = "🟢" if h['result'] == 'WIN' else "🔴"
+            st.caption(f"{icon} {h['time']}: {h['type']} {h['bet']}đ → {h['pnl']:+,}đ")
+    else:
+        st.caption("Chưa có lịch sử")
+    
+    if st.button("🗑️ Reset lịch sử"):
+        st.session_state.bet_history = []
         st.rerun()
 
 # Form nhập liệu
 with st.form("input_form"):
-    st.subheader("📥 Nhập kết quả các kỳ")
+    st.subheader("📥 NHẬP KẾT QUẢ 10-20 KỲ GẦN NHẤT")
     
     raw_data = st.text_area(
-        "Dán dữ liệu tại đây:",
-        value=st.session_state.raw_input,
-        placeholder="Ví dụ:\n95231\n18472\n03659\n74125\n...\n(Lưu ý chọn đúng thứ tự kỳ ở sidebar ⬅️)",
-        height=220,
-        key="input_area"  # Key cố định tránh bị reset
+        "Dán kết quả tại đây (mỗi dòng 5 chữ số):",
+        placeholder="Ví dụ:\n95231\n18472\n03659\n74125\n...\n(Kỳ mới nhất ở TRÊN CÙNG)",
+        height=200
     )
     
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        submitted = st.form_submit_button("🚀 PHÂN TÍCH NGAY", type="primary", use_container_width=True)
+        submitted = st.form_submit_button("🚀 PHÂN TÍCH XIÊN 2", type="primary", use_container_width=True)
     with col2:
         preview_btn = st.form_submit_button("👀 Xem trước", use_container_width=True)
     with col3:
@@ -147,120 +218,109 @@ with st.form("input_form"):
 
 # Xử lý nút
 if cleared:
-    st.session_state.raw_input = ""
-    st.session_state.analysis_result = None
+    st.session_state.analysis_cache = None
     st.rerun()
 
-# Preview dữ liệu (không cần submit)
+# Preview & Analysis
 if preview_btn or (submitted and raw_data):
-    if raw_data:
-        st.session_state.raw_input = raw_data
-        periods, errors = clean_and_parse_input(raw_data, st.session_state.period_order)
-        
-        # Hiển thị preview bảng
-        with st.expander("🔍 Xem trước dữ liệu đã parse", expanded=True):
-            if periods:
-                # Tạo bảng preview
-                preview_data = {
-                    "Kỳ #": [p['period'] for p in periods[:10]],  # Show 10 kỳ đầu
-                    "Số": [p['value'] for p in periods[:10]],
-                    "🔢 Dãy số": [" • ".join(str(d) for d in p['digits']) for p in periods[:10]]
-                }
-                st.dataframe(preview_data, use_container_width=True, hide_index=True)
-                
-                if len(periods) > 10:
-                    st.caption(f"... và {len(periods) - 10} kỳ nữa")
-            else:
-                st.warning("Chưa có dữ liệu hợp lệ để xem trước")
-            
-            if errors:
-                st.warning(f"⚠️ {len(errors)} dòng không hợp lệ:")
-                for e in errors[:5]:
-                    st.caption(f"• {e}")
-                if len(errors) > 5:
-                    st.caption(f"... và {len(errors) - 5} lỗi khác")
+    periods, errors = clean_input(raw_data)
     
-    # Nếu bấm Submit thì phân tích
-    if submitted:
-        periods, errors = clean_and_parse_input(raw_data, st.session_state.period_order)
+    if errors:
+        with st.expander(f"⚠️ {len(errors)} dòng không hợp lệ", expanded=False):
+            for e in errors:
+                st.warning(e)
+    
+    if len(periods) < 10:
+        st.warning(f"⚠️ Cần ít nhất 10 kỳ để phân tích thống kê. Hiện có: {len(periods)}")
+    else:
+        st.session_state.analysis_cache = {"periods": periods, "errors": errors}
         
-        if len(periods) < 5:
-            st.error(f"❌ Cần ít nhất 5 kỳ hợp lệ! Hiện có: {len(periods)}")
-            if errors:
-                with st.expander("Xem lỗi chi tiết"):
-                    for e in errors:
-                        st.warning(e)
-        else:
-            with st.spinner("🔄 Đang phân tích..."):
-                time.sleep(0.3)
-                analysis = analyze_positions(periods)
-                st.session_state.analysis_result = {"analysis": analysis, "periods": periods}
+        if submitted:
+            with st.spinner("🔍 Đang phân tích Xiên 2..."):
+                time.sleep(0.5)
+                recommendations, stats = analyze_xien2(periods)
             
-            if analysis:
-                st.success(f"✅ Phân tích xong {len(periods)} kỳ! Kỳ mới nhất: `{periods[0]['value']}`")
-                
-                # 📊 BẢNG DỰ ĐOÁN
-                st.subheader("📊 KẾT QUẢ PHÂN TÍCH")
-                cols = st.columns(5)
-                
-                labels = ["Chục Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"]
-                for idx, name in enumerate(labels):
-                    item = analysis[name]
-                    is_tai = item['pred'] == "TÀI"
-                    color = "#FF4B4B" if is_tai else "#1F77B4"
-                    bg = "#FFE5E5" if is_tai else "#E5F0FF"
+            st.success(f"✅ Phân tích xong {len(periods)} kỳ!")
+            
+            # 📊 BẢNG THỐNG KÊ CHI TIẾT
+            st.subheader("📊 THỐNG KÊ TỪNG VỊ TRÍ")
+            cols = st.columns(5)
+            labels = ["Chục Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"]
+            
+            for idx, name in enumerate(labels):
+                s = stats[name]
+                with cols[idx]:
+                    st.markdown(f"""
+                    <div style='background:#f0f2f6; padding:10px; border-radius:8px; text-align:center'>
+                        <b>{name}</b><br>
+                        Tài: {s['tai']}/{s['total']} ({s['tai_rate']*100:.0f}%)<br>
+                        Xu hướng: {s['trend']}
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    with cols[idx]:
-                        st.markdown(f"""
-                        <div style='background:{bg}; padding:12px; border-radius:10px; 
-                                  text-align:center; border:2px solid {color}; margin:5px'>
-                            <b>{name}</b><br>
-                            <h2 style='color:{color}; margin:8px 0'>{item['pred']}</h2>
-                            <small>🎯 {item['confidence']}</small><br>
-                            <small>{item['stats']['trend']}</small>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        st.caption(f"_{item['note']}_")
-                        
-                        # Mini bar
-                        stats = item['stats']
-                        if stats['total'] > 0:
-                            tai_pct = int(stats['tai'] / stats['total'] * 100)
-                            st.progress(tai_pct, text=f"Tài {tai_pct}%")
+                    # Cảnh báo bệt
+                    if s['is_tai_bet']:
+                        st.caption("🔥 Đang bệt TÀI")
+                    elif s['is_xiu_bet']:
+                        st.caption("🔥 Đang bệt XỈU")
+            
+            st.divider()
+            
+            # 🎯 GỢI Ý XIÊN 2
+            st.subheader("🎯 GỢI Ý KÈO XIÊN 2")
+            
+            for i, rec in enumerate(recommendations, 1):
+                risk_color = {"THẤP": "🟢", "TRUNG BÌNH": "🟡", "CAO": "🔴"}
                 
-                st.divider()
-                
-                # 🚀 XIÊN 2
-                st.subheader("💎 GỢI Ý XIÊN 2")
-                c1, c2 = st.columns(2)
-                
-                with c1:
-                    p1 = f"{analysis['Chục Ngàn']['pred']}+{analysis['Ngàn']['pred']}"
-                    c1_conf = min(analysis['Chục Ngàn']['confidence'], analysis['Ngàn']['confidence'])
-                    st.metric("Cặp 1: Chục Ngàn + Ngàn", p1, delta=f"🎯 {c1_conf}")
-                    st.caption("👉 Đánh khi cầu đang bệt, ưu tiên bẻ")
-                
-                with c2:
-                    p2 = f"{analysis['Chục']['pred']}+{analysis['Đơn Vị']['pred']}"
-                    c2_conf = min(analysis['Chục']['confidence'], analysis['Đơn Vị']['confidence'])
-                    st.metric("Cặp 2: Chục + Đơn Vị", p2, delta=f"🎯 {c2_conf}")
-                    st.caption("👉 Đánh khi cầu nhảy, theo xu hướng")
-                
-                # 📈 Xu hướng chi tiết
-                with st.expander("📈 Xem chi tiết xu hướng từng vị trí"):
-                    for name in labels:
-                        item = analysis[name]
-                        digits = [p['digits'][labels.index(name)] for p in periods[:10]]
-                        trend_vis = " → ".join([f"{'🔴' if d>=5 else '🔵'}{d}" for d in digits])
-                        st.write(f"**{name}**: {trend_vis}")
-                        st.caption(f"Trung bình: {item['stats']['avg']:.2f} | {item['stats']['tai']} Tài / {item['stats']['xiu']} Xỉu")
-
-            else:
-                st.error("❌ Không thể phân tích. Kiểm tra lại dữ liệu nhập vào.")
-
-elif not raw_data and submitted:
-    st.warning("⚠️ Anh chưa nhập số! Dán dữ liệu vào ô trên rồi bấm nút nhé 🔼")
+                with st.expander(f"{i}. {rec['pair']} → {rec['bet']}", expanded=(i==1)):
+                    c1, c2, c3 = st.columns(3)
+                    with c1:
+                        st.metric("Độ tin cậy", rec['confidence'])
+                    with c2:
+                        st.metric("Rủi ro", f"{risk_color.get(rec['risk'], '⚪')} {rec['risk']}")
+                    with c3:
+                        st.metric("Lý do", rec['reason'][:30]+"...")
+                    
+                    # Tính toán cược cho kèo này
+                    if "XIÊN" in rec['bet'] or "2" in rec['pair']:
+                        bet_amount = calculate_bet_amount(st.session_state.bankroll, "XIÊN", martingale)
+                        potential_win = int(bet_amount * 3.6)  # Tỷ lệ Xiên 2 ~3.6x
+                    else:
+                        bet_amount = calculate_bet_amount(st.session_state.bankroll, "ĐƠN", martingale)
+                        potential_win = int(bet_amount * 1.9)  # Tỷ lệ Đơn ~1.9x
+                    
+                    st.info(f"""
+                    💰 **Mức cược gợi ý**: {bet_amount:,}đ  
+                    🏆 **Thắng nhận**: {potential_win:,}đ  
+                    📊 **Lợi nhuận**: +{potential_win - bet_amount:,}đ
+                    """)
+            
+            st.divider()
+            
+            # 📈 BIỂU ĐỒ XU HƯỚNG
+            st.subheader("📈 XU HƯỚNG 5 KỲ GẦN NHẤT")
+            
+            for name in labels:
+                s = stats[name]
+                digits = [periods[i]['digits'][labels.index(name)] for i in range(min(5, len(periods)))]
+                trend_str = " → ".join([f"{'🔴' if d>=5 else '🔵'}{d}" for d in digits])
+                st.caption(f"**{name}**: {trend_str}")
+            
+            st.divider()
+            
+            # ⚠️ CẢNH BÁO QUAN TRỌNG
+            st.error("""
+            🔴 **QUY TẮC VÀNG**:
+            1. Không đánh Xiên 2 quá 3 ván liên tiếp
+            2. Thua 2 ván Xiên 2 → Quay về đánh Đơn nuôi vốn
+            3. Dừng ngay khi thua 20% vốn/ngày
+            4. Chốt lời khi thắng 15% vốn/ngày
+            5. Không chasing loss (đuổi lỗ cảm tính)
+            """)
 
 # Footer
 st.markdown("---")
-st.caption("🔐 TITAN v30.7 | Fix lỗi nhảy kỳ + Input thông minh | Kết quả tham khảo - Chơi có trách nhiệm 🙏")
+st.caption("""
+🔐 **TITAN v32.0** | Chuyên biệt Kèo Đôi Xiên 2 5D KU | Phân tích thống kê + Quản lý vốn  
+⚠️ Kết quả tham khảo - Không đảm bảo thắng | Chơi có trách nhiệm 🙏
+""")
