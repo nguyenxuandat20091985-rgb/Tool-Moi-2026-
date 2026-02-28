@@ -3,7 +3,7 @@ from datetime import datetime
 import time
 import re
 
-st.set_page_config(page_title="TITAN v34.0 - CHỮ TO", layout="centered", page_icon="⚡")
+st.set_page_config(page_title="TITAN v34.1 - CHỮ TO", layout="centered", page_icon="⚡")
 
 # --- CSS CHỮ TO + MÀU TƯƠNG PHẢN CAO ---
 st.markdown("""
@@ -80,28 +80,6 @@ st.markdown("""
         border-radius: 8px;
         margin: 10px 0;
     }
-    .btn-win { 
-        background: #00AA00; 
-        color: white; 
-        font-size: 1.5em; 
-        font-weight: bold;
-        padding: 15px 30px;
-        border: none;
-        border-radius: 10px;
-        width: 100%;
-        margin: 5px 0;
-    }
-    .btn-lose { 
-        background: #FF0000; 
-        color: white; 
-        font-size: 1.5em; 
-        font-weight: bold;
-        padding: 15px 30px;
-        border: none;
-        border-radius: 10px;
-        width: 100%;
-        margin: 5px 0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -162,7 +140,7 @@ def quick_analyze(raw_text):
     return best_pick
 
 # --- GIAO DIỆN ---
-st.title("⚡ TITAN v34.0 - CHỮ TO RÕ RÀNG")
+st.title("⚡ TITAN v34.1 - CHỮ TO RÕ RÀNG")
 
 # Countdown
 now = datetime.now()
@@ -189,7 +167,7 @@ with st.form("quick_form", clear_on_submit=False):
     with col2:
         st.form_submit_button("🗑️ XOÁ", use_container_width=True)
 
-# Kết quả
+# Kết quả - SỬ DỤNG st.markdown VỚI unsafe_allow_html=True
 if go and raw:
     rec = quick_analyze(raw)
     
@@ -197,8 +175,10 @@ if go and raw:
         st.session_state.period_count += 1
         
         bet_class = "tai" if rec['bet'] == "TÀI" else "xiu"
+        profit = int(rec['bet_amount'] * 0.985)
         
-        st.markdown(f"""
+        # Tạo HTML string
+        html_content = f"""
         <div class="recommendation">
             <div class="title">🎯 KHUYẾN NGHỊ KỲ {st.session_state.period_count}</div>
             <hr style="border: 2px solid #333333;">
@@ -212,7 +192,7 @@ if go and raw:
             <div class="label">💰 CƯỢC:</div>
             <div class="bet-amount">{rec['bet_amount']:,}đ</div>
             
-            <div class="odds">🎯 Odds: 1.985 → Thắng +{int(rec['bet_amount']*0.985):,}đ</div>
+            <div class="odds">🎯 Odds: 1.985 → Thắng +{profit:,}đ</div>
             
             <hr style="border: 2px solid #333333;">
             
@@ -220,15 +200,18 @@ if go and raw:
             
             <div class="confidence">⚡ Độ tin cậy: {"█" * (rec['confidence']//10)}{"░" * (10 - rec['confidence']//10)} {rec['confidence']}%</div>
         </div>
-        """, unsafe_allow_html=True)
+        """
+        
+        # Render HTML - QUAN TRỌNG: unsafe_allow_html=True
+        st.markdown(html_content, unsafe_allow_html=True)
         
         # Nút hành động
         c1, c2 = st.columns(2)
         with c1:
             if st.button("✅ THẮNG", type="primary", use_container_width=True, key="win"):
-                st.session_state.bankroll += int(rec['bet_amount'] * 0.985)
+                st.session_state.bankroll += profit
                 st.balloons()
-                st.success(f"🎉 +{int(rec['bet_amount']*0.985):,}đ")
+                st.success(f"🎉 +{profit:,}đ")
                 st.rerun()
         with c2:
             if st.button("❌ THUA", type="secondary", use_container_width=True, key="lose"):
@@ -245,4 +228,4 @@ if go and raw:
 
 # Footer
 st.markdown("---")
-st.caption("⚡ TITAN v34.0 | CHỮ TO - MÀU RÕ - 3 GIÂY QUYẾT ĐỊNH | Chơi có trách nhiệm 🙏")
+st.caption("⚡ TITAN v34.1 | CHỮ TO - MÀU RÕ - 3 GIÂY QUYẾT ĐỊNH | Chơi có trách nhiệm 🙏")
