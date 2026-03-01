@@ -1,3 +1,4 @@
+# ================= IMPORT THƯ VIỆN =================
 import streamlit as st
 import google.generativeai as genai
 import re
@@ -7,11 +8,11 @@ from collections import Counter
 from datetime import datetime
 
 # ================= CẤU HÌNH BẢO MẬT =================
-# Lấy key từ Secrets của Streamlit Cloud (Không hardcode nữa)
+# Lấy key từ Secrets của Streamlit Cloud (KHÔNG hardcode trong code)
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("⚠️ Chưa cấu hình API Key trong Secrets! Xem hướng dẫn bên dưới.")
+    st.error("⚠️ Chưa cấu hình API Key trong Secrets! Vào Settings → Secrets để thêm.")
     st.stop()
 
 # ================= KHỞI TẠO HỆ THỐNG =================
@@ -84,35 +85,39 @@ with st.sidebar:
         )
     
     st.divider()
+    st.write(f"📊 **Tổng kỳ:** {len(st.session_state.history)}")
     if st.button("🗑️ Xóa toàn bộ dữ liệu"):
         st.session_state.history = []
         st.rerun()
+    
+    st.divider()
+    st.caption("🔐 API Key được bảo mật trong Secrets")
 
 # ================= PHẦN 1: NHẬP LIỆU & XỬ LÝ =================
 col1, col2 = st.columns([3, 1])
 with col1:
     raw_input = st.text_area("📡 Dán kết quả xổ số (Mỗi dòng 5 số)", height=150, placeholder="32880\n21808\n99215...")
 with col2:
-    st.metric("Tổng kỳ dữ liệu", len(st.session_state.history))
-    if st.button("🚀 XỬ LÝ & DỰ ĐOÁN", type="primary", use_container_width=True):
+    st.metric("Kỳ gần nhất", len(st.session_state.history))
+    if st.button("🚀 LƯU DỮ LIỆU", type="primary", use_container_width=True):
         if raw_input:
             clean = re.findall(r"\d{5}", raw_input)
             if clean:
-                # Thêm mới và loại bỏ trùng
                 new_data = list(dict.fromkeys(clean))
                 st.session_state.history.extend(new_data)
-                # Giới hạn lưu 1000 kỳ gần nhất để tránh nặng
                 st.session_state.history = st.session_state.history[-1000:] 
+                st.success(f"✅ Đã lưu {len(new_data)} kỳ mới!")
                 st.rerun()
         else:
             st.warning("Vui lòng nhập dữ liệu!")
 
 # ================= PHẦN 2: PHÂN TÍCH AI =================
+st.markdown("---")
+st.subheader("🤖 Phân Tích AI")
+
 if st.session_state.history:
-    # Nút kích hoạt AI riêng để tiết kiệm quota
-    if st.button("🔍 KÍCH HOẠT AI PHÂN TÍCH"):
+    if st.button("🔍 KÍCH HOẠT AI PHÂN TÍCH", type="secondary", use_container_width=True):
         with st.spinner("🧠 Titan đang tư duy..."):
-            # Chuẩn bị dữ liệu thống kê gửi kèm AI
             all_nums = "".join(st.session_state.history[-50:])
             freq = Counter(all_nums)
             top_freq = [str(x[0]) for x in freq.most_common(5)]
@@ -138,15 +143,17 @@ if st.session_state.history:
             """
             try:
                 response = neural_engine.generate_content(prompt)
-                # Làm sạch response để lấy JSON
                 text = response.text
                 json_match = re.search(r'\{.*\}', text, re.DOTALL)
                 if json_match:
                     st.session_state.last_prediction = json.loads(json_match.group())
+                    st.success("✅ AI đã phân tích xong!")
                 else:
                     st.error("AI trả về kết quả không đúng chuẩn JSON.")
             except Exception as e:
                 st.error(f"Lỗi AI: {e}")
+else:
+    st.warning("⚠️ Chưa có dữ liệu. Vui lòng nhập kết quả xổ số trước.")
 
 # ================= PHẦN 3: HIỂN THỊ KẾT QUẢ =================
 if st.session_state.last_prediction:
@@ -154,16 +161,15 @@ if st.session_state.last_prediction:
     is_go = res.get('decision', '').upper() == 'ĐÁNH'
     badge_class = "bg-go" if is_go else "bg-stop"
     
+    st.markdown("---")
     st.markdown(f"<div class='main-card'>", unsafe_allow_html=True)
     
-    # Header trạng thái
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         st.markdown(f"<h3 style='text-align:center'>📢 KẾT LUẬN: <span class='status-badge {badge_class}'>{res.get('decision', 'CHỜ')}</span></h3>", unsafe_allow_html=True)
     
     st.divider()
     
-    # Số dự đoán
     c_num1, c_num2 = st.columns(2)
     with c_num1:
         st.markdown("<p style='text-align:center;color:#8b949e'>🔥 3 SỐ CHỦ LỰC</p>", unsafe_allow_html=True)
@@ -176,13 +182,13 @@ if st.session_state.last_prediction:
     st.info(f"💡 **Logic:** {res.get('reasoning', 'Không có giải thích')}")
     st.success(f"🎯 **Độ tin cậy:** {res.get('confidence', 0)}%")
     
-    # Copy dàn
     full_set = "".join(sorted(set(res.get('main_3', '') + res.get('support_4', ''))))
     st.text_input("📋 Dàn số tham khảo (Copy):", full_set)
     
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ================= PHẦN 4: THỐNG KÊ VISUAL =================
+st.markdown("---")
 with st.expander("📊 Biểu đồ tần suất (50 kỳ gần nhất)"):
     if st.session_state.history:
         all_d = "".join(st.session_state.history[-50:])
@@ -192,3 +198,4 @@ with st.expander("📊 Biểu đồ tần suất (50 kỳ gần nhất)"):
 # ================= FOOTER =================
 st.markdown("---")
 st.caption("⚠️ **Cảnh báo:** Công cụ hỗ trợ tham khảo dựa trên xác suất thống kê và AI. Không đảm bảo trúng thưởng. Chơi xổ số có rủi ro, hãy cân nhắc kỹ trước khi xuống tiền.")
+st.caption(f"🕐 Cập nhật: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
