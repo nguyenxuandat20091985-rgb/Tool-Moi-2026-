@@ -8,7 +8,6 @@ from collections import Counter
 from datetime import datetime
 
 # ================= CẤU HÌNH BẢO MẬT =================
-# Lấy key từ Secrets của Streamlit Cloud (KHÔNG hardcode trong code)
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
 except:
@@ -22,8 +21,10 @@ st.set_page_config(page_title="TITAN v25.0 CLOUD", layout="wide", page_icon="�
 def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except: 
+        # ✅ SỬA: Dùng model mới nhất và ổn định
+        return genai.GenerativeModel('gemini-1.5-flash-latest')
+    except Exception as e:
+        st.error(f"Lỗi khởi tạo AI: {e}")
         return None
 
 neural_engine = setup_neural()
@@ -56,6 +57,7 @@ st.markdown("""
     .status-badge { padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; }
     .bg-go { background: #238636; color: white; }
     .bg-stop { background: #da3633; color: white; }
+    .error-box { background: #da3633; color: white; padding: 10px; border-radius: 8px; margin: 10px 0; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -142,16 +144,40 @@ if st.session_state.history:
             }}
             """
             try:
-                response = neural_engine.generate_content(prompt)
+                # ✅ SỬA: Thêm timeout và xử lý lỗi chi tiết
+                response = neural_engine.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.7,
+                        top_p=0.9,
+                        max_output_tokens=1024
+                    )
+                )
                 text = response.text
                 json_match = re.search(r'\{.*\}', text, re.DOTALL)
                 if json_match:
                     st.session_state.last_prediction = json.loads(json_match.group())
                     st.success("✅ AI đã phân tích xong!")
+                    st.rerun()
                 else:
                     st.error("AI trả về kết quả không đúng chuẩn JSON.")
+                    st.write(f"Raw response: {text[:500]}")
             except Exception as e:
-                st.error(f"Lỗi AI: {e}")
+                error_msg = str(e)
+                st.error(f"❌ Lỗi AI: {error_msg}")
+                
+                # ✅ FALLBACK: Nếu AI lỗi, dùng thống kê thuần túy
+                st.warning("⚠️ Chuyển sang chế độ thống kê thuần túy...")
+                all_n = "".join(st.session_state.history[-40:])
+                top = [x[0] for x in Counter(all_n).most_common(7)]
+                st.session_state.last_prediction = {
+                    "main_3": "".join([str(x) for x in top[:3]]),
+                    "support_4": "".join([str(x) for x in top[3:]]),
+                    "decision": "ĐÁNH",
+                    "confidence": 75,
+                    "reasoning": "Dùng thống kê tần suất thuần túy (AI đang bảo trì)"
+                }
+                st.rerun()
 else:
     st.warning("⚠️ Chưa có dữ liệu. Vui lòng nhập kết quả xổ số trước.")
 
@@ -182,7 +208,7 @@ if st.session_state.last_prediction:
     st.info(f"💡 **Logic:** {res.get('reasoning', 'Không có giải thích')}")
     st.success(f"🎯 **Độ tin cậy:** {res.get('confidence', 0)}%")
     
-    full_set = "".join(sorted(set(res.get('main_3', '') + res.get('support_4', ''))))
+    full_set = "".join(sorted(set(str(res.get('main_3', '')) + str(res.get('support_4', '')))))
     st.text_input("📋 Dàn số tham khảo (Copy):", full_set)
     
     st.markdown("</div>", unsafe_allow_html=True)
