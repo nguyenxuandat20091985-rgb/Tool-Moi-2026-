@@ -7,17 +7,15 @@ import pandas as pd
 import numpy as np
 from collections import Counter, defaultdict
 from datetime import datetime
-from itertools import combinations
 
-# ================= CẤU HÌNH BẢO MẬT =================
+# ================= CẤU HÌNH =================
 try:
     API_KEY = st.secrets["GEMINI_API_KEY"]
 except:
-    st.error("⚠️ Chưa cấu hình API Key trong Secrets!")
+    st.error("⚠️ Chưa cấu hình API Key!")
     st.stop()
 
-# ================= KHỞI TẠO HỆ THỐNG =================
-st.set_page_config(page_title="TITAN v26.0 PRO", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="TITAN v27.0 - ANTI-SCAM", layout="wide", page_icon="🛡️")
 
 @st.cache_resource
 def setup_neural():
@@ -41,165 +39,188 @@ def load_data_from_json(uploaded_file):
 def convert_df_to_json(data):
     return json.dumps(data, ensure_ascii=False).encode('utf-8')
 
-# Khởi tạo session state
 if "history" not in st.session_state:
     st.session_state.history = []
 if "last_prediction" not in st.session_state:
     st.session_state.last_prediction = None
 
-# ================= THUẬT TOÁN 1: PHÂN TÍCH TẦN SUẤT NÂNG CAO =================
-def advanced_frequency_analysis(history, top_n=10):
-    """Phân tích tần suất với trọng số thời gian"""
-    if not history:
-        return {}
+# ================= THUẬT TOÁN 1: PHÁT HIỆN CẦU LỪA =================
+def detect_scam_patterns(history):
+    """
+    Phát hiện các dấu hiệu nhà cái đang "lừa":
+    1. Pattern quá đẹp/quá hoàn hảo
+    2. Thay đổi đột ngột sau khi pattern ổn định
+    3. Ra số trùng lặp bất thường
+    """
+    if len(history) < 10:
+        return {"scam_level": "UNKNOWN", "warnings": [], "risk_score": 0}
     
-    # Tách từng vị trí
-    positions = {'hang_chuc_ngan': [], 'hang_ngan': [], 'hang_tram': [], 'hang_chuc': [], 'hang_don_vi': []}
+    warnings = []
+    risk_score = 0
     
-    for num in history[-50:]:
-        if len(num) == 5:
-            positions['hang_chuc_ngan'].append(int(num[0]))
-            positions['hang_ngan'].append(int(num[1]))
-            positions['hang_tram'].append(int(num[2]))
-            positions['hang_chuc'].append(int(num[3]))
-            positions['hang_don_vi'].append(int(num[4]))
+    recent = history[-20:]
     
-    # Tính tần suất có trọng số (kỳ gần nặng hơn)
-    weighted_freq = {}
-    for pos_name, pos_data in positions.items():
-        freq = Counter(pos_data)
-        # Trọng số giảm dần
-        weights = [i/len(pos_data) for i in range(1, len(pos_data)+1)]
-        weighted = defaultdict(float)
-        for i, num in enumerate(pos_data):
-            weighted[num] += weights[i]
-        
-        weighted_freq[pos_name] = dict(sorted(weighted.items(), key=lambda x: x[1], reverse=True)[:top_n])
-    
-    return weighted_freq
-
-# ================= THUẬT TOÁN 2: NHẬN DIỆN CẦU =================
-def detect_patterns(history, window=20):
-    """Nhận diện các dạng cầu: bệt, đảo, nhịp"""
-    if len(history) < window:
-        return {"cau_bet": [], "cau_dao": [], "cau_nhip": []}
-    
-    patterns = {
-        "cau_bet": [],      # Số ra liên tiếp
-        "cau_dao": [],      # Số ra xen kẽ
-        "cau_nhip": [],     # Số ra theo nhịp 2-3 kỳ
-        "cau_cham": []      # Số lâu chưa ra
-    }
-    
-    # Lấy 20 kỳ gần
-    recent = history[-window:]
+    # 1. Kiểm tra pattern lặp lại QUÁ NHIỀU
     all_nums = "".join(recent)
+    digit_freq = Counter(all_nums)
+    most_common_count = max(digit_freq.values()) if digit_freq else 0
     
-    # Phân tích từng vị trí
+    if most_common_count > 15:  # Một số xuất hiện >15 lần trong 20 kỳ
+        warnings.append(f"⚠️ Số {digit_freq.most_common(1)[0][0]} ra QUÁ NHIỀU ({most_common_count} lần)")
+        risk_score += 30
+    
+    # 2. Kiểm tra cầu bệt bất thường
     for pos in range(5):
-        pos_sequence = [int(num[pos]) if len(num) > pos else 0 for num in recent]
+        pos_seq = [int(num[pos]) if len(num) > pos else 0 for num in recent]
         
-        # Cầu bệt (ra liên tiếp 2-3 lần)
-        for i in range(len(pos_sequence)-1):
-            if pos_sequence[i] == pos_sequence[i+1]:
-                patterns["cau_bet"].append({
-                    'so': pos_sequence[i],
-                    'vi_tri': pos,
-                    'lan': 2
-                })
+        # Đếm streak (chuỗi liên tiếp)
+        max_streak = 1
+        current_streak = 1
+        for i in range(1, len(pos_seq)):
+            if pos_seq[i] == pos_seq[i-1]:
+                current_streak += 1
+                max_streak = max(max_streak, current_streak)
+            else:
+                current_streak = 1
         
-        # Cầu nhịp 2 (ra cách 1 kỳ)
-        for i in range(len(pos_sequence)-2):
-            if pos_sequence[i] == pos_sequence[i+2] and pos_sequence[i] != pos_sequence[i+1]:
-                patterns["cau_nhip"].append({
-                    'so': pos_sequence[i],
-                    'vi_tri': pos,
-                    'nhịp': 2
-                })
+        if max_streak >= 4:  # Bệt 4 kỳ trở lên
+            warnings.append(f"🎭 Vị trí {pos} bệt {max_streak} kỳ → DẤU HIỆU LỪA")
+            risk_score += 25
+    
+    # 3. Kiểm tra sự thay đổi ĐỘT NGỘT
+    if len(history) >= 30:
+        old_recent = history[-30:-10]
+        new_recent = history[-10:]
         
-        # Cầu nhịp 3
-        for i in range(len(pos_sequence)-3):
-            if pos_sequence[i] == pos_sequence[i+3]:
-                patterns["cau_nhip"].append({
-                    'so': pos_sequence[i],
-                    'vi_tri': pos,
-                    'nhịp': 3
-                })
+        old_avg = sum(int(d) for num in old_recent for d in num) / len(old_recent) / 5
+        new_avg = sum(int(d) for num in new_recent for d in num) / len(new_recent) / 5
+        
+        if abs(new_avg - old_avg) > 2:  # Thay đổi trung bình >2
+            warnings.append(f"📉 Thay đổi đột ngột: TB cũ {old_avg:.1f} → TB mới {new_avg:.1f}")
+            risk_score += 20
     
-    # Số lâu chưa ra (cold numbers)
-    all_digits = [0,1,2,3,4,5,6,7,8,9]
-    recent_digits = set(int(d) for d in all_nums)
-    cold = [d for d in all_digits if d not in recent_digits]
-    patterns["cau_cham"] = cold
+    # 4. Kiểm tra tổng các số
+    totals = [sum(int(d) for d in num) for num in recent]
+    total_std = np.std(totals)
     
-    return patterns
-
-# ================= THUẬT TOÁN 3: THỐNG KÊ TỔNG - THIỆP =================
-def analyze_totals(history):
-    """Phân tích tổng các số"""
-    if not history:
-        return {}
+    if total_std < 3:  # Độ lệch chuẩn quá thấp → quá ổn định
+        warnings.append(f"⚡ Tổng số QUÁ ỔN ĐỊNH (std={total_std:.2f}) → DẤU HIỆU GIẢ")
+        risk_score += 25
     
-    totals = []
-    for num in history[-30:]:
-        if len(num) == 5:
-            total = sum(int(d) for d in num)
-            totals.append(total)
+    # 5. Kiểm tra số trùng lặp HOÀN TOÀN
+    unique_nums = set(history[-20:])
+    if len(unique_nums) < 15:  # Ít hơn 15 số khác nhau trong 20 kỳ
+        warnings.append(f"🔄 Quá ít số độc nhất ({len(unique_unique)}/20) → NHÀ CÁI ĐIỀU KHIỂN")
+        risk_score += 30
     
-    total_freq = Counter(totals)
-    avg_total = np.mean(totals) if totals else 0
+    # Đánh giá mức độ rủi ro
+    if risk_score >= 60:
+        scam_level = "HIGH - NÊN DỪNG"
+    elif risk_score >= 40:
+        scam_level = "MEDIUM - CẨN THẬN"
+    elif risk_score >= 20:
+        scam_level = "LOW - THEO DÕI"
+    else:
+        scam_level = "NORMAL - CÓ THỂ CHƠI"
     
     return {
-        'total_freq': dict(total_freq.most_common(5)),
-        'avg_total': round(avg_total, 1),
-        'hot_totals': [t for t, c in total_freq.most_common(3)]
+        "scam_level": scam_level,
+        "warnings": warnings,
+        "risk_score": risk_score,
+        "recommendation": "DỪNG NGAY" if risk_score >= 60 else "CHỜ" if risk_score >= 40 else "CÂN NHẮC"
     }
 
-# ================= THUẬT TOÁN 4: DỰ ĐOÁN VỊ TRÍ =================
-def position_prediction(history):
-    """Dự đoán theo từng vị trí riêng biệt"""
-    if len(history) < 10:
-        return {}
+# ================= THUẬT TOÁN 2: PHÁT HIỆN BẺ CẦU =================
+def detect_bridge_break(history):
+    """
+    Phát hiện khi nhà cái đang "bẻ cầu":
+    - Pattern đẹp đột ngột biến mất
+    - Số ra ngẫu nhiên bất thường
+    """
+    if len(history) < 15:
+        return {"breaking": False, "signs": []}
     
-    predictions = {}
+    signs = []
+    recent = history[-15:]
     
+    # 1. Kiểm tra sự gián đoạn pattern
     for pos in range(5):
-        pos_name = ['Chục ngàn', 'Ngàn', 'Trăm', 'Chục', 'Đơn vị'][pos]
-        pos_sequence = [int(num[pos]) if len(num) > pos else 0 for num in history[-30:]]
+        pos_seq = [int(num[pos]) if len(num) > pos else 0 for num in recent]
         
-        # Tần suất vị trí
-        freq = Counter(pos_sequence)
-        top_3 = [num for num, count in freq.most_common(3)]
-        
-        # Xu hướng gần (5 kỳ cuối)
-        recent_trend = pos_sequence[-5:]
-        recent_freq = Counter(recent_trend)
-        trending = [num for num, count in recent_freq.most_common(2)]
-        
-        predictions[pos_name] = {
-            'top_3': top_3,
-            'trending': trending,
-            'hot': freq.most_common(1)[0][0] if freq else 0
-        }
+        # Tính autocorrelation (tương quan tự động)
+        if len(pos_seq) > 5:
+            correlation = np.corrcoef(pos_seq[:-1], pos_seq[1:])[0, 1]
+            
+            if abs(correlation) < 0.2:  # Tương quan rất thấp → ngẫu nhiên
+                signs.append(f"Vị trí {pos}: Tương quan thấp ({correlation:.2f}) → BẺ CẦU")
     
-    return predictions
+    # 2. Kiểm tra độ phức tạp (entropy)
+    all_digits = "".join(recent)
+    freq = Counter(all_digits)
+    total = len(all_digits)
+    entropy = -sum((count/total) * np.log2(count/total) for count in freq.values())
+    
+    if entropy > 3.2:  # Entropy cao → quá ngẫu nhiên
+        signs.append(f"🎲 Entropy cao ({entropy:.2f}) → NGẪU NHIÊN BẤT THƯỜNG")
+    
+    return {
+        "breaking": len(signs) > 0,
+        "signs": signs,
+        "entropy": entropy
+    }
 
-# ================= GIAO DIỆN & CSS =================
+# ================= THUẬT TOÁN 3: PHÂN TÍCH NHỊP NHÀ CÁI =================
+def analyze_house_rhythm(history):
+    """
+    Phân tích nhịp độ nhà cái thay đổi:
+    - Chu kỳ thay đổi pattern
+    - Thời điểm "an toàn" vs "nguy hiểm"
+    """
+    if len(history) < 30:
+        return {"cycle": "UNKNOWN", "safe_period": False}
+    
+    # Phân tích theo chu kỳ 10 kỳ
+    cycles = []
+    for i in range(0, len(history)-10, 10):
+        chunk = history[i:i+10]
+        unique = len(set(chunk))
+        cycles.append(unique)
+    
+    # Nếu chu kỳ thay đổi đều đặn → có pattern
+    if len(cycles) >= 3:
+        cycle_std = np.std(cycles)
+        if cycle_std < 1.5:
+            return {
+                "cycle": f"ỔN ĐỊNH ({np.mean(cycles):.1f} số độc nhất/chu kỳ)",
+                "safe_period": True,
+                "warning": "Nhà cái đang theo chu kỳ → Có thể dự đoán"
+            }
+        else:
+            return {
+                "cycle": "BẤT ỔN",
+                "safe_period": False,
+                "warning": "Nhà cái thay đổi liên tục → RỦI RO CAO"
+            }
+    
+    return {"cycle": "UNKNOWN", "safe_period": False}
+
+# ================= GIAO DIỆN =================
 st.markdown("""
     <style>
     .stApp { background: #0d1117; color: #c9d1d9; }
     .main-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 20px; margin: 10px 0; }
+    .danger-box { background: #7c2d12; border-left: 5px solid #fbbf24; padding: 15px; border-radius: 8px; margin: 10px 0; }
+    .warning-box { background: #451a03; border-left: 5px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 10px 0; }
+    .safe-box { background: #064e3b; border-left: 5px solid #10b981; padding: 15px; border-radius: 8px; margin: 10px 0; }
     .big-number { font-size: 60px; font-weight: 800; color: #ff7b72; text-align: center; letter-spacing: 8px; }
-    .sub-number { font-size: 40px; font-weight: 700; color: #58a6ff; text-align: center; letter-spacing: 5px; }
-    .status-badge { padding: 5px 15px; border-radius: 20px; font-weight: bold; display: inline-block; }
-    .bg-go { background: #238636; color: white; }
-    .bg-stop { background: #da3633; color: white; }
-    .algo-box { background: #1f2937; border-left: 4px solid #3b82f6; padding: 15px; margin: 10px 0; border-radius: 5px; }
-    .stat-card { background: #1f2937; padding: 15px; border-radius: 8px; text-align: center; }
+    .risk-high { color: #ef4444; font-size: 24px; font-weight: bold; }
+    .risk-med { color: #f59e0b; font-size: 24px; font-weight: bold; }
+    .risk-low { color: #10b981; font-size: 24px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-st.title("🎯 TITAN v26.0 - 4 THUẬT TOÁN NÂNG CAO")
+st.title("🛡️ TITAN v27.0 - PHÁT HIỆN CẦU LỪA")
+st.markdown("### 🎭 Nhận diện thủ thuật nhà cái trước khi mất tiền")
 st.markdown("---")
 
 # ================= SIDEBAR =================
@@ -225,9 +246,6 @@ with st.sidebar:
     
     st.divider()
     st.write(f"📊 **Tổng kỳ:** {len(st.session_state.history)}")
-    if st.button("🗑️ Xóa dữ liệu"):
-        st.session_state.history = []
-        st.rerun()
 
 # ================= NHẬP LIỆU =================
 col1, col2 = st.columns([3, 1])
@@ -245,185 +263,140 @@ with col2:
                 st.success(f"✅ Đã lưu {len(new_data)} kỳ!")
                 st.rerun()
 
-# ================= PHÂN TÍCH 4 THUẬT TOÁN =================
+# ================= PHÂN TÍCH CẦU LỪA =================
 st.markdown("---")
-st.subheader("🔬 PHÂN TÍCH ĐA THUẬT TOÁN")
+st.subheader("🎭 PHÂN TÍCH RỦI RO NHÀ CÁI")
 
-if st.session_state.history and len(st.session_state.history) >= 20:
-    if st.button("🎯 CHẠY 4 THUẬT TOÁN", type="secondary", use_container_width=True):
-        with st.spinner("🧠 Đang phân tích..."):
+if st.session_state.history and len(st.session_state.history) >= 15:
+    if st.button("🔍 QUÉT CẦU LỪA", type="secondary", use_container_width=True):
+        with st.spinner("🔬 Đang phân tích pattern nhà cái..."):
             
-            # Thuật toán 1: Tần suất nâng cao
-            freq_analysis = advanced_frequency_analysis(st.session_state.history)
+            # Chạy 3 thuật toán
+            scam_detect = detect_scam_patterns(st.session_state.history)
+            bridge_break = detect_bridge_break(st.session_state.history)
+            rhythm = analyze_house_rhythm(st.session_state.history)
             
-            # Thuật toán 2: Nhận diện cầu
-            patterns = detect_patterns(st.session_state.history)
-            
-            # Thuật toán 3: Thống kê tổng
-            totals = analyze_totals(st.session_state.history)
-            
-            # Thuật toán 4: Dự đoán vị trí
-            pos_pred = position_prediction(st.session_state.history)
-            
-            # Tổng hợp kết quả
-            all_digits = []
-            for pos_data in freq_analysis.values():
-                all_digits.extend(list(pos_data.keys())[:3])
-            
-            for pattern in patterns['cau_bet'] + patterns['cau_nhip']:
-                all_digits.append(pattern['so'])
-            
-            # Tìm số xuất hiện nhiều nhất
-            final_freq = Counter(all_digits)
-            top_7 = [str(x[0]) for x in final_freq.most_common(7)]
-            
-            # Gửi AI phân tích tổng hợp
-            prompt = f"""
-            Role: Chuyên gia xổ số cao cấp.
-            
-            DỮ LIỆU PHÂN TÍCH:
-            1. Lịch sử 50 kỳ: {st.session_state.history[-50:]}
-            
-            2. TẦN SUẤT NÂNG CAO (theo vị trí):
-            {json.dumps(freq_analysis, ensure_ascii=False)}
-            
-            3. MÔ HÌNH CẦU PHÁT HIỆN:
-            - Cầu bệt: {patterns['cau_bet']}
-            - Cầu nhịp: {patterns['cau_nhip']}
-            - Số lâu chưa ra: {patterns['cau_cham']}
-            
-            4. THỐNG KÊ TỔNG:
-            {json.dumps(totals, ensure_ascii=False)}
-            
-            5. DỰ ĐOÁN VỊ TRÍ:
-            {json.dumps(pos_pred, ensure_ascii=False)}
-            
-            6. TOP 7 SỐ TỪ THUẬT TOÁN: {top_7}
-            
-            NHIỆM VỤ:
-            1. Chọn 3 số chính (có xác suất cao nhất)
-            2. Chọn 4 số lót (bổ sung)
-            3. Quyết định ĐÁNH hoặc CHỜ
-            4. Giải thích logic rõ ràng
-            
-            Output JSON:
-            {{
-                "main_3": "abc",
-                "support_4": "defg",
-                "decision": "ĐÁNH",
-                "confidence": 85,
-                "reasoning": "Phân tích chi tiết...",
-                "algorithm_weights": {{
-                    "frequency": "30%",
-                    "patterns": "40%",
-                    "totals": "15%",
-                    "positions": "15%"
-                }}
-            }}
-            """
-            
-            try:
-                response = neural_engine.generate_content(prompt)
-                json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-                if json_match:
-                    st.session_state.last_prediction = json.loads(json_match.group())
-                    st.session_state.last_prediction['algorithms'] = {
-                        'frequency': freq_analysis,
-                        'patterns': patterns,
-                        'totals': totals,
-                        'positions': pos_pred
-                    }
-                    st.success("✅ Phân tích hoàn tất!")
-                    st.rerun()
-            except Exception as e:
-                st.error(f"Lỗi AI: {e}")
-                # Fallback
-                st.session_state.last_prediction = {
-                    "main_3": "".join(top_7[:3]),
-                    "support_4": "".join(top_7[3:]),
-                    "decision": "ĐÁNH",
-                    "confidence": 75,
-                    "reasoning": "Dùng thống kê thuần túy"
-                }
-                st.rerun()
+            # Lưu kết quả
+            st.session_state.last_prediction = {
+                "scam": scam_detect,
+                "bridge_break": bridge_break,
+                "rhythm": rhythm
+            }
+            st.rerun()
 
 elif st.session_state.history:
-    st.warning(f"⚠️ Cần ít nhất 20 kỳ để phân tích (hiện có {len(st.session_state.history)})")
+    st.warning(f"⚠️ Cần ít nhất 15 kỳ để phân tích (hiện có {len(st.session_state.history)})")
 
-# ================= HIỂN THỊ KẾT QUẢ =================
-if st.session_state.last_prediction:
-    res = st.session_state.last_prediction
-    is_go = res.get('decision', '').upper() == 'ĐÁNH'
-    badge_class = "bg-go" if is_go else "bg-stop"
+# ================= HIỂN THỊ CẢNH BÁO =================
+if st.session_state.last_prediction and "scam" in st.session_state.last_prediction:
+    data = st.session_state.last_prediction
     
     st.markdown("---")
-    st.markdown(f"<div class='main-card'>", unsafe_allow_html=True)
     
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
-        st.markdown(f"<h2 style='text-align:center'>📢 KẾT LUẬN: <span class='status-badge {badge_class}'>{res.get('decision', 'CHỜ')}</span></h2>", unsafe_allow_html=True)
+    # Hiển thị mức độ rủi ro
+    risk_score = data['scam']['risk_score']
+    
+    if risk_score >= 60:
+        st.markdown(f"""
+            <div class='danger-box'>
+                <h2 style='color: #fbbf24'>🚨 CẢNH BÁO ĐỎ - RỦI RO: {risk_score}/100</h2>
+                <p style='font-size: 18px'><strong>{data['scam']['scam_level']}</strong></p>
+                <p>📌 Khuyến nghị: <strong>{data['scam']['recommendation']}</strong></p>
+            </div>
+        """, unsafe_allow_html=True)
+    elif risk_score >= 40:
+        st.markdown(f"""
+            <div class='warning-box'>
+                <h3 style='color: #f59e0b'>⚠️ CẢNH BÁO VÀNG - RỦI RO: {risk_score}/100</h3>
+                <p><strong>{data['scam']['scam_level']}</strong></p>
+                <p>📌 Khuyến nghị: <strong>{data['scam']['recommendation']}</strong></p>
+            </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+            <div class='safe-box'>
+                <h3 style='color: #10b981'>✅ TƯƠNG ĐỐI AN TOÀN - RỦI RO: {risk_score}/100</h3>
+                <p><strong>{data['scam']['scam_level']}</strong></p>
+            </div>
+        """, unsafe_allow_html=True)
+    
+    # Hiển thị các dấu hiệu cảnh báo
+    if data['scam']['warnings']:
+        st.markdown("### 🚩 Các dấu hiệu phát hiện:")
+        for warning in data['scam']['warnings']:
+            st.write(f"- {warning}")
+    
+    # Hiển thị dấu hiệu bẻ cầu
+    if data['bridge_break']['breaking']:
+        st.markdown("### 🔨 Dấu hiệu bẻ cầu:")
+        for sign in data['bridge_break']['signs']:
+            st.write(f"- {sign}")
+    
+    # Hiển thị nhịp nhà cái
+    st.markdown("### 📊 Phân tích nhịp nhà cái:")
+    st.write(f"**Chu kỳ:** {data['rhythm']['cycle']}")
+    if not data['rhythm']['safe_period']:
+        st.warning(data['rhythm']['warning'])
+    else:
+        st.success(data['rhythm']['warning'])
     
     st.divider()
     
-    c_num1, c_num2 = st.columns(2)
-    with c_num1:
-        st.markdown("<p style='text-align:center;color:#8b949e'>🔥 3 SỐ CHÍNH</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='big-number'>{res.get('main_3', '???')}</div>", unsafe_allow_html=True)
-    with c_num2:
-        st.markdown("<p style='text-align:center;color:#8b949e'>🛡️ 4 SỐ LÓT</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='sub-number'>{res.get('support_4', '???')}</div>", unsafe_allow_html=True)
+    # Khuyến nghị cụ thể
+    st.markdown("### 💡 KHUYẾN NGHỊ CHIẾN LƯỢC:")
     
-    st.divider()
-    st.info(f"💡 **Logic:** {res.get('reasoning', 'N/A')}")
-    st.success(f"🎯 **Độ tin cậy:** {res.get('confidence', 0)}%")
-    
-    # Dàn số
-    full_set = "".join(sorted(set(str(res.get('main_3', '')) + str(res.get('support_4', '')))))
-    st.text_input("📋 Dàn số (Copy):", full_set)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # ================= CHI TIẾT 4 THUẬT TOÁN =================
-    if 'algorithms' in res:
-        algos = res['algorithms']
+    if risk_score >= 60:
+        st.error("""
+        **DỪNG CHƠI NGAY!**
         
-        st.markdown("### 📊 CHI TIẾT PHÂN TÍCH")
+        - Nhà cái đang điều khiển kết quả rõ ràng
+        - Pattern quá bất thường
+        - Chờ ít nhất 10-15 kỳ nữa để quan sát
+        - Không vào tiền lúc này!
+        """)
+    elif risk_score >= 40:
+        st.warning("""
+        **CHỜ VÀ QUAN SÁT**
         
-        col1, col2, col3, col4 = st.columns(4)
+        - Có dấu hiệu nhà cái đang test pattern
+        - Nếu muốn chơi: Đánh nhỏ để thăm dò
+        - Theo dõi thêm 5-10 kỳ
+        - Không all-in!
+        """)
+    else:
+        st.success("""
+        **CÓ THỂ THAM GIA**
         
-        with col1:
-            st.markdown("##### 1️⃣ TẦN SUẤT")
-            for pos, data in algos['frequency'].items():
-                if data:
-                    top_num = list(data.keys())[0]
-                    st.write(f"{pos}: **{top_num}**")
-        
-        with col2:
-            st.markdown("##### 2️⃣ CẦU")
-            if algos['patterns']['cau_bet']:
-                st.write(f" Bệt: {[x['so'] for x in algos['patterns']['cau_bet'][:3]]}")
-            if algos['patterns']['cau_nhip']:
-                st.write(f"🔵 Nhịp: {[x['so'] for x in algos['patterns']['cau_nhip'][:3]]}")
-        
-        with col3:
-            st.markdown("##### 3️⃣ TỔNG")
-            st.write(f"TB: {algos['totals'].get('avg_total', 'N/A')}")
-            st.write(f"Nóng: {algos['totals'].get('hot_totals', [])}")
-        
-        with col4:
-            st.markdown("##### 4️⃣ VỊ TRÍ")
-            for pos_name, data in list(algos['positions'].items())[:3]:
-                st.write(f"{pos_name}: {data['trending']}")
+        - Pattern tương đối ổn định
+        - Vẫn nên đánh nhỏ, quản lý vốn chặt
+        - Theo dõi sát sao từng kỳ
+        - Sẵn sàng dừng nếu có dấu hiệu lạ
+        """)
 
 # ================= BIỂU ĐỒ =================
 st.markdown("---")
-with st.expander("📈 Biểu đồ tần suất"):
+with st.expander("📈 Biểu đồ phân tích"):
     if st.session_state.history:
-        all_d = "".join(st.session_state.history[-50:])
-        df_freq = pd.Series(Counter(all_d)).sort_index()
-        st.bar_chart(df_freq, color="#58a6ff")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("##### Tần suất số (20 kỳ gần)")
+            all_d = "".join(st.session_state.history[-20:])
+            df_freq = pd.Series(Counter(all_d)).sort_index()
+            st.bar_chart(df_freq, color="#f59e0b")
+        
+        with col2:
+            st.write("##### Tổng các kỳ")
+            totals = [sum(int(d) for d in num) for num in st.session_state.history[-20:]]
+            st.line_chart(pd.Series(totals))
 
 # ================= FOOTER =================
 st.markdown("---")
-st.caption("⚠️ **Cảnh báo:** Công cụ tham khảo. Không đảm bảo 100%.")
+st.caption("""
+⚠️ **LƯU Ý QUAN TRỌNG:** 
+- Tool này giúp NHẬN DIỆN RỦI RO, không đảm bảo thắng
+- Nhà cái online CÓ THỂ điều khiển kết quả
+- Chỉ chơi với số tiền có thể mất
+- DỪNG ĐÚNG LÚC quan trọng hơn thắng
+""")
 st.caption(f"🕐 Cập nhật: {datetime.now().strftime('%d/%m/%Y %H:%M')}")
