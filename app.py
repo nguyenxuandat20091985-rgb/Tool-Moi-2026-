@@ -6,7 +6,7 @@ import json
 import pandas as pd
 import numpy as np
 from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 
 # ================= CẤU HÌNH =================
@@ -16,19 +16,47 @@ except:
     st.error("⚠️ Chưa cấu hình API Key trong Secrets!")
     st.stop()
 
-st.set_page_config(page_title="TITAN v30.0 PRO MAX", layout="wide", page_icon="🎯")
+st.set_page_config(page_title="TITAN v30.1 QUOTA-SAFE", layout="wide", page_icon="🎯")
 
-# ================= KHỞI TẠO AI THÔNG MINH =================
+# ================= QUẢN LÝ QUOTA =================
+@st.cache_resource
+def init_quota_tracker():
+    """Theo dõi số lần gọi API trong ngày"""
+    return {
+        'count': 0,
+        'last_reset': datetime.now().date(),
+        'limit': 18,  # Để dự phòng 2 request
+        'last_error': None
+    }
+
+quota = init_quota_tracker()
+
+def check_quota():
+    """Kiểm tra còn quota không"""
+    today = datetime.now().date()
+    if quota['last_reset'] != today:
+        quota['count'] = 0
+        quota['last_reset'] = today
+        quota['last_error'] = None
+    
+    remaining = quota['limit'] - quota['count']
+    return remaining > 0, remaining
+
+def increment_quota():
+    """Tăng counter sau khi gọi API thành công"""
+    quota['count'] += 1
+
+def set_quota_error(error_msg):
+    """Lưu lỗi quota để hiển thị"""
+    quota['last_error'] = error_msg
+
+# ================= KHỞI TẠO AI =================
 @st.cache_resource
 def get_available_models():
     try:
         genai.configure(api_key=API_KEY)
         models = genai.list_models()
-        available = []
-        for model in models:
-            if 'generateContent' in model.supported_generation_methods:
-                available.append(model.name)
-        return available
+        return [m.name for m in models if 'generateContent' in m.supported_generation_methods]
     except:
         return []
 
@@ -37,36 +65,25 @@ def setup_neural():
     try:
         genai.configure(api_key=API_KEY)
         
-        available_models = get_available_models()
-        
-        # ✅ Ưu tiên model ổn định nhất
-        preferred_models = [
-            'models/gemini-2.0-flash-exp',
-            'models/gemini-1.5-flash',
-            'models/gemini-1.5-pro',
+        # ✅ Ưu tiên model có quota cao hơn
+        preferred = [
+            'models/gemini-1.5-flash',  # Free tier: 15 RPM, 1500 RPD
             'models/gemini-pro',
             'models/gemini-1.0-pro'
         ]
         
-        selected_model = None
-        for model in preferred_models:
-            if model in available_models:
-                selected_model = model
-                break
+        available = get_available_models()
+        selected = next((m for m in preferred if m in available), None)
         
-        if not selected_model and available_models:
-            selected_model = available_models[0]
+        if not selected and available:
+            selected = available[0]
         
-        if not selected_model:
-            st.error("❌ Không tìm thấy model!")
+        if not selected:
             return None, None
         
-        model_instance = genai.GenerativeModel(selected_model)
-        
-        return model_instance, selected_model
+        return genai.GenerativeModel(selected), selected
         
     except Exception as e:
-        st.error(f"❌ Lỗi AI: {str(e)}")
         return None, None
 
 neural_engine, model_name = setup_neural()
@@ -86,29 +103,52 @@ def convert_df_to_json(data):
 
 def clean_and_validate_data(raw_text, existing_history):
     """
-    ✅ LÀM SẠCH DỮ LIỆU ĐẦU VÀO
-    - Chỉ lấy số đúng 5 chữ số
-    - Loại bỏ trùng lặp
-    - Hiển thị số đã lọc
+    ✅ LÀM SẠCH DỮ LIỆU NÂNG CAO
+    - Loại bỏ khoảng trắng, ký tự đặc biệt
+    - Chỉ giữ số đúng 5 chữ số
+    - Báo cáo chi tiết số bị loại
     """
-    # Tìm tất cả dãy 5 số
-    all_matches = re.findall(r"\b\d{5}\b", raw_text)
+    # 1. Chuẩn hóa: xóa space, tab, newline thừa
+    cleaned = re.sub(r'[\s\t]+', ' ', raw_text.strip())
     
-    # Loại bỏ trùng lặp, giữ thứ tự
-    unique_numbers = list(dict.fromkeys(all_matches))
+    # 2. Tìm tất cả dãy 5 số (có thể có space giữa)
+    # Match: 12345 hoặc 12 345 hoặc 1 2 3 4 5
+    patterns = [
+        r'\b\d{5}\b',  # 12345
+        r'\b\d\s*\d\s*\d\s*\d\s*\d\b',  # 1 2 3 4 5 hoặc 12 345
+    ]
     
-    # Lọc số đã có trong history
-    new_numbers = [num for num in unique_numbers if num not in existing_history]
+    all_matches = []
+    for pattern in patterns:
+        matches = re.findall(pattern, cleaned)
+        for m in matches:
+            # Chuẩn hóa về 5 số liên tiếp
+            normalized = re.sub(r'\D', '', m)
+            if len(normalized) == 5:
+                all_matches.append(normalized)
+    
+    # Loại trùng, giữ thứ tự
+    unique = list(dict.fromkeys(all_matches))
+    new_numbers = [n for n in unique if n not in existing_history]
+    
+    # Phân tích số bị loại
+    rejected = []
+    for m in re.findall(r'\b\d{3,7}\b', cleaned):
+        normalized = re.sub(r'\D', '', m)
+        if len(normalized) != 5 and normalized not in unique:
+            rejected.append(f"{m}→{len(normalized)}digit")
     
     return {
         'total_found': len(all_matches),
-        'unique': len(unique_numbers),
+        'unique': len(unique),
         'new': len(new_numbers),
-        'duplicates_removed': len(all_matches) - len(unique_numbers),
+        'duplicates': len(all_matches) - len(unique),
+        'rejected_sample': list(set(rejected))[:10],  # Sample 10 số bị loại
         'numbers': new_numbers,
-        'all_unique': unique_numbers
+        'all_unique': unique
     }
 
+# Session state
 if "history" not in st.session_state:
     st.session_state.history = []
 if "last_prediction" not in st.session_state:
@@ -118,7 +158,7 @@ if "show_debug" not in st.session_state:
 if "last_cleaned_data" not in st.session_state:
     st.session_state.last_cleaned_data = None
 
-# ================= THUẬT TOÁN 1: PHÁT HIỆN CẦU LỪA =================
+# ================= THUẬT TOÁN =================
 def detect_scam_patterns(history, window=20):
     if len(history) < window:
         return {"risk_score": 0, "warnings": [], "level": "UNKNOWN"}
@@ -130,6 +170,7 @@ def detect_scam_patterns(history, window=20):
     all_nums = "".join(recent)
     digit_freq = Counter(all_nums)
     most_common = digit_freq.most_common(1)
+    
     if most_common and most_common[0][1] > 15:
         warnings.append(f"Số {most_common[0][0]} ra {most_common[0][1]}/{window}")
         risk_score += 25
@@ -166,7 +207,6 @@ def detect_scam_patterns(history, window=20):
     
     return {"risk_score": risk_score, "warnings": warnings, "level": level}
 
-# ================= THUẬT TOÁN 2: PHÂN TÍCH NHỊP =================
 def analyze_bridge_rhythm(history):
     if len(history) < 15:
         return {"patterns": [], "trend": "UNKNOWN", "hot_numbers": []}
@@ -176,12 +216,10 @@ def analyze_bridge_rhythm(history):
     
     for pos in range(5):
         pos_seq = [int(num[pos]) if len(num) > pos else 0 for num in recent]
-        
         for i in range(len(pos_seq)-1):
             if pos_seq[i] == pos_seq[i+1]:
                 patterns.append(f"Vị{pos}:Bệt-{pos_seq[i]}")
                 break
-        
         for i in range(len(pos_seq)-2):
             if pos_seq[i] == pos_seq[i+2] and pos_seq[i] != pos_seq[i+1]:
                 patterns.append(f"Vị{pos}:Nhịp2-{pos_seq[i]}")
@@ -190,17 +228,11 @@ def analyze_bridge_rhythm(history):
     all_digits = "".join(recent)
     hot = [str(x[0]) for x in Counter(all_digits).most_common(3)]
     
-    return {
-        "patterns": list(set(patterns))[:5],
-        "trend": f"Nóng: {', '.join(hot)}",
-        "hot_numbers": hot
-    }
+    return {"patterns": list(set(patterns))[:5], "trend": f"Nóng: {', '.join(hot)}", "hot_numbers": hot}
 
-# ================= THUẬT TOÁN 3: THỐNG KÊ NÂNG CAO =================
 def advanced_stats(history):
     if not history:
         return {}
-    
     stats = {}
     recent = history[-50:]
     
@@ -210,7 +242,6 @@ def advanced_stats(history):
         weighted_freq = defaultdict(float)
         for i, val in enumerate(pos_data):
             weighted_freq[val] += weights[i]
-        
         top_3 = sorted(weighted_freq.items(), key=lambda x: x[1], reverse=True)[:3]
         stats[name] = [str(x[0]) for x in top_3]
     
@@ -219,15 +250,9 @@ def advanced_stats(history):
         'avg': round(np.mean(totals), 1) if totals else 0,
         'hot': [t for t, _ in Counter(totals).most_common(3)] if totals else []
     }
-    
     return stats
 
-# ================= THUẬT TOÁN 4: DỰ ĐOÁN THEO VỊ TRÍ =================
 def position_based_prediction(history):
-    """
-    ✅ DỰ ĐOÁN RIÊNG TỪNG VỊ TRÍ
-    Tăng độ chính xác bằng cách phân tích từng cột
-    """
     if len(history) < 20:
         return {"numbers": [], "confidence": 50}
     
@@ -236,118 +261,109 @@ def position_based_prediction(history):
     
     for pos in range(5):
         pos_seq = [int(num[pos]) if len(num) > pos else 0 for num in recent]
-        
-        # Tần suất có trọng số
         weights = np.linspace(0.3, 1.0, len(pos_seq))
         weighted_freq = defaultdict(float)
         for i, val in enumerate(pos_seq):
             weighted_freq[val] += weights[i]
-        
-        # Top 2 số cho vị trí này
         top_2 = sorted(weighted_freq.items(), key=lambda x: x[1], reverse=True)[:2]
-        predictions.append({
-            'position': pos,
-            'top_numbers': [x[0] for x in top_2],
-            'confidence': top_2[0][1] if top_2 else 0
-        })
+        predictions.append({'position': pos, 'top_numbers': [x[0] for x in top_2], 'confidence': top_2[0][1] if top_2 else 0})
     
-    # Chọn số có confidence cao nhất từ mỗi vị trí
     main_numbers = [p['top_numbers'][0] for p in predictions if p['top_numbers']]
+    return {"numbers": main_numbers[:5], "by_position": predictions, "confidence": np.mean([p['confidence'] for p in predictions]) if predictions else 50}
+
+def fallback_prediction(history, bridge_rhythm):
+    """✅ DỰ PHÒNG KHI AI LỖI/QUOTA"""
+    all_n = "".join(history[-50:])
+    top = [str(x[0]) for x in Counter(all_n).most_common(7)]
+    pos_pred = position_based_prediction(history)
+    
+    # Kết hợp: ưu tiên số từ position prediction
+    pos_nums = [str(n) for n in pos_pred['numbers'][:3]]
+    main_3 = "".join(pos_nums) if pos_nums else "".join(top[:3])
     
     return {
-        "numbers": main_numbers[:5],
-        "by_position": predictions,
-        "confidence": np.mean([p['confidence'] for p in predictions]) if predictions else 50
+        "main_3": main_3,
+        "support_4": "".join(top[3:7]) if len(top) >= 7 else "".join(top[3:]),
+        "decision": "THEO DÕI",
+        "confidence": 75,
+        "logic": f"Fallback: Thống kê + Vị trí (Hot: {bridge_rhythm['hot_numbers']})",
+        "is_fallback": True
     }
 
 # ================= GIAO DIỆN =================
 st.markdown("""
     <style>
     .stApp { background: #010409; color: #e6edf3; }
-    .prediction-card {
-        background: #0d1117; border: 1px solid #30363d;
-        border-radius: 12px; padding: 25px; margin: 15px 0;
-    }
-    .num-box {
-        font-size: 80px; font-weight: 900; color: #ff5858;
-        text-align: center; letter-spacing: 12px;
-    }
-    .lot-box {
-        font-size: 55px; font-weight: 700; color: #58a6ff;
-        text-align: center; letter-spacing: 8px;
-    }
-    .status-bar { 
-        padding: 15px; border-radius: 10px; text-align: center; 
-        font-weight: bold; font-size: 20px; margin: 15px 0; 
-    }
+    .prediction-card { background: #0d1117; border: 1px solid #30363d; border-radius: 12px; padding: 25px; margin: 15px 0; }
+    .num-box { font-size: 80px; font-weight: 900; color: #ff5858; text-align: center; letter-spacing: 12px; }
+    .lot-box { font-size: 55px; font-weight: 700; color: #58a6ff; text-align: center; letter-spacing: 8px; }
+    .status-bar { padding: 15px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 20px; margin: 15px 0; }
     .risk-high { background: #7c2d12; border-left: 5px solid #fbbf24; }
     .risk-med { background: #451a03; border-left: 5px solid #f59e0b; }
     .risk-low { background: #064e3b; border-left: 5px solid #10b981; }
-    .data-info { 
-        background: #1f2937; border-radius: 8px; padding: 15px; 
-        margin: 10px 0; border: 1px solid #374151;
-    }
-    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-    .stat-item { background: #374151; padding: 10px; border-radius: 8px; text-align: center; }
-    .stat-value { font-size: 24px; font-weight: bold; color: #58a6ff; }
-    .stat-label { font-size: 12px; color: #8b949e; }
+    .quota-warning { background: #422006; border: 1px solid #9a6700; padding: 15px; border-radius: 8px; margin: 10px 0; }
+    .quota-ok { background: #064e3b; border: 1px solid #10b981; padding: 15px; border-radius: 8px; margin: 10px 0; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #58a6ff;'>🎯 TITAN v30.0 PRO MAX</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: #8b949e;'>🤖 Model: <code>{model_name.split('/')[-1] if model_name else 'None'}</code> | 📊 Data: <code>{len(st.session_state.history)}</code> kỳ</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #58a6ff;'>🎯 TITAN v30.1 QUOTA-SAFE</h1>", unsafe_allow_html=True)
+
+# Hiển thị quota status
+has_quota, remaining = check_quota()
+if has_quota:
+    st.markdown(f"""
+        <div class='quota-ok'>
+            ✅ Quota API: <strong>{remaining}/{quota['limit']}</strong> request còn lại hôm nay
+        </div>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+        <div class='quota-warning'>
+            ⚠️ <strong>ĐÃ HẾT QUOTA API!</strong> Còn 0/{quota['limit']} request.
+            <br>🔄 Tool sẽ tự động chuyển sang chế độ thống kê thuần túy.
+            <br>⏰ Quota sẽ reset vào 00:00 UTC ngày mai.
+        </div>
+    """, unsafe_allow_html=True)
 
 # ================= SIDEBAR =================
 with st.sidebar:
     st.header("⚙️ Cài đặt")
-    
     st.session_state.show_debug = st.checkbox("🐛 Debug Mode", value=False)
     
     st.divider()
-    
     uploaded_db = st.file_uploader("📂 Nạp DB", type="json")
     if uploaded_db:
         st.session_state.history = load_data_from_json(uploaded_db)
         st.success(f"✅ {len(st.session_state.history)} kỳ")
-        st.rerun()
     
     st.divider()
-    
     if st.session_state.history:
         json_data = convert_df_to_json(st.session_state.history)
-        st.download_button(
-            label="💾 Tải DB",
-            data=json_data,
-            file_name=f"titan_db_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-            mime="application/json"
-        )
+        st.download_button(label="💾 Tải DB", data=json_data, file_name=f"titan_db_{datetime.now().strftime('%Y%m%d')}.json", mime="application/json")
     
     st.divider()
     st.metric("📊 Tổng kỳ", len(st.session_state.history))
+    st.metric("🔌 API calls today", quota['count'])
     
     if st.button("🗑️ Xóa toàn bộ"):
         st.session_state.history = []
         st.session_state.last_prediction = None
-        st.session_state.last_cleaned_data = None
         st.rerun()
     
-    st.divider()
     if model_name:
-        st.success(f"✅ AI: {model_name.split('/')[-1]}")
+        st.success(f"✅ Model: {model_name.split('/')[-1]}")
     else:
         st.error("❌ AI không khả dụng")
 
-# ================= NHẬP LIỆU & LÀM SẠCH =================
+# ================= NHẬP LIỆU =================
 st.markdown("### 📡 NHẬP DỮ LIỆU")
 col1, col2 = st.columns([3, 1])
 with col1:
-    raw_input = st.text_area("Dán kết quả (5 số/dòng)", height=150, 
-                            placeholder="25878\n58261\n83104...",
-                            help="Tool sẽ tự động lọc số trùng và chỉ lưu số mới")
+    raw_input = st.text_area("Dán kết quả (5 số/dòng)", height=150, placeholder="25878\n58261...", help="Tool tự động loại space, trùng lặp")
 with col2:
     st.metric("Kỳ trong DB", len(st.session_state.history))
     
-    if st.button("🔍 XEM TRƯỚC DỮ LIỆU", use_container_width=True):
+    if st.button("🔍 XEM TRƯỚC", use_container_width=True):
         if raw_input:
             clean_result = clean_and_validate_data(raw_input, st.session_state.history)
             st.session_state.last_cleaned_data = clean_result
@@ -361,165 +377,112 @@ with col2:
                 st.session_state.history.extend(clean_result['numbers'])
                 st.session_state.history = st.session_state.history[-3000:]
                 st.success(f"✅ Lưu {clean_result['new']} kỳ mới!")
-                st.info(f"📊 Tìm: {clean_result['total_found']} | Riêng: {clean_result['unique']} | Trùng: {clean_result['duplicates_removed']}")
+                st.info(f"📊 Tìm: {clean_result['total_found']} | Riêng: {clean_result['unique']} | Trùng: {clean_result['duplicates']}")
                 st.rerun()
             else:
                 st.warning("⚠️ Tất cả số đã có trong DB!")
-        else:
-            st.warning("Vui lòng nhập dữ liệu!")
 
 # Hiển thị kết quả làm sạch
-if st.session_state.last_cleaned_data:
-    st.markdown("### 📊 KẾT QUẢ LÀM SẠCH DỮ LIỆU")
+if st.session_state.last_cleaned_
+    st.markdown("### 📊 KẾT QUẢ LÀM SẠCH")
     c1, c2, c3, c4 = st.columns(4)
     d = st.session_state.last_cleaned_data
     c1.metric("🔍 Tìm thấy", d['total_found'])
     c2.metric("✅ Riêng", d['unique'])
     c3.metric("➕ Mới", d['new'])
-    c4.metric("🗑️ Trùng", d['duplicates_removed'])
+    c4.metric("🗑️ Trùng", d['duplicates'])
     
-    if d['duplicates_removed'] > 0:
-        st.warning(f"⚠️ Đã loại {d['duplicates_removed']} số trùng lặp tự động!")
+    if d['rejected_sample']:
+        with st.expander("🚫 Số bị loại (định dạng sai)"):
+            for r in d['rejected_sample']:
+                st.write(f"- `{r}`")
 
 # ================= PHÂN TÍCH =================
 st.markdown("---")
-st.subheader("🔬 PHÂN TÍCH THÔNG MINH")
+st.subheader("🔬 PHÂN TÍCH")
 
 if st.session_state.history and len(st.session_state.history) >= 15:
-    if st.button("🎯 CHẠY AI PHÂN TÍCH", type="secondary", use_container_width=True):
-        if neural_engine is None:
-            st.error("❌ AI không khả dụng")
-        else:
-            with st.spinner("🤖 Đang phân tích đa lớp..."):
+    if st.button("🎯 CHẠY PHÂN TÍCH", type="secondary", use_container_width=True):
+        
+        # Chạy thuật toán thống kê trước (không tốn quota)
+        scam_detect = detect_scam_patterns(st.session_state.history)
+        bridge_rhythm = analyze_bridge_rhythm(st.session_state.history)
+        adv_stats = advanced_stats(st.session_state.history)
+        pos_pred = position_based_prediction(st.session_state.history)
+        
+        # Nếu risk cao, không cần gọi AI
+        if scam_detect['risk_score'] >= 60:
+            st.session_state.last_prediction = {
+                "main_3": "000", "support_4": "0000", "decision": "DỪNG",
+                "confidence": 99, "logic": "Risk cao - Không nên chơi",
+                "risk_assessment": scam_detect, "is_fallback": True
+            }
+            st.warning("⚠️ Risk cao → Không gọi AI, dùng cảnh báo thống kê")
+            st.rerun()
+        
+        # Kiểm tra quota trước khi gọi AI
+        has_quota, remaining = check_quota()
+        
+        if not has_quota or neural_engine is None:
+            st.warning("⚠️ Hết quota hoặc AI lỗi → Dùng fallback")
+            result = fallback_prediction(st.session_state.history, bridge_rhythm)
+            result['risk_assessment'] = scam_detect
+            st.session_state.last_prediction = result
+            st.rerun()
+        
+        # Gọi AI với retry logic
+        with st.spinner("🤖 Đang phân tích..."):
+            prompt = f"""TITAN v30.1 - Chuyên gia xổ số.
+DATA: Lịch sử: {st.session_state.history[-50:]} | Risk: {scam_detect['risk_score']}/100 | Patterns: {bridge_rhythm['patterns']} | Hot: {bridge_rhythm['hot_numbers']}
+YÊU CẦU: 1) Nếu Risk>=60: decision="DỪNG" 2) Nếu Risk<60: chọn main_3(3 số), support_4(4 số), decision="ĐÁNH"/"THEO DÕI"
+JSON: {{"main_3":"123","support_4":"4567","decision":"ĐÁNH","confidence":85,"logic":"Ngắn gọn"}}"""
+            
+            try:
+                response = neural_engine.generate_content(
+                    prompt,
+                    generation_config=genai.types.GenerationConfig(temperature=0.2, top_p=0.9, max_output_tokens=512)
+                )
                 
-                # Chạy 4 thuật toán
-                scam_detect = detect_scam_patterns(st.session_state.history)
-                bridge_rhythm = analyze_bridge_rhythm(st.session_state.history)
-                adv_stats = advanced_stats(st.session_state.history)
-                pos_pred = position_based_prediction(st.session_state.history)
+                raw_text = response.text.strip()
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
+                if not json_match:
+                    json_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
                 
-                # ✅ PROMPT CẢI TIẾN - RÕ RÀNG HƠN
-                prompt = f"""Bạn là TITAN v30.0 - Chuyên gia xổ số cao cấp.
-
-=== DỮ LIỆU ===
-Lịch sử 50 kỳ gần: {st.session_state.history[-50:]}
-Risk Score: {scam_detect['risk_score']}/100 ({scam_detect['level']})
-Cầu phát hiện: {bridge_rhythm['patterns']}
-Số nóng: {bridge_rhythm['hot_numbers']}
-Dự đoán theo vị trí: {pos_pred['numbers']}
-
-=== YÊU CẦU ===
-1. Nếu Risk >= 60: decision = "DỪNG" (không cần dự đoán số)
-2. Nếu Risk < 60: 
-   - main_3: 3 số có xác suất cao nhất (3 chữ số, ví dụ: "123")
-   - support_4: 4 số lót (4 chữ số, ví dụ: "4567")
-   - decision: "ĐÁNH" hoặc "THEO DÕI"
-   - confidence: 0-100
-
-=== QUY TẮC ===
-- main_3 và support_4 PHẢI là chuỗi số, không phải mảng
-- confidence PHẢI là số nguyên
-- decision PHẢI là "ĐÁNH", "THEO DÕI", hoặc "DỪNG"
-- KHÔNG thêm text ngoài JSON
-
-=== JSON OUTPUT ===
-{{"main_3":"123","support_4":"4567","decision":"ĐÁNH","confidence":85,"logic":"Phân tích ngắn"}}"""
+                if json_match:
+                    result = json.loads(json_match.group(1))
+                    required = ['main_3', 'support_4', 'decision', 'confidence', 'logic']
+                    if all(k in result for k in required):
+                        result['main_3'] = str(result['main_3'])[:3].zfill(3)
+                        result['support_4'] = str(result['support_4'])[:4].zfill(4)
+                        result['risk_assessment'] = scam_detect
+                        result['is_fallback'] = False
+                        st.session_state.last_prediction = result
+                        increment_quota()
+                        st.success(f"✅ OK! Quota còn: {check_quota()[1]}")
+                        st.rerun()
                 
-                try:
-                    # Retry logic
-                    max_retries = 3
-                    result = None
-                    
-                    for attempt in range(max_retries):
-                        response = neural_engine.generate_content(
-                            prompt,
-                            generation_config=genai.types.GenerationConfig(
-                                temperature=0.1,  # Rất thấp để ổn định
-                                top_p=0.9,
-                                max_output_tokens=512
-                            )
-                        )
-                        
-                        raw_text = response.text.strip()
-                        
-                        if st.session_state.show_debug:
-                            st.markdown(f"##### 📄 Raw Response (lần {attempt+1}):")
-                            st.code(raw_text[:1000], language="text")
-                        
-                        # Parse JSON - nhiều cách
-                        json_str = None
-                        
-                        # Cách 1: Markdown code block
-                        match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
-                        if match:
-                            json_str = match.group(1)
-                        
-                        # Cách 2: Tìm JSON object
-                        if not json_str:
-                            match = re.search(r'\{[^{}]*(?:\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}[^{}]*)*\}', raw_text, re.DOTALL)
-                            if match:
-                                json_str = match.group(0)
-                        
-                        # Cách 3: Parse trực tiếp
-                        if not json_str:
-                            json_str = raw_text
-                        
-                        try:
-                            result = json.loads(json_str)
-                            
-                            # Validate fields
-                            required = ['main_3', 'support_4', 'decision', 'confidence', 'logic']
-                            if all(k in result for k in required):
-                                # Validate types
-                                if not isinstance(result['main_3'], str) or len(result['main_3']) != 3:
-                                    result['main_3'] = str(result['main_3'])[:3].zfill(3)
-                                if not isinstance(result['support_4'], str) or len(result['support_4']) != 4:
-                                    result['support_4'] = str(result['support_4'])[:4].zfill(4)
-                                if not isinstance(result['confidence'], (int, float)):
-                                    result['confidence'] = 70
-                                
-                                result['risk_assessment'] = scam_detect
-                                result['position_prediction'] = pos_pred
-                                st.session_state.last_prediction = result
-                                
-                                if attempt > 0:
-                                    st.success(f"✅ OK sau {attempt+1} lần thử!")
-                                else:
-                                    st.success("✅ Phân tích hoàn tất!")
-                                break
-                            else:
-                                missing = [k for k in required if k not in result]
-                                if attempt == max_retries - 1:
-                                    st.error(f"❌ Thiếu: {missing}")
-                        except json.JSONDecodeError:
-                            if attempt == max_retries - 1:
-                                st.error("❌ Không parse được JSON sau 3 lần")
-                    
-                    # Fallback nếu tất cả retry thất bại
-                    if result is None:
-                        st.warning("⚠️ Dùng fallback thống kê + vị trí")
-                        all_n = "".join(st.session_state.history[-50:])
-                        top = [str(x[0]) for x in Counter(all_n).most_common(7)]
-                        
-                        # Kết hợp với dự đoán vị trí
-                        pos_nums = [str(n) for n in pos_pred['numbers'][:3]]
-                        main_3 = "".join(pos_nums) if pos_nums else "".join(top[:3])
-                        
-                        st.session_state.last_prediction = {
-                            "main_3": main_3,
-                            "support_4": "".join(top[3:7]) if len(top) >= 7 else "".join(top[3:]),
-                            "decision": "THEO DÕI",
-                            "confidence": 75,
-                            "logic": f"Fallback: Thống kê + Vị trí (Hot: {bridge_rhythm['hot_numbers']})",
-                            "risk_assessment": scam_detect,
-                            "position_prediction": pos_pred
-                        }
+                # Nếu parse lỗi
+                raise ValueError("Invalid JSON format")
                 
-                except Exception as e:
-                    st.error(f"❌ Lỗi: {str(e)}")
-                    if st.session_state.show_debug:
-                        import traceback
-                        st.code(traceback.format_exc(), language="text")
+            except Exception as e:
+                error_str = str(e)
+                
+                # ✅ Xử lý quota exceeded
+                if '429' in error_str or 'quota' in error_str.lower() or 'rate limit' in error_str.lower():
+                    set_quota_error(error_str)
+                    st.warning("⚠️ Hết quota API → Chuyển sang fallback")
+                    result = fallback_prediction(st.session_state.history, bridge_rhythm)
+                    result['risk_assessment'] = scam_detect
+                    result['quota_error'] = True
+                    st.session_state.last_prediction = result
+                    st.rerun()
+                
+                # Lỗi khác
+                st.error(f"❌ Lỗi AI: {error_str[:200]}")
+                result = fallback_prediction(st.session_state.history, bridge_rhythm)
+                result['risk_assessment'] = scam_detect
+                st.session_state.last_prediction = result
+                st.info("⚠️ Dùng fallback thống kê")
 
 elif st.session_state.history:
     st.info(f"💡 Cần ≥15 kỳ (có {len(st.session_state.history)})")
@@ -531,27 +494,29 @@ if st.session_state.last_prediction:
     risk_score = risk.get('risk_score', 0)
     
     st.markdown("---")
-    st.markdown("### 🎯 KẾT QUẢ DỰ ĐOÁN")
+    st.markdown("### 🎯 KẾT QUẢ")
     
     if risk_score >= 60:
         st.markdown(f"<div class='status-bar risk-high'>🚨 RỦI RO: {risk_score}/100 - {risk.get('level')}<br>{' | '.join(risk.get('warnings', []))}</div>", unsafe_allow_html=True)
-        st.error("**KHUYẾN NGHỊ: DỪNG CHƠI!** Pattern bất thường, không nên vào tiền.")
+        st.error("**KHUYẾN NGHỊ: DỪNG CHƠI!** Pattern bất thường.")
     elif risk_score >= 40:
         st.markdown(f"<div class='status-bar risk-med'>⚠️ RỦI RO: {risk_score}/100 - {risk.get('level')}</div>", unsafe_allow_html=True)
-        st.warning("**CẨN THẬN** - Đánh nhỏ, quản lý vốn chặt.")
+        st.warning("**CẨN THẬN** - Đánh nhỏ.")
     else:
         st.markdown(f"<div class='status-bar risk-low'>✅ RỦI RO: {risk_score}/100 - {risk.get('level')}</div>", unsafe_allow_html=True)
     
     if risk_score < 60:
         decision = res.get('decision', 'N/A')
         conf = res.get('confidence', 0)
+        is_fallback = res.get('is_fallback', False)
         
         colors = {"ĐÁNH": ("#238636", "✅"), "THEO DÕI": ("#d29922", "⏳"), "DỪNG": ("#da3633", "🛑")}
         bg, icon = colors.get(decision, ("#30363d", "❓"))
         
+        badge = "🔄 FALLBACK" if is_fallback else "🤖 AI"
         st.markdown(f"""
             <div class='status-bar' style='background:{bg};color:white;'>
-                {icon} KẾT LUẬN: {decision} | Độ tin cậy: {conf}%
+                {icon} {decision} | Độ tin: {conf}% | {badge}
             </div>
         """, unsafe_allow_html=True)
 
@@ -566,50 +531,18 @@ if st.session_state.last_prediction:
             st.markdown(f"<div class='lot-box'>{res.get('support_4', '???')}</div>", unsafe_allow_html=True)
         
         st.divider()
+        st.write(f"💡 **Logic:** {res.get('logic', 'N/A')}")
         
-        col_logic, col_copy = st.columns([2, 1])
-        with col_logic:
-            st.write(f"💡 **Logic:** {res.get('logic', 'N/A')}")
-            
-            # Hiển thị dự đoán theo vị trí nếu có
-            if 'position_prediction' in res:
-                pos_pred = res['position_prediction']
-                if 'by_position' in pos_pred:
-                    st.write("📍 **Dự đoán theo vị trí:**")
-                    pos_names = ['Chục ngàn', 'Ngàn', 'Trăm', 'Chục', 'Đơn vị']
-                    for i, pos_data in enumerate(pos_pred['by_position'][:5]):
-                        st.write(f"- {pos_names[i]}: `{pos_data['top_numbers']}`")
-            
-            if conf < 75:
-                st.warning("⚠️ Độ tin thấp - Nên đánh nhỏ hoặc chờ")
-        
-        with col_copy:
-            full_dan = "".join(sorted(set(str(res.get('main_3', '')) + str(res.get('support_4', '')))))
-            st.text_input("📋 Dàn 7 số:", full_dan)
+        full_dan = "".join(sorted(set(str(res.get('main_3', '')) + str(res.get('support_4', '')))))
+        st.text_input("📋 Dàn 7 số:", full_dan)
         
         st.markdown("</div>", unsafe_allow_html=True)
-
-# ================= BIỂU ĐỒ =================
-st.markdown("---")
-with st.expander("📊 Thống kê chi tiết"):
-    if st.session_state.history:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write("##### Tần suất số (50 kỳ)")
-            all_d = "".join(st.session_state.history[-50:])
-            st.bar_chart(pd.Series(Counter(all_d)).sort_index(), color="#58a6ff")
-        
-        with col2:
-            st.write("##### Tổng các kỳ")
-            totals = [sum(int(d) for d in num) for num in st.session_state.history[-50:] if len(num)==5]
-            st.line_chart(pd.Series(totals))
 
 # ================= FOOTER =================
 st.markdown("---")
 st.caption("""
-⚠️ **LƯU Ý:** Tool tham khảo dựa trên thống kê + AI. Nhà cái có thể điều khiển kết quả.
-📊 **Độ chính xác:** Không đảm bảo 100%. Quản lý vốn chặt, dừng đúng lúc!
+⚠️ **LƯU Ý:** Tool tham khảo. Nhà cái có thể điều khiển kết quả. Quản lý vốn chặt!
+🔌 **Quota API:** Free tier ~20 request/ngày. Tool tự chuyển fallback khi hết quota.
 🔐 **Bảo mật:** API Key trong Secrets, không lộ trên GitHub.
 """)
-st.caption(f"🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')} | TITAN v30.0 PRO MAX")
+st.caption(f"🕐 {datetime.now().strftime('%d/%m/%Y %H:%M')} | TITAN v30.1 QUOTA-SAFE")
