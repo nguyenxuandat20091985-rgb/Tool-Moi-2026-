@@ -1,6 +1,5 @@
 # ==============================================================================
-# FILE: app.py - VERSION 3.0 (NO CUSTOM HTML)
-# TITAN v33.0 PRO - Pure Streamlit Components
+# FILE: app.py - FINAL VERSION (FIXED MOBILE LAYOUT)
 # ==============================================================================
 
 import streamlit as st
@@ -20,15 +19,16 @@ warnings.filterwarnings('ignore')
 # ==============================================================================
 
 st.set_page_config(
-    page_title="TITAN v33.0 PRO | 3 Số 5 Tinh",
+    page_title="TITAN v33.0 PRO",
     page_icon="🎰",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# CSS chỉ cho màu sắc cơ bản (không dùng HTML custom)
+# CSS với flexbox để hiển thị ngang
 st.markdown("""
 <style>
+    /* Dark theme */
     .stApp {
         background-color: #010409;
         color: #e6edf3;
@@ -39,47 +39,72 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Number boxes */
-    .num-display {
-        font-size: 60px;
-        font-weight: bold;
-        color: #ff5858;
-        text-align: center;
-    }
-    
-    .lot-display {
-        font-size: 45px;
-        font-weight: bold;
-        color: #58a6ff;
-        text-align: center;
-    }
-    
-    /* Status colors */
+    /* Status bars */
     .status-green {
-        background-color: #238636;
+        background: linear-gradient(135deg, #238636, #2ea043);
         color: white;
         padding: 10px;
         border-radius: 8px;
         text-align: center;
         font-weight: bold;
+        margin: 10px 0;
     }
     
     .status-red {
-        background-color: #da3633;
+        background: linear-gradient(135deg, #da3633, #f85149);
         color: white;
         padding: 10px;
         border-radius: 8px;
         text-align: center;
         font-weight: bold;
+        margin: 10px 0;
     }
     
     .status-yellow {
-        background-color: #d29922;
+        background: linear-gradient(135deg, #d29922, #f0b429);
         color: #0d1117;
         padding: 10px;
         border-radius: 8px;
         text-align: center;
         font-weight: bold;
+        margin: 10px 0;
+    }
+    
+    /* Number display - HORIZONTAL LAYOUT with flexbox */
+    .numbers-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: center;
+        align-items: center;
+        gap: 15px;
+        margin: 20px 0;
+        flex-wrap: wrap;
+    }
+    
+    .num-box {
+        font-size: 60px;
+        font-weight: bold;
+        color: #ff5858;
+        background: linear-gradient(135deg, #0d1117, #161b22);
+        border: 2px solid #30363d;
+        border-radius: 12px;
+        padding: 15px 25px;
+        min-width: 80px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(255,88,88,0.2);
+    }
+    
+    .lot-box {
+        font-size: 45px;
+        font-weight: bold;
+        color: #58a6ff;
+        background: linear-gradient(135deg, #0d1117, #161b22);
+        border: 2px solid #30363d;
+        border-radius: 10px;
+        padding: 12px 20px;
+        min-width: 65px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(88,166,255,0.2);
     }
     
     /* Cards */
@@ -96,6 +121,7 @@ st.markdown("""
         background: #0d1117;
         border: 1px solid #30363d;
         border-radius: 8px;
+        gap: 8px;
     }
     .stTabs [aria-selected="true"] {
         background-color: #58a6ff;
@@ -110,25 +136,39 @@ st.markdown("""
         border-radius: 8px;
         font-weight: bold;
         padding: 12px 28px;
+        width: 100%;
     }
     
-    /* Text inputs */
+    /* Inputs */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
         background-color: #0d1117;
         color: #e6edf3;
         border: 1px solid #30363d;
     }
+    
+    /* Mobile responsive */
+    @media (max-width: 600px) {
+        .num-box {
+            font-size: 45px;
+            padding: 10px 15px;
+            min-width: 60px;
+        }
+        .lot-box {
+            font-size: 35px;
+            padding: 8px 12px;
+            min-width: 50px;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. SECRETS & API MANAGEMENT
+# 2. SECRETS & API
 # ==============================================================================
 
 @st.cache_resource
 def init_gemini():
-    """Initialize Gemini API safely."""
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
         genai.configure(api_key=api_key)
@@ -137,7 +177,6 @@ def init_gemini():
         return None
 
 def get_quota_status():
-    """Manage daily API quota."""
     if "quota" not in st.session_state:
         st.session_state.quota = {
             "used": 0,
@@ -155,7 +194,6 @@ def get_quota_status():
     return quota
 
 def use_quota():
-    """Consume one API quota unit."""
     quota = get_quota_status()
     if quota["used"] < quota["limit"]:
         quota["used"] += 1
@@ -163,15 +201,13 @@ def use_quota():
     return False
 
 # ==============================================================================
-# 3. DATA CLEANING & MANAGEMENT
+# 3. DATA FUNCTIONS
 # ==============================================================================
 
 def clean_lottery_data(raw_text, existing_db):
-    """Clean raw input and extract 5-digit numbers."""
     if not raw_text.strip():
         return [], {"found": 0, "new": 0, "duplicate_input": 0, "already_in_db": 0}
     
-    # Regex để lọc số 5 chữ số
     matches = re.findall(r'\b\d{5}\b', raw_text)
     
     new_entries = []
@@ -201,7 +237,6 @@ def clean_lottery_data(raw_text, existing_db):
     return new_entries, stats
 
 def add_to_database(new_numbers):
-    """Add new numbers to database."""
     if "lottery_db" not in st.session_state:
         st.session_state.lottery_db = []
     
@@ -211,18 +246,16 @@ def add_to_database(new_numbers):
         st.session_state.lottery_db = st.session_state.lottery_db[:3000]
 
 def check_win(prediction_3, result_5):
-    """Check if prediction wins (3 số 5 tinh)."""
     if len(prediction_3) != 3 or len(result_5) != 5:
         return False
     result_digits = set(result_5)
     return all(digit in result_digits for digit in prediction_3)
 
 # ==============================================================================
-# 4. CORE PREDICTION ALGORITHMS
+# 4. PREDICTION ALGORITHMS
 # ==============================================================================
 
 def calculate_risk(history, window=50):
-    """Calculate risk score 0-100."""
     if len(history) < window:
         return 0, []
     
@@ -232,7 +265,6 @@ def calculate_risk(history, window=50):
     reasons = []
     risk = 0
     
-    # 1. Over-represented numbers
     total_slots = len(all_digits)
     if total_slots > 0:
         most_common = freq.most_common(1)[0]
@@ -240,7 +272,6 @@ def calculate_risk(history, window=50):
             risk += 30
             reasons.append(f"Số '{most_common[0]}' xuất hiện quá nhiều ({most_common[1]} lần)")
     
-    # 2. Abnormal streaks (cầu bệt)
     for pos in range(5):
         seq = [n[pos] if len(n) > pos else '0' for n in recent]
         max_streak = 1
@@ -255,7 +286,6 @@ def calculate_risk(history, window=50):
             risk += 25
             reasons.append(f"Cầu bệt {max_streak} kỳ ở vị trí {pos}")
     
-    # 3. Low entropy
     if len(all_digits) > 0:
         entropy = -sum((c/len(all_digits)) * np.log2(c/len(all_digits)) 
                       for c in freq.values() if c > 0)
@@ -263,7 +293,6 @@ def calculate_risk(history, window=50):
             risk += 25
             reasons.append("Phân phối quá đều (entropy thấp)")
     
-    # 4. Overly stable sums
     totals = [sum(int(d) for d in n) for n in recent if len(n) == 5]
     if len(totals) > 10:
         std_dev = np.std(totals)
@@ -274,7 +303,6 @@ def calculate_risk(history, window=50):
     return min(100, risk), reasons
 
 def analyze_frequency(history, window=100):
-    """Frequency analysis with weighting."""
     recent = history[-window:] if len(history) >= window else history
     
     weighted_freq = defaultdict(float)
@@ -300,7 +328,6 @@ def analyze_frequency(history, window=100):
     }
 
 def analyze_positions(history, window=50):
-    """Position-based analysis."""
     recent = history[-window:] if len(history) >= window else history
     
     pos_freq = [Counter() for _ in range(5)]
@@ -336,7 +363,6 @@ def analyze_positions(history, window=50):
     }
 
 def analyze_hot_cold(history, recent_window=10, cold_window=15):
-    """Hot/Cold analysis."""
     recent = history[-recent_window:] if len(history) >= recent_window else history
     older = history[-cold_window:-recent_window] if len(history) >= cold_window else []
     
@@ -360,18 +386,15 @@ def analyze_hot_cold(history, recent_window=10, cold_window=15):
     }
 
 def detect_patterns(history, window=30):
-    """Pattern detection."""
     recent = history[-window:] if len(history) >= window else history
     
     patterns = {
         'bet': [],
         'nhip2': [],
-        'nhip3': [],
         'detected': [],
         'likely': []
     }
     
-    # Cầu bệt
     for pos in range(5):
         seq = [n[pos] if len(n) > pos else '0' for n in recent]
         for i in range(len(seq) - 2):
@@ -383,7 +406,6 @@ def detect_patterns(history, window=30):
                     if digit not in patterns['likely']:
                         patterns['likely'].append(digit)
     
-    # Cầu nhịp 2
     for pos in range(5):
         seq = [n[pos] if len(n) > pos else '0' for n in recent]
         for i in range(len(seq) - 2):
@@ -398,22 +420,17 @@ def detect_patterns(history, window=30):
     return patterns
 
 def consensus_engine(stat_result, pos_result, hotcold_result, pattern_result):
-    """Combine all methods with weighted voting."""
     all_votes = []
     
-    # Frequency 40%
     for num in stat_result.get('top_3', []):
         all_votes.extend([num] * 4)
     
-    # Position 30%
     for num in pos_result.get('top_3', []):
         all_votes.extend([num] * 3)
     
-    # Hot/Cold 20%
     for num in hotcold_result.get('hot', [])[:3]:
         all_votes.extend([num] * 2)
     
-    # Pattern 10%
     for num in pattern_result.get('likely', []):
         all_votes.append(num)
     
@@ -457,7 +474,6 @@ def consensus_engine(stat_result, pos_result, hotcold_result, pattern_result):
     }
 
 def predict_3_numbers(history):
-    """Main prediction function."""
     if len(history) < 20:
         return {
             'error': f'Cần ít nhất 20 kỳ dữ liệu (hiện có: {len(history)})',
@@ -529,7 +545,6 @@ def predict_3_numbers(history):
 # ==============================================================================
 
 def log_prediction(prediction, actual_result=None):
-    """Log prediction for tracking."""
     if "predictions_log" not in st.session_state:
         st.session_state.predictions_log = []
     
@@ -552,11 +567,11 @@ def log_prediction(prediction, actual_result=None):
         st.session_state.predictions_log = st.session_state.predictions_log[:200]
 
 # ==============================================================================
-# 6. UI COMPONENTS - PURE STREAMLIT (NO CUSTOM HTML)
+# 6. UI COMPONENTS - FLEXBOX HORIZONTAL LAYOUT
 # ==============================================================================
 
 def render_prediction_display(result, risk_info):
-    """Render prediction card using PURE STREAMLIT COMPONENTS."""
+    """Render prediction with HORIZONTAL number display using flexbox."""
     risk_score, risk_reasons = risk_info
     
     if not result or 'main_3' not in result:
@@ -569,59 +584,56 @@ def render_prediction_display(result, risk_info):
     main_3 = (main_3 + ['?']*3)[:3]
     support_4 = (support_4 + ['?']*4)[:4]
     
-    # Status bar using Streamlit columns
-    if result['decision'] == 'ĐÁNH':
-        status_color = "🟢"
-        status_bg = "status-green"
-    elif result['decision'] == 'DỪNG':
-        status_color = "🔴"
-        status_bg = "status-red"
-    else:
-        status_color = "🟡"
-        status_bg = "status-yellow"
-    
     # Status bar
+    if result['decision'] == 'ĐÁNH':
+        status_class = "status-green"
+        status_icon = "✅"
+    elif result['decision'] == 'DỪNG':
+        status_class = "status-red"
+        status_icon = "🛑"
+    else:
+        status_class = "status-yellow"
+        status_icon = "⚠️"
+    
     st.markdown(f"""
-    <div class="{status_bg}">
-        {status_color} RISK: {risk_score}/100 | KHUYẾN NGHỊ: {result['decision']}
+    <div class="{status_class}">
+        {status_icon} RISK: {risk_score}/100 | KHUYẾN NGHỊ: {result['decision']}
     </div>
     """, unsafe_allow_html=True)
     
-    # 3 SỐ CHÍNH - Using columns for proper display
-    st.markdown("<div style='text-align: center; margin: 20px 0;'>", unsafe_allow_html=True)
-    st.markdown(f"🔮 **3 SỐ CHÍNH** (Độ tin cậy: {result['confidence']}%)", unsafe_allow_html=True)
-    
-    # Display 3 main numbers in columns
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f"<div class='num-display'>{main_3[0]}</div>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<div class='num-display'>{main_3[1]}</div>", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"<div class='num-display'>{main_3[2]}</div>", unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+    # 3 SỐ CHÍNH - HORIZONTAL with flexbox
+    st.markdown("""
+    <div style="text-align: center; margin: 20px 0;">
+        <div style="color: #8b949e; font-size: 14px; margin-bottom: 15px;">
+            🔮 3 SỐ CHÍNH (Độ tin cậy: {}%)
+        </div>
+        <div class="numbers-container">
+            <div class="num-box">{}</div>
+            <div class="num-box">{}</div>
+            <div class="num-box">{}</div>
+        </div>
+    </div>
+    """.format(result['confidence'], main_3[0], main_3[1], main_3[2]), unsafe_allow_html=True)
     
     # Divider
-    st.markdown("---")
+    st.markdown("<div style='border-top: 1px solid #30363d; margin: 20px 0;'></div>", unsafe_allow_html=True)
     
-    # 4 SỐ LÓT
-    st.markdown("<div style='text-align: center; margin: 20px 0;'>", unsafe_allow_html=True)
-    st.markdown("🎲 **4 SỐ LÓT**", unsafe_allow_html=True)
+    # 4 SỐ LÓT - HORIZONTAL with flexbox
+    st.markdown("""
+    <div style="text-align: center; margin: 20px 0;">
+        <div style="color: #8b949e; font-size: 13px; margin-bottom: 15px;">
+            🎲 4 SỐ LÓT
+        </div>
+        <div class="numbers-container">
+            <div class="lot-box">{}</div>
+            <div class="lot-box">{}</div>
+            <div class="lot-box">{}</div>
+            <div class="lot-box">{}</div>
+        </div>
+    </div>
+    """.format(support_4[0], support_4[1], support_4[2], support_4[3]), unsafe_allow_html=True)
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.markdown(f"<div class='lot-display'>{support_4[0]}</div>", unsafe_allow_html=True)
-    with col2:
-        st.markdown(f"<div class='lot-display'>{support_4[1]}</div>", unsafe_allow_html=True)
-    with col3:
-        st.markdown(f"<div class='lot-display'>{support_4[2]}</div>", unsafe_allow_html=True)
-    with col4:
-        st.markdown(f"<div class='lot-display'>{support_4[3]}</div>", unsafe_allow_html=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Logic explanation in info box
+    # Logic
     st.info(f"💡 **Logic:** {result['logic']}")
     
     # Risk warnings
@@ -631,14 +643,13 @@ def render_prediction_display(result, risk_info):
             warning_text += f"• {reason}\n"
         st.warning(warning_text)
     
-    # Copy button with code block
+    # Copy code
     st.markdown("---")
     numbers_to_copy = ','.join(main_3 + support_4)
     st.code(numbers_to_copy, language=None)
-    st.caption("📋 Bấm vào code trên để copy dàn 7 số")
+    st.caption("📋 Bấm vào code trên để copy")
 
 def render_analysis_details(result):
-    """Render detailed analysis."""
     if not result or 'details' not in result:
         return
     
@@ -648,152 +659,95 @@ def render_analysis_details(result):
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("### 📊 Phân tích Tần suất (40%)")
+            st.markdown("### 📊 Tần suất (40%)")
             if 'frequency' in details and 'scores' in details['frequency']:
                 freq_df = pd.DataFrame(
                     list(details['frequency']['scores'].items()), 
                     columns=['Số', 'Điểm']
                 ).sort_values('Điểm', ascending=False)
                 st.bar_chart(freq_df.set_index('Số'))
-                st.caption(f"Top 3: {', '.join(details['frequency'].get('top_3', []))}")
             
-            st.markdown("### 📍 Phân tích Vị trí (30%)")
+            st.markdown("### 📍 Vị trí (30%)")
             if 'positions' in details and 'pos_top' in details['positions']:
                 pos_data = {f'Vị {i}': details['positions']['pos_top'][i] for i in range(5)}
                 st.json(pos_data)
         
         with col2:
-            st.markdown("### 🔥 Số Nóng/Lạnh (20%)")
+            st.markdown("### 🔥 Nóng/Lạnh (20%)")
             if 'hot_cold' in details:
                 hc = details['hot_cold']
-                st.markdown(f"**🔥 Nóng:** {' '.join(hc.get('hot', [])[:5])}")
-                st.markdown(f"**❄️ Lạnh:** {' '.join(hc.get('cold', [])[:5]) if hc.get('cold') else 'Không có'}")
+                st.markdown(f"**Nóng:** {' '.join(hc.get('hot', [])[:5])}")
                 if hc.get('due'):
-                    st.markdown(f"**⏰ Đến kỳ:** {' '.join(hc['due'])}")
+                    st.markdown(f"**Đến kỳ:** {' '.join(hc['due'])}")
             
-            st.markdown("### 🔄 Pattern Phát hiện (10%)")
+            st.markdown("### 🔄 Pattern (10%)")
             if 'patterns' in details and details['patterns'].get('detected'):
                 for p in details['patterns']['detected'][:5]:
                     st.markdown(f"• {p}")
-            else:
-                st.caption("Không phát hiện pattern rõ ràng")
-        
-        # Vote breakdown
-        if 'votes' in details and details['votes']:
-            st.markdown("---")
-            st.markdown("### 🗳️ Consensus Voting")
-            votes_df = pd.DataFrame(
-                list(details['votes'].items()), 
-                columns=['Số', 'Phiếu']
-            ).sort_values('Phiếu', ascending=False)
-            st.dataframe(votes_df, hide_index=True, use_container_width=True)
 
 def render_stats_tab():
-    """Render statistics tab."""
-    st.header("📊 Thống kê & Database")
+    st.header("📊 Thống kê")
     
     if "lottery_db" not in st.session_state or not st.session_state.lottery_db:
-        st.info("📭 Chưa có dữ liệu. Vui lòng nhập kết quả ở Tab 1.")
+        st.info("📭 Chưa có dữ liệu.")
         return
     
     db = st.session_state.lottery_db
-    predictions_log = st.session_state.get('predictions_log', [])
     
-    # Quick stats
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     with col1:
         st.metric("📦 Tổng kỳ", len(db))
     with col2:
-        recent_digits = ''.join(db[:100])
-        hottest = Counter(recent_digits).most_common(1)[0][0] if recent_digits else "-"
-        st.metric("🔥 Số nóng nhất", hottest)
-    with col3:
-        if predictions_log:
-            decided = [e for e in predictions_log if e['won'] is not None]
-            if decided:
-                wins = sum(1 for e in decided if e['won'])
-                win_rate = round(wins/len(decided)*100, 1)
-                st.metric("🎯 Win Rate", f"{win_rate}%")
-            else:
-                st.metric("🎯 Win Rate", "Chưa có")
-        else:
-            st.metric("🎯 Win Rate", "Chưa có")
-    with col4:
         quota = get_quota_status()
         st.metric("🤖 Gemini", f"{quota['limit'] - quota['used']}/{quota['limit']}")
     
-    # Charts
-    tab1, tab2 = st.tabs(["📈 Biểu đồ", "📋 Dữ liệu"])
+    st.markdown("### Tần suất 50 kỳ gần")
+    recent_50 = db[:50]
+    all_digits = ''.join(recent_50)
+    freq = Counter(all_digits)
+    df_freq = pd.DataFrame(
+        [(str(d), c) for d, c in sorted(freq.items())], 
+        columns=['Số', 'Tần suất']
+    )
+    st.bar_chart(df_freq.set_index('Số'))
     
-    with tab1:
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("### Tần suất 50 kỳ gần")
-            recent_50 = db[:50]
-            all_digits = ''.join(recent_50)
-            freq = Counter(all_digits)
-            df_freq = pd.DataFrame(
-                [(str(d), c) for d, c in sorted(freq.items())], 
-                columns=['Số', 'Tần suất']
-            )
-            st.bar_chart(df_freq.set_index('Số'))
-        
-        with col2:
-            st.markdown("### Top 5 Số Nóng")
-            all_digits_full = ''.join(db)
-            freq_full = Counter(all_digits_full)
-            top_5 = freq_full.most_common(5)
-            
-            for num, count in top_5:
-                st.metric(f"Số {num}", f"{count} lần")
+    # Data management
+    st.markdown("### 💾 Database")
+    c1, c2, c3 = st.columns(3)
     
-    with tab2:
-        st.markdown("### 💾 Quản lý Database")
-        
-        c1, c2, c3 = st.columns(3)
-        
-        with c1:
-            st.download_button(
-                label="📥 Download JSON",
-                data=json.dumps(db, indent=2, ensure_ascii=False),
-                file_name=f"titan_db_{datetime.now().strftime('%Y%m%d')}.json",
-                mime="application/json"
-            )
-        
-        with c2:
-            uploaded = st.file_uploader("📤 Upload JSON", type="json")
-            if uploaded:
-                try:
-                    new_db = json.load(uploaded)
-                    if isinstance(new_db, list) and all(len(str(x))==5 for x in new_db):
-                        st.session_state.lottery_db = new_db
-                        st.success("✅ Đã tải database thành công!")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("❌ File không hợp lệ")
-                except Exception as e:
-                    st.error(f"❌ Lỗi: {e}")
-        
-        with c3:
-            if st.button("🗑️ Xóa toàn bộ", type="primary"):
-                st.session_state.lottery_db = []
-                st.success("✅ Đã xóa dữ liệu!")
-                time.sleep(1)
-                st.rerun()
-        
-        st.markdown("### 📜 Lịch sử 20 kỳ gần")
-        df_hist = pd.DataFrame(db[:20], columns=["Kết Quả"])
-        df_hist.index = [f"#{i+1}" for i in range(len(df_hist))]
-        st.dataframe(df_hist, use_container_width=True)
+    with c1:
+        st.download_button(
+            label="📥 Download",
+            data=json.dumps(db, indent=2),
+            file_name=f"titan_db.json",
+            mime="application/json"
+        )
+    
+    with c2:
+        uploaded = st.file_uploader("📤 Upload", type="json")
+        if uploaded:
+            try:
+                new_db = json.load(uploaded)
+                if isinstance(new_db, list):
+                    st.session_state.lottery_db = new_db
+                    st.success("✅ Đã tải!")
+                    time.sleep(1)
+                    st.rerun()
+            except:
+                st.error("❌ Lỗi file")
+    
+    with c3:
+        if st.button("🗑️ Xóa", type="primary"):
+            st.session_state.lottery_db = []
+            st.success("✅ Đã xóa!")
+            time.sleep(1)
+            st.rerun()
 
 # ==============================================================================
-# 7. MAIN APPLICATION
+# 7. MAIN APP
 # ==============================================================================
 
 def main():
-    # Initialize session state
     if "lottery_db" not in st.session_state:
         st.session_state.lottery_db = []
     if "predictions_log" not in st.session_state:
@@ -803,55 +757,35 @@ def main():
     if "last_risk" not in st.session_state:
         st.session_state.last_risk = None
     
-    # Header
     st.title("🎰 TITAN v33.0 PRO")
-    st.caption("3 Số 5 Tinh | Thống kê thực tế > AI Hallucination")
+    st.caption("3 Số 5 Tinh")
     
-    # Sidebar
     with st.sidebar:
-        st.markdown("### ⚙️ Trạng thái Hệ thống")
-        display_quota_warning()
-        
+        st.markdown("### ⚙️ Trạng thái")
+        quota = get_quota_status()
+        st.write(f"🤖 Gemini: {quota['limit'] - quota['used']}/{quota['limit']}")
         st.markdown("---")
-        st.markdown("### 📋 Hướng dẫn nhanh")
-        st.markdown("""
-        1️⃣ Dán kết quả xổ số (5 số/dòng)  
-        2️⃣ Nhấn "LƯU & PHÂN TÍCH"  
-        3️⃣ Xem kết quả dự đoán ngay  
-        4️⃣ Theo dõi win rate ở Tab 3
-        """)
-        
-        st.markdown("---")
-        st.warning("""
-        ⚠️ Tool hỗ trợ phân tích  
-        ⚠️ Risk >= 60: Nên DỪNG  
-        ⚠️ Quản lý vốn cẩn thận
-        """)
+        st.warning("⚠️ Risk >= 60: DỪNG")
     
-    # Main Tabs
-    tab1, tab2, tab3 = st.tabs(["📝 Nhập & Dự đoán", "🔍 Phân tích Chi tiết", "📊 Thống kê"])
+    tab1, tab2, tab3 = st.tabs(["📝 Nhập & Dự đoán", "🔍 Phân tích", "📊 Thống kê"])
     
-    # ==================== TAB 1 ====================
     with tab1:
-        st.header("📥 Nhập Kết Quả & Dự đoán Nhanh")
-        
-        st.markdown("Dán kết quả xổ số (5 chữ số mỗi dòng). Hệ thống tự động làm sạch và phân tích.")
+        st.header("📥 Nhập Kết Quả")
         
         input_text = st.text_area(
-            "📋 Dữ liệu thô",
+            "📋 Dữ liệu (5 số/dòng)",
             height=180,
-            placeholder="Ví dụ:\n12345\n67890\n54321\n...",
-            key="input_area"
+            placeholder="12345\n67890\n..."
         )
         
         if st.button("🚀 LƯU & PHÂN TÍCH", type="primary"):
             if input_text.strip():
-                with st.spinner("🔄 Đang xử lý: Làm sạch → Lưu → Phân tích → Dự đoán..."):
+                with st.spinner("🔄 Đang xử lý..."):
                     new_nums, stats = clean_lottery_data(input_text, st.session_state.lottery_db)
                     
                     if stats['new'] > 0:
                         add_to_database(new_nums)
-                        st.success(f"✅ Thêm {stats['new']} số mới (Tìm thấy: {stats['found']} | Trùng: {stats['duplicate_input']} | Có trong DB: {stats['already_in_db']})")
+                        st.success(f"✅ Thêm {stats['new']} số mới")
                         
                         result = predict_3_numbers(st.session_state.lottery_db)
                         risk_info = (result.get('risk_score', 0), result.get('risk_reasons', []))
@@ -861,85 +795,30 @@ def main():
                         st.session_state.last_prediction = result
                         st.session_state.last_risk = risk_info
                         
-                        st.markdown("### 🎯 Kết quả Dự đoán")
+                        st.markdown("### 🎯 Kết quả")
                         render_prediction_display(result, risk_info)
-                        
-                    elif stats['found'] > 0:
-                        st.warning(f"⚠️ Không có số mới (tất cả đã có trong DB)")
-                        if len(st.session_state.lottery_db) >= 20:
-                            result = predict_3_numbers(st.session_state.lottery_db)
-                            risk_info = (result.get('risk_score', 0), result.get('risk_reasons', []))
-                            st.session_state.last_prediction = result
-                            st.session_state.last_risk = risk_info
-                            st.markdown("### 🎯 Kết quả Dự đoán")
-                            render_prediction_display(result, risk_info)
                     else:
-                        st.error("❌ Không tìm thấy số 5 chữ số hợp lệ")
+                        st.warning("⚠️ Không có số mới")
             else:
-                st.error("❌ Vui lòng nhập dữ liệu!")
+                st.error("❌ Nhập dữ liệu!")
         
-        elif st.session_state.last_prediction and st.session_state.last_risk:
-            st.markdown("### 🎯 Kết quả Dự đoán Gần nhất")
+        elif st.session_state.last_prediction:
+            st.markdown("### 🎯 Kết quả Gần nhất")
             render_prediction_display(st.session_state.last_prediction, st.session_state.last_risk)
-            
-            # Win tracking
-            st.markdown("---")
-            st.markdown("##### 🎲 Nhập kết quả thực tế để theo dõi Win Rate:")
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                actual_input = st.text_input("Kết quả thực tế (5 số)", key="actual_input", placeholder="Ví dụ: 12864")
-            with col2:
-                if st.button("✅ Ghi nhận", key="record_win"):
-                    if actual_input and len(actual_input) == 5 and actual_input.isdigit():
-                        if st.session_state.predictions_log:
-                            st.session_state.predictions_log[0]['actual_result'] = actual_input
-                            st.session_state.predictions_log[0]['won'] = check_win(
-                                ''.join(st.session_state.last_prediction['main_3']), 
-                                actual_input
-                            )
-                            status = '🎉 TRÚNG' if st.session_state.predictions_log[0]['won'] else '❌ Trượt'
-                            st.success(f"✅ {status}")
-                    else:
-                        st.error("Nhập đúng 5 chữ số!")
     
-    # ==================== TAB 2 ====================
     with tab2:
-        st.header("🔍 Phân tích Chi tiết")
-        
+        st.header("🔍 Phân tích")
         if st.session_state.last_prediction:
             render_prediction_display(st.session_state.last_prediction, st.session_state.last_risk)
             render_analysis_details(st.session_state.last_prediction)
-            
-            if st.session_state.last_risk[1]:
-                st.markdown("### ⚠️ Phân tích Rủi ro")
-                for reason in st.session_state.last_risk[1]:
-                    st.markdown(f"• {reason}")
         else:
-            st.info("👈 Nhập dữ liệu ở Tab 1 để xem chi tiết")
+            st.info("👈 Tab 1")
     
-    # ==================== TAB 3 ====================
     with tab3:
         render_stats_tab()
     
-    # Footer
     st.markdown("---")
-    st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px; padding:20px;'>TITAN v33.0 PRO | Chơi có trách nhiệm</div>", unsafe_allow_html=True)
-
-def display_quota_warning():
-    """Display quota status in sidebar."""
-    quota = get_quota_status()
-    remaining = quota["limit"] - quota["used"]
-    
-    if remaining == 0:
-        st.error(f"🚫 Gemini: HẾT ({quota['limit']}/{quota['limit']})")
-    elif remaining <= 3:
-        st.warning(f"⚠️ Gemini: {remaining}/{quota['limit']}")
-    else:
-        st.success(f"✅ Gemini: {remaining}/{quota['limit']}")
-
-# ==============================================================================
-# 8. ENTRY POINT
-# ==============================================================================
+    st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TITAN v33.0 PRO</div>", unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
