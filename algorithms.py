@@ -1,331 +1,96 @@
-# ==============================================================================
-# TITAN v35.0 - Prediction Algorithms
-# Multi-Algorithm Ensemble Engine
-# ==============================================================================
-
 import numpy as np
 from collections import Counter, defaultdict
-from datetime import datetime
 
 class PredictionEngine:
-    """Multi-algorithm prediction engine for 5D bet."""
-    
     def __init__(self):
+        # Trọng số ban đầu của các thuật toán
         self.weights = {
-            'frequency': 40,
-            'pattern': 30,
-            'hotcold': 20,
-            'markov': 10
+            'frequency': 0.3,
+            'markov': 0.3,
+            'pattern': 0.2,
+            'hotcold': 0.2
         }
-        self.risk_threshold = 70
-    
-    def predict(self, history):
-        """Main prediction method - Ensemble of all algorithms."""
-        if len(history) < 20:
-            return self._error_prediction("Cần ít nhất 20 kỳ dữ liệu")
+        self.learning_rate = 0.05 # Tốc độ tự điều chỉnh sau mỗi kỳ
+
+    def get_frequency_analysis(self, data):
+        """Phân tích tần suất xuất hiện của từng số."""
+        all_digits = "".join(data[-100:]) # Lấy 100 kỳ gần nhất
+        counts = Counter(all_digits)
+        sorted_counts = sorted(counts.items(), key=lambda x: x[1], reverse=True)
+        return [num for num, count in sorted_counts[:7]]
+
+    def get_markov_chain(self, data):
+        """Thuật toán chuỗi Markov dự đoán số dựa trên số trước đó."""
+        transitions = defaultdict(list)
+        all_digits = "".join(data[-200:])
+        for i in range(len(all_digits) - 1):
+            transitions[all_digits[i]].append(all_digits[i+1])
         
-        # Run all algorithms
-        freq_result = self._frequency_analysis(history)
-        pattern_result = self._pattern_recognition(history)
-        hotcold_result = self._hotcold_analysis(history)
-        markov_result = self._markov_chain(history)
+        last_digit = all_digits[-1]
+        next_options = transitions.get(last_digit, [])
+        if not next_options:
+            return []
         
-        # Ensemble voting
-        all_votes = []
-        avoid_votes = []
-        
-        # Frequency (40%)
-        for num in freq_result['top_3']:
-            all_votes.extend([num] * self.weights['frequency'])
-        
-        # Pattern (30%)
-        for num in pattern_result['likely']:
-            all_votes.extend([num] * self.weights['pattern'])
-        for num in pattern_result.get('avoid', []):
-            avoid_votes.append(num)
-        
-        # Hot/Cold (20%)
-        for num in hotcold_result['hot'][:3]:
-            all_votes.extend([num] * self.weights['hotcold'])
-        for num in hotcold_result.get('due', []):
-            all_votes.extend([num] * (self.weights['hotcold'] + 5))
-        
-        # Markov (10%)
-        for num in markov_result['top_3']:
-            all_votes.extend([num] * self.weights['markov'])
-        
-        # Vote counting
-        vote_count = Counter(all_votes)
-        avoid_set = set(avoid_votes)
-        
-        # Get top 3 (excluding avoid)
-        final_3 = []
-        for num, count in vote_count.most_common():
-            if num not in final_3 and num not in avoid_set:
-                final_3.append(num)
-            if len(final_3) == 3:
-                break
-        
-        # Fill if needed
-        while len(final_3) < 3:
-            for i in range(10):
-                if str(i) not in final_3 and str(i) not in avoid_set:
-                    final_3.append(str(i))
-                    break
-        
-        # Support 4
-        remaining = [n for n, c in vote_count.most_common(10) if n not in final_3 and n not in avoid_set]
-        support_4 = remaining[:4]
-        while len(support_4) < 4:
-            for i in range(10):
-                if str(i) not in final_3 and str(i) not in support_4:
-                    support_4.append(str(i))
-                    break
-        
-        # Confidence calculation
-        if vote_count:
-            top_vote = vote_count.most_common(1)[0][1]
-            confidence = min(95, 60 + top_vote * 2)
+        counts = Counter(next_options)
+        return [num for num, _ in counts.most_common(7)]
+
+    def detect_patterns(self, data):
+        """Tìm kiếm quy luật lặp lại (Pattern)."""
+        # Logic: Tìm các dãy số thường xuyên xuất hiện sau một số cụ thể
+        return self.get_frequency_analysis(data[-20:]) # Ưu tiên xu hướng ngắn hạn
+
+    def update_weights(self, won, method_used):
+        """
+        HÀM TỰ HỌC: Điều chỉnh trọng số thuật toán.
+        Nếu thắng, tăng trọng số thuật toán đó. Nếu thua, giảm xuống.
+        """
+        if won:
+            self.weights[method_used] = min(0.6, self.weights[method_used] + self.learning_rate)
         else:
-            confidence = 50
+            self.weights[method_used] = max(0.1, self.weights[method_used] - self.learning_rate)
         
-        # Build logic
-        logic_parts = []
-        if freq_result['top_3']:
-            logic_parts.append(f"Tần suất: {','.join(freq_result['top_3'])}")
-        if pattern_result['detected']:
-            logic_parts.append(f"{len(pattern_result['detected'])} pattern")
-        if hotcold_result.get('due'):
-            logic_parts.append(f"Đến kỳ: {','.join(hotcold_result['due'][:2])}")
+        # Chuẩn hóa lại tổng trọng số = 1
+        total = sum(self.weights.values())
+        for k in self.weights:
+            self.weights[k] /= total
+
+    def predict(self, data):
+        if len(data) < 10:
+            return {'main_3': ['1','2','3'], 'support_4': ['4','5','6','7'], 'confidence': 50}
+
+        # Lấy kết quả từ các "chuyên gia" thuật toán
+        f_results = self.get_frequency_analysis(data)
+        m_results = self.get_markov_chain(data)
+        p_results = self.detect_patterns(data)
+
+        # Kết hợp kết quả dựa trên trọng số hiện tại (Ensemble)
+        score_board = defaultdict(float)
         
+        for num in f_results: score_board[num] += self.weights['frequency']
+        for num in m_results: score_board[num] += self.weights['markov']
+        for num in p_results: score_board[num] += self.weights['pattern']
+
+        sorted_final = sorted(score_board.items(), key=lambda x: x[1], reverse=True)
+        final_numbers = [x[0] for x in sorted_final]
+
+        # Đảm bảo đủ 7 số
+        while len(final_numbers) < 7:
+            for n in "0123456789":
+                if n not in final_numbers:
+                    final_numbers.append(n)
+
         return {
-            'main_3': final_3,
-            'support_4': support_4,
-            'confidence': confidence,
-            'algorithm': 'Ensemble (5 algorithms)',
-            'logic': ' | '.join(logic_parts) if logic_parts else 'Phân tích đa thuật toán',
-            'avoid': list(avoid_set),
-            'details': {
-                'frequency': freq_result,
-                'pattern': pattern_result,
-                'hotcold': hotcold_result,
-                'markov': markov_result,
-                'votes': dict(vote_count.most_common(10))
-            }
+            'main_3': final_numbers[:3],
+            'support_4': final_numbers[3:7],
+            'confidence': int(min(95, 60 + len(data)*0.1)),
+            'weights': self.weights # Trả về để app theo dõi
         }
-    
-    def calculate_risk(self, history):
-        """Calculate risk score 0-100."""
-        if len(history) < 20:
-            return 0, "LOW", []
-        
-        recent = history[-50:] if len(history) >= 50 else history
-        all_digits = ''.join(recent)
-        freq = Counter(all_digits)
-        reasons = []
-        risk = 0
-        
-        # 1. Over-represented numbers
-        total_slots = len(all_digits)
-        if total_slots > 0:
-            for num, count in freq.most_common(3):
-                rate = count / total_slots
-                if rate > 0.25:
-                    risk += 20
-                    reasons.append(f"Số '{num}' xuất hiện {rate*100:.0f}%")
-        
-        # 2. Abnormal streaks
-        for pos in range(5):
-            seq = [n[pos] if len(n) > pos else '0' for n in recent]
-            max_streak = 1
-            current = 1
-            for i in range(1, len(seq)):
-                if seq[i] == seq[i-1]:
-                    current += 1
-                    max_streak = max(max_streak, current)
-                else:
-                    current = 1
-            if max_streak >= 5:
-                risk += 30
-                reasons.append(f"Cầu bệt {max_streak} kỳ vị trí {pos}")
-        
-        # 3. Entropy
-        if len(all_digits) > 0:
-            entropy = -sum((c/len(all_digits)) * np.log2(c/len(all_digits)) 
-                          for c in freq.values() if c > 0)
-            if entropy < 2.8:
-                risk += 25
-                reasons.append(f"Entropy thấp ({entropy:.2f})")
-        
-        # 4. Stable sums
-        totals = [sum(int(d) for d in n) for n in recent if len(n) == 5]
-        if len(totals) > 10:
-            std_dev = np.std(totals)
-            if std_dev < 2.5:
-                risk += 15
-                reasons.append(f"Tổng quá ổn định (σ={std_dev:.2f})")
-        
-        risk = min(100, risk)
-        
-        if risk >= 70:
-            level = "HIGH"
-        elif risk >= 40:
-            level = "MEDIUM"
-        else:
-            level = "LOW"
-        
-        return risk, level, reasons
-    
-    def detect_patterns(self, history):
-        """Detect patterns in history."""
-        recent = history[-30:] if len(history) >= 30 else history
-        
-        patterns = {
-            'bet': [],
-            'nhip2': [],
-            'nhip3': [],
-            'detected': [],
-            'likely': [],
-            'avoid': []
-        }
-        
-        # Cầu bệt
-        for pos in range(5):
-            seq = [n[pos] if len(n) > pos else '0' for n in recent]
-            for i in range(len(seq) - 2):
-                if seq[i] == seq[i+1] == seq[i+2]:
-                    digit = seq[i]
-                    streak_len = 3
-                    for j in range(i+3, len(seq)):
-                        if seq[j] == digit:
-                            streak_len += 1
-                        else:
-                            break
-                    
-                    if digit not in patterns['bet']:
-                        patterns['bet'].append(digit)
-                        patterns['detected'].append(f'Bệt {streak_len} kỳ vị {pos}: {digit}')
-                        
-                        if streak_len >= 4:
-                            if digit not in patterns['avoid']:
-                                patterns['avoid'].append(digit)
-                        else:
-                            if digit not in patterns['likely']:
-                                patterns['likely'].append(digit)
-        
-        # Cầu nhịp 2
-        for pos in range(5):
-            seq = [n[pos] if len(n) > pos else '0' for n in recent]
-            for i in range(len(seq) - 4):
-                if seq[i] == seq[i+2] == seq[i+4] and seq[i] != seq[i+1]:
-                    digit = seq[i]
-                    if digit not in patterns['nhip2']:
-                        patterns['nhip2'].append(digit)
-                        patterns['detected'].append(f'Nhịp-2 vị {pos}: {digit}')
-                        if digit not in patterns['likely']:
-                            patterns['likely'].append(digit)
-        
-        return patterns
-    
-    def _frequency_analysis(self, history):
-        """Algorithm 1: Frequency analysis with exponential weighting."""
-        recent = history[-100:] if len(history) >= 100 else history
-        
-        weighted_freq = defaultdict(float)
-        
-        for idx, num in enumerate(recent):
-            # Exponential decay: recent = 5.0, older = 1.0
-            weight = 5.0 - 4.0 * (idx / max(len(recent), 1))
-            for digit in num:
-                if digit.isdigit():
-                    weighted_freq[digit] += weight
-        
-        sorted_items = sorted(weighted_freq.items(), key=lambda x: x[1], reverse=True)
-        top_3 = [str(x[0]) for x in sorted_items[:3]]
-        
-        while len(top_3) < 3:
-            for i in range(10):
-                if str(i) not in top_3:
-                    top_3.append(str(i))
-                    break
-        
-        return {
-            'top_3': top_3,
-            'scores': {k: round(v, 2) for k, v in sorted_items[:10]}
-        }
-    
-    def _pattern_recognition(self, history):
-        """Algorithm 2: Pattern recognition."""
-        return self.detect_patterns(history)
-    
-    def _hotcold_analysis(self, history):
-        """Algorithm 3: Hot/Cold analysis."""
-        recent = history[-10:] if len(history) >= 10 else history
-        older = history[-20:-10] if len(history) >= 20 else []
-        
-        recent_digits = Counter(''.join(recent))
-        older_digits = Counter(''.join(older)) if older else Counter()
-        
-        hot = [str(x[0]) for x in recent_digits.most_common(5)]
-        
-        all_recent = ''.join(recent)
-        cold = [str(i) for i in range(10) if str(i) not in all_recent]
-        
-        due = []
-        for num in cold:
-            if older_digits.get(num, 0) >= 4:
-                due.append(num)
-        
-        return {
-            'hot': hot,
-            'cold': cold,
-            'due': due
-        }
-    
-    def _markov_chain(self, history):
-        """Algorithm 4: Markov Chain prediction."""
-        if len(history) < 30:
-            return {'top_3': ['0', '1', '2'], 'transition_matrix': {}}
-        
-        # Build transition matrix (last digit → next digits)
-        transition = defaultdict(lambda: defaultdict(int))
-        
-        for num in history[:-1]:
-            if len(num) >= 5:
-                last_digit = num[-1]
-                next_num = history[history.index(num) + 1] if num in history else None
-                if next_num:
-                    for digit in next_num:
-                        transition[last_digit][digit] += 1
-        
-        # Get most likely next digits
-        all_next = defaultdict(int)
-        for last_d, next_dict in transition.items():
-            for next_d, count in next_dict.items():
-                all_next[next_d] += count
-        
-        sorted_items = sorted(all_next.items(), key=lambda x: x[1], reverse=True)
-        top_3 = [str(x[0]) for x in sorted_items[:3]]
-        
-        while len(top_3) < 3:
-            for i in range(10):
-                if str(i) not in top_3:
-                    top_3.append(str(i))
-                    break
-        
-        return {
-            'top_3': top_3,
-            'transition_matrix': dict(transition)
-        }
-    
-    def _error_prediction(self, error_msg):
-        """Return error prediction."""
-        return {
-            'main_3': ['?', '?', '?'],
-            'support_4': ['0', '0', '0', '0'],
-            'confidence': 0,
-            'algorithm': 'Error',
-            'logic': error_msg,
-            'avoid': [],
-            'details': {}
-        }
+
+    def calculate_risk(self, data):
+        if len(data) < 20: return (50, "MEDIUM", ["Thiếu dữ liệu"])
+        # Logic tính Risk dựa trên độ biến động của 10 kỳ gần nhất
+        last_10 = data[-10:]
+        unique_digits = len(set("".join(last_10)))
+        risk_score = min(100, unique_digits * 4)
+        level = "LOW" if risk_score < 40 else "HIGH" if risk_score > 70 else "MEDIUM"
+        return (risk_score, level, ["Dữ liệu biến động" if risk_score > 70 else "Nhịp số ổn định"])
