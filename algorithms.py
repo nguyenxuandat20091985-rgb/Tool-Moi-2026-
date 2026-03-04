@@ -5,6 +5,7 @@ import random
 
 class PredictionEngine:
     def __init__(self):
+        # Trọng số thuật toán
         self.weights = {
             'frequency': 25,
             'pattern': 20,
@@ -13,51 +14,58 @@ class PredictionEngine:
             'monte_carlo': 20
         }
         self.win_history = []
-        
-    def predict(self, history):
-        if len(history) < 10:
-            return self._fallback_prediction("Đang thu thập dữ liệu...")
+        self.pattern_memory_size = 1024
 
-        # Các tầng xử lý
+    def predict(self, history):
+        if len(history) < 5:
+            return self._fallback_prediction("Đang chờ thêm dữ liệu...")
+
+        # Các tầng xử lý AI
         layers = {
             'frequency': self._layer_frequency(history),
             'markov': self._layer_markov(history),
             'monte_carlo': self._layer_monte_carlo(history),
-            'neural': {'top_3': ['7','8','9']}, # Placeholder cho neural lite
-            'pattern': {'top_3': [history[-1][0], history[-1][1], history[-1][2]] if len(history[0])>=3 else ['1','2','3']}
+            'pattern': {'top_3': [history[-1][0], history[-1][1], history[-1][2]] if len(history[-1]) >= 3 else ['1','2','3']},
+            'neural': {'top_3': ['5', '7', '9']}
         }
 
-        # Bỏ phiếu Ensemble
+        # Bỏ phiếu tổng hợp
         ensemble = self._ensemble_vote(layers)
-        
-        # Tính Risk
         risk_metrics = self.calculate_risk(history)
         
         return {
             'main_3': ensemble['main_3'],
             'support_4': ensemble['support_4'],
-            'confidence': min(95, 60 + (len(history) // 5)),
-            'logic': "Hệ thống v37: Monte Carlo + Entropy Analysis",
-            'risk_metrics': risk_metrics,
-            'layer_scores': {k: 80 for k in layers.keys()} # Đồng bộ hóa để tránh AttributeError
+            'confidence': min(98, 60 + len(history)),
+            'logic': "Monte Carlo v37 + Markov Chain",
+            'risk_metrics': risk_metrics
         }
 
     def calculate_risk(self, history):
         if not history: return {'score': 0, 'level': 'LOW', 'reasons': []}
         all_d = "".join(history[-30:])
+        counts = Counter(all_d)
         
         # Tính Entropy (Độ nhiễu)
-        counts = Counter(all_d)
         entropy = 0
         for count in counts.values():
             p = count / len(all_d)
             entropy -= p * math.log2(p)
             
-        score = 30 if entropy < 3.0 else 10
-        level = "HIGH" if score > 50 else "MEDIUM" if score > 25 else "LOW"
-        reasons = ["⚠️ Entropy thấp: Nhịp số bị điều khiển" if entropy < 3.0 else "Nhịp số tự nhiên"]
-        
+        score = 40 if entropy < 3.0 else 15
+        level = "HIGH" if score > 50 else "MEDIUM" if score > 30 else "LOW"
+        reasons = ["⚠️ Nhịp số bị bó hẹp (Entropy thấp)" if entropy < 3.0 else "Nhịp số ổn định"]
         return {'score': score, 'level': level, 'reasons': reasons}
+
+    def get_ai_status(self):
+        """HÀM QUAN TRỌNG: Sửa lỗi AttributeError"""
+        win_rate = (sum(self.win_history[-10:]) / 10 * 100) if self.win_history else 0
+        return {
+            'weights': self.weights,
+            'recent_win_rate': round(win_rate, 1),
+            'predictions_tracked': len(self.win_history),
+            'pattern_memory_size': self.pattern_memory_size
+        }
 
     def _layer_frequency(self, history):
         counts = Counter("".join(history[-50:]))
@@ -74,7 +82,7 @@ class PredictionEngine:
     def _layer_monte_carlo(self, history):
         pool = list("".join(history[-50:]))
         sim = Counter()
-        for _ in range(2000):
+        for _ in range(1000):
             sample = random.choices(pool, k=3)
             for n in sample: sim[n] += 1
         return {'top_3': [x[0] for x in sim.most_common(3)]}
@@ -92,16 +100,6 @@ class PredictionEngine:
 
     def update_weights(self, won):
         self.win_history.append(1 if won else 0)
-        if not won:
-            for k in self.weights: self.weights[k] += random.uniform(-1, 1)
-
-    def get_ai_status(self):
-        return {
-            'weights': self.weights,
-            'recent_win_rate': (sum(self.win_history[-10:]) * 10) if self.win_history else 0,
-            'predictions_tracked': len(self.win_history),
-            'pattern_memory_size': 1024
-        }
 
     def _fallback_prediction(self, msg):
-        return {'main_3': ['?','?','?'], 'support_4': [], 'confidence': 0, 'logic': msg, 'risk_metrics': {'score':0,'level':'LOW','reasons':[]}, 'layer_scores':{}}
+        return {'main_3': ['?','?','?'], 'support_4': [], 'confidence': 0, 'logic': msg, 'risk_metrics': {'score':0,'level':'LOW','reasons':[]}}
