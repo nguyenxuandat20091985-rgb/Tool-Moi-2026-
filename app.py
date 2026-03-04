@@ -1,20 +1,18 @@
 # ==============================================================================
-# TITAN v37.5 PRO MAX - Main Application
-# Mobile-Optimized Grid UI with Enhanced AI Integration
+# TITAN v37.5 PRO MAX - Main Application (FIXED & UPGRADED)
+# Mobile-Optimized UI | Error-Handled | Self-Learning AI
 # ==============================================================================
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 import re
-import time
 import json
-
-# Import the enhanced AI Engine
+import time
 from algorithms import PredictionEngine
 
 # ==============================================================================
-# 1. PAGE CONFIG & ENHANCED CSS
+# 1. PAGE CONFIG & CSS
 # ==============================================================================
 
 st.set_page_config(
@@ -24,13 +22,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Enhanced Mobile-Optimized CSS
+# Mobile-Optimized CSS (Kept original structure, enhanced)
 st.markdown("""
 <style>
     /* Global Dark Theme */
-    .stApp {
-        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
-        color: #e6edf3;
+    .stApp { 
+        background: linear-gradient(135deg, #0d1117 0%, #010409 100%); 
+        color: white; 
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     
@@ -39,92 +37,50 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Main Number Boxes - Enhanced */
-    .main-box {
-        background: linear-gradient(135deg, #161b22, #0d1117);
-        border: 3px solid #f85149;
-        border-radius: 18px;
-        padding: 25px 20px;
-        text-align: center;
-        margin: 8px 0;
-        box-shadow: 0 8px 25px rgba(248,81,73,0.3);
-        transition: transform 0.2s;
+    /* Main Number Boxes */
+    .main-box { 
+        background: linear-gradient(135deg, #161b22, #0d1117); 
+        border: 3px solid #f85149; 
+        border-radius: 15px; 
+        padding: 20px; 
+        text-align: center; 
+        margin: 10px 0;
+        box-shadow: 0 6px 20px rgba(248,81,73,0.3);
     }
-    .main-box:hover {
-        transform: translateY(-3px);
-    }
-    
-    .main-val {
-        font-size: 55px;
-        font-weight: 900;
+    .main-val { 
+        font-size: 50px; 
+        font-weight: 900; 
         color: #f85149;
-        text-shadow: 0 0 20px rgba(248,81,73,0.6);
-        line-height: 1;
-    }
-    
-    .main-label {
-        font-size: 12px;
-        color: #8b949e;
-        margin-top: 10px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+        text-shadow: 0 0 15px rgba(248,81,73,0.6);
     }
     
     /* Support Numbers Grid */
-    .sup-container {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
+    .sup-container { 
+        display: grid; 
+        grid-template-columns: repeat(4, 1fr); 
         gap: 8px;
         margin: 15px 0;
     }
-    
-    .sup-box {
-        background: linear-gradient(135deg, #161b22, #0d1117);
-        border: 2px solid #58a6ff;
-        border-radius: 12px;
-        padding: 18px 12px;
-        text-align: center;
-        color: #58a6ff;
-        font-weight: 800;
-        font-size: 32px;
-        box-shadow: 0 4px 15px rgba(88,166,255,0.2);
+    .sup-box { 
+        background: linear-gradient(135deg, #161b22, #0d1117); 
+        border: 2px solid #58a6ff; 
+        border-radius: 10px; 
+        padding: 15px; 
+        text-align: center; 
+        color: #58a6ff; 
+        font-weight: bold; 
+        font-size: 28px;
     }
     
-    /* Risk Tag/Banner */
-    .risk-tag {
-        padding: 12px 20px;
-        border-radius: 10px;
-        text-align: center;
-        font-weight: 700;
+    /* Risk Tag */
+    .risk-tag { 
+        padding: 12px; 
+        border-radius: 10px; 
+        text-align: center; 
+        font-weight: bold; 
         font-size: 16px;
         margin: 15px 0;
         border: 2px solid;
-    }
-    
-    /* Status Colors */
-    .status-low {
-        background: rgba(35,134,54,0.15);
-        border-color: #238636;
-        color: #3fb950;
-    }
-    .status-medium {
-        background: rgba(210,153,34,0.15);
-        border-color: #d29922;
-        color: #f0b429;
-    }
-    .status-high {
-        background: rgba(218,54,51,0.15);
-        border-color: #da3633;
-        color: #f85149;
-    }
-    
-    /* Info Boxes */
-    .info-enhanced {
-        background: rgba(88,166,255,0.1);
-        border-left: 4px solid #58a6ff;
-        padding: 12px 18px;
-        border-radius: 0 8px 8px 0;
-        margin: 10px 0;
     }
     
     /* Buttons */
@@ -143,35 +99,19 @@ st.markdown("""
         box-shadow: 0 6px 20px rgba(35,134,54,0.5);
     }
     
-    /* Text Areas & Inputs */
+    /* Text inputs */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
-        background-color: #161b22 !important;
-        color: #e6edf3 !important;
-        border: 1px solid #30363d !important;
-        border-radius: 8px !important;
+        background-color: #161b22;
+        color: white;
+        border: 1px solid #30363d;
     }
     
     /* Mobile Responsive */
     @media (max-width: 600px) {
-        .main-box {
-            padding: 20px 15px;
-        }
-        .main-val {
-            font-size: 45px;
-        }
-        .sup-container {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-        }
-        .sup-box {
-            font-size: 28px;
-            padding: 15px 10px;
-        }
-        .risk-tag {
-            font-size: 14px;
-            padding: 10px 15px;
-        }
+        .main-val { font-size: 40px; }
+        .sup-box { font-size: 24px; padding: 12px; }
+        .sup-container { grid-template-columns: repeat(4, 1fr); gap: 5px; }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -181,7 +121,7 @@ st.markdown("""
 # ==============================================================================
 
 def init_session():
-    """Initialize all session state variables."""
+    """Initialize all session state variables safely."""
     if "ai" not in st.session_state:
         st.session_state.ai = PredictionEngine()
     
@@ -191,90 +131,76 @@ def init_session():
     if "pred" not in st.session_state:
         st.session_state.pred = None
     
+    if "last_risk" not in st.session_state:
+        st.session_state.last_risk = {'score': 0, 'level': 'LOW', 'reasons': []}
+    
+    if "predictions_log" not in st.session_state:
+        st.session_state.predictions_log = []
+    
     if "bankroll" not in st.session_state:
         st.session_state.bankroll = {
             "initial": 1000000,
             "current": 1000000,
-            "bet_per_round": 10000,
-            "history": []
+            "bet_per_round": 10000
         }
-    
-    if "predictions_log" not in st.session_state:
-        st.session_state.predictions_log = []
 
 # ==============================================================================
-# 3. UI HELPER FUNCTIONS
+# 3. UTILITY FUNCTIONS
 # ==============================================================================
 
-def render_risk_banner(risk_metrics):
-    """Render enhanced risk status banner."""
-    score = risk_metrics.get('score', 0)
-    level = risk_metrics.get('level', 'LOW')
-    reasons = risk_metrics.get('reasons', [])
+def clean_and_add_numbers(raw_text, existing_db):
+    """
+    Clean raw input and add new numbers to database.
+    Returns: (added_count, stats_dict)
+    """
+    if not raw_text or not raw_text.strip():
+        return 0, {"found": 0, "new": 0, "duplicate": 0}
     
-    if level == "LOW":
-        status_class = "status-low"
-        icon = "✅"
-        action = "ĐÁNH"
-    elif level == "HIGH":
-        status_class = "status-high"
-        icon = "🛑"
-        action = "DỪNG"
-    else:
-        status_class = "status-medium"
-        icon = "⚠️"
-        action = "THEO DÕI"
+    # Extract all 5-digit numbers
+    nums = re.findall(r'\d{5}', raw_text)
     
-    st.markdown(f"""
-    <div class="risk-tag {status_class}">
-        {icon} RISK: {score}/100 | KHUYẾN NGHỊ: {action}
-    </div>
-    """, unsafe_allow_html=True)
+    stats = {"found": len(nums), "new": 0, "duplicate": 0}
+    db_set = set(existing_db)
     
-    # Show reasons if any
-    if reasons and level != "LOW":
-        with st.expander("📋 Chi tiết cảnh báo", expanded=False):
-            for reason in reasons:
-                st.markdown(f"• {reason}")
+    for n in nums:
+        if n not in db_set:
+            existing_db.insert(0, n)  # Add to front (newest first)
+            db_set.add(n)
+            stats["new"] += 1
+        else:
+            stats["duplicate"] += 1
+    
+    # Limit database size
+    if len(existing_db) > 3000:
+        existing_db[:] = existing_db[:3000]
+    
+    return stats["new"], stats
 
-def render_main_numbers(numbers):
-    """Render 3 main numbers in responsive grid."""
-    st.markdown("🔮 **3 SỐ CHÍNH (VÀO MẠNH)**")
+def check_win_3so5tinh(prediction_3, result_5):
+    """
+    Check win condition for "3 số 5 tinh":
+    Win if ALL 3 predicted numbers appear in the 5-digit result (any position).
+    """
+    if not prediction_3 or not result_5 or len(result_5) != 5:
+        return False
     
-    html = '<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 15px 0;">'
-    labels = ["Số 1", "Số 2", "Số 3"]
+    pred_set = set(prediction_3)
+    result_set = set(result_5)
     
-    for i, num in enumerate(numbers):
-        html += f'''
-        <div class="main-box">
-            <div class="main-val">{num}</div>
-            <div class="main-label">{labels[i]}</div>
-        </div>
-        '''
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
-
-def render_support_numbers(numbers):
-    """Render 4 support numbers in responsive grid."""
-    st.markdown("🎲 **4 SỐ LÓT (GIỮ VỐN)**")
-    
-    html = '<div class="sup-container">'
-    for num in numbers:
-        html += f'<div class="sup-box">{num}</div>'
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
+    # Win if all 3 predicted numbers are in the result
+    return pred_set.issubset(result_set)
 
 # ==============================================================================
 # 4. MAIN APPLICATION
 # ==============================================================================
 
 def main():
-    # Initialize session
+    # Initialize session state
     init_session()
     
     # Header
     st.title("🎯 TITAN v37.5 PRO MAX")
-    st.caption("Multi-Layer AI Prediction | Self-Learning Engine")
+    st.caption("Multi-Layer AI Prediction | Self-Learning")
     
     # Quick Stats Bar
     col1, col2, col3 = st.columns(3)
@@ -282,10 +208,9 @@ def main():
         st.metric("📦 Tổng kỳ", len(st.session_state.db))
     with col2:
         if st.session_state.predictions_log:
-            logs = [l for l in st.session_state.predictions_log if l.get('actual')]
+            logs = [l for l in st.session_state.predictions_log if l.get('result')]
             if logs:
-                wins = sum(1 for l in logs if l.get('won'))
-                rate = wins / len(logs) * 100
+                rate = sum(1 for l in logs if l.get('won')) / len(logs) * 100
                 st.metric("🎯 Win Rate", f"{rate:.1f}%")
             else:
                 st.metric("🎯 Win Rate", "Chưa có")
@@ -296,17 +221,12 @@ def main():
         color = "🟢" if profit >= 0 else "🔴"
         st.metric("💰 Lợi nhuận", f"{color} ₫{profit:,.0f}")
     
-    # Input Section
-    st.markdown("### 📥 Nhập kết quả")
-    st.markdown("""
-    **💡 Hướng dẫn:** Nhập kết quả 5D bet (5 chữ số), mỗi kỳ 1 dòng. 
-    Càng nhiều dữ liệu, AI càng thông minh!
-    """)
-    
+    # Input Area
+    st.markdown("### 📥 Nhập kết quả (Mỗi kỳ 1 dòng)")
     raw = st.text_area(
-        "Kết quả (5 số/dòng):",
+        "Nhập số 5 chữ số:",
         height=120,
-        placeholder="71757\n81750\n92002\n...",
+        placeholder="71757\n81750\n92341\n...",
         key="raw_input"
     )
     
@@ -325,125 +245,151 @@ def main():
     
     # Process Analysis
     if analyze_btn and raw.strip():
-        with st.spinner("🧠 AI đang phân tích đa tầng..."):
-            try:
-                # Clean and validate input
-                nums = re.findall(r'\d{5}', raw)
+        try:
+            with st.spinner("🧠 AI đang phân tích đa tầng..."):
+                # Clean and add numbers
+                added, stats = clean_and_add_numbers(raw, st.session_state.db)
                 
-                if not nums:
-                    st.error("❌ Dữ liệu không đúng định dạng 5 chữ số!")
+                if stats['new'] > 0:
+                    st.success(f"✅ Thêm {stats['new']} số mới (Tìm thấy: {stats['found']} | Trùng: {stats['duplicate']})")
+                elif stats['found'] > 0:
+                    st.info(f"ℹ️ Không có số mới ({stats['duplicate']} số đã có trong DB)")
                 else:
-                    # Update database
-                    st.session_state.db = nums
-                    st.success(f"✅ Đã nạp {len(nums)} kỳ dữ liệu")
-                    
-                    # Run AI prediction
-                    st.session_state.pred = st.session_state.ai.predict(st.session_state.db)
+                    st.error("❌ Không tìm thấy số 5 chữ số hợp lệ")
+                
+                # Generate prediction if enough data
+                if len(st.session_state.db) >= 15:
+                    pred = st.session_state.ai.predict(st.session_state.db)
+                    st.session_state.pred = pred
+                    st.session_state.last_risk = pred.get('risk_metrics', {})
                     st.rerun()
+                else:
+                    st.warning(f"⚠️ Cần ít nhất 15 kỳ (hiện có: {len(st.session_state.db)})")
                     
-            except Exception as e:
-                st.error(f"❌ Lỗi: {str(e)}")
+        except Exception as e:
+            st.error(f"❌ Lỗi: {str(e)}")
     
-    # Display Prediction Results
+    elif analyze_btn and not raw.strip():
+        st.error("❌ Vui lòng nhập dữ liệu trước!")
+    
+    # Display Prediction
     if st.session_state.pred:
         p = st.session_state.pred
         risk = p.get('risk_metrics', {'score': 0, 'level': 'LOW', 'reasons': []})
         
-        # Risk Banner
-        render_risk_banner(risk)
+        # Risk Banner (FIXED: proper color handling)
+        if risk.get('level') == "LOW":
+            color = "#238636"
+            icon = "✅"
+        else:
+            color = "#da3633"
+            icon = "⚠️"
         
-        # 3 Main Numbers
-        render_main_numbers(p['main_3'])
+        st.markdown(f'''
+        <div class="risk-tag" style="background: {color}22; border-color: {color}; color: {color}">
+            {icon} RISK: {risk.get("score", 0)}/100 | KHUYẾN NGHỊ: {risk.get("level", "N/A")}
+        </div>
+        ''', unsafe_allow_html=True)
         
-        # Show avoid numbers if any
-        layer_details = p.get('layer_details', {})
-        if 'pattern' in layer_details:
-            avoid = layer_details['pattern'].get('details', {}).get('avoid', [])
-            if avoid:
-                st.markdown(f"""
-                <div style="background: rgba(218,54,51,0.1); border-left: 4px solid #da3633; 
-                           padding: 12px; border-radius: 8px; margin: 15px 0;">
-                    <strong style="color: #f85149;">🚫 TRÁNH:</strong> {', '.join(avoid)}
-                </div>
-                """, unsafe_allow_html=True)
+        # 3 Main Numbers (FIXED: proper grid display)
+        st.write("🔮 **3 SỐ CHÍNH (VÀO MẠNH)**")
+        cols = st.columns(3)
+        for i, num in enumerate(p.get('main_3', ['?', '?', '?'])):
+            cols[i].markdown(f'''
+            <div class="main-box">
+                <div class="main-val">{num}</div>
+            </div>
+            ''', unsafe_allow_html=True)
         
-        # 4 Support Numbers
-        render_support_numbers(p['support_4'])
+        # 4 Support Numbers (FIXED: proper grid)
+        st.write("🎲 **4 SỐ LÓT (GIỮ VỐN)**")
+        support_nums = p.get('support_4', ['?', '?', '?', '?'])
+        s_html = "".join([f'<div class="sup-box">{n}</div>' for n in support_nums])
+        st.markdown(f'<div class="sup-container">{s_html}</div>', unsafe_allow_html=True)
         
-        # Logic & Confidence
-        confidence = p.get('confidence', 0)
+        # Logic & Confidence (FIXED: safe access)
         logic = p.get('logic', 'N/A')
-        st.info(f"💡 **Logic:** {logic} | **Tin cậy:** {confidence}%")
+        confidence = p.get('confidence', 0)
+        st.info(f"💡 Logic: {logic} | Tin cậy: {confidence}%")
         
-        # Copy Code
-        st.markdown("---")
-        st.code(','.join(p['main_3'] + p['support_4']), language=None)
+        # Risk reasons if any
+        if risk.get('reasons') and risk['reasons'] != ["Nhịp số tự nhiên"]:
+            st.warning("⚠️ **Cảnh báo:**\n" + "\n".join([f"• {r}" for r in risk['reasons']]))
+        
+        # Copy code for easy betting
+        st.code(','.join(p.get('main_3', []) + p.get('support_4', [])), language=None)
         st.caption("📋 Bấm vào code để copy dàn 7 số")
         
-        # Result Confirmation & AI Learning
+        # Result Confirmation & AI Learning (FIXED: correct win condition)
+        st.markdown("---")
         st.markdown("### ✅ Xác nhận kết quả & Dạy AI")
         
         col1, col2 = st.columns([3, 1])
         with col1:
-            actual = st.text_input("Kết quả thực tế (5 số):", key="actual_input", placeholder="12864")
+            actual = st.text_input("Kết quả thực tế kỳ này (5 số):", key="actual_input", placeholder="12864")
         with col2:
-            learn_btn = st.button("✅ GHI NHẬN & TỐI ƯU AI", type="primary", use_container_width=True)
+            learn_btn = st.button("✅ GHI NHẬN", type="primary", use_container_width=True)
         
         if learn_btn and actual and len(actual) == 5 and actual.isdigit():
-            # Check win condition (3 số 5 tinh)
-            pred_set = set(p['main_3'])
-            result_set = set(actual)
-            is_win = len(pred_set.intersection(result_set)) >= 3
-            
-            # Determine which layer to reward (simplified heuristic)
-            layer_details = p.get('layer_details', {})
-            best_layer = 'frequency'  # Default
-            
-            if layer_details:
-                # Pick layer with highest detail score (simplified)
-                scores = {}
-                for layer, details in layer_details.items():
-                    if isinstance(details, dict) and 'details' in details:
-                        d = details['details']
-                        if 'top_score' in d:
-                            scores[layer] = d['top_score']
-                        elif 'patterns_detected' in d:
-                            scores[layer] = d['patterns_detected'] * 2
-                if scores:
-                    best_layer = max(scores, key=scores.get)
-            
-            # Update AI weights (SELF-LEARNING)
-            st.session_state.ai.update_weights(is_win, best_layer)
-            
-            # Update bankroll
-            bet = st.session_state.bankroll['bet_per_round']
-            if is_win:
-                profit = bet * 1.9  # Typical 5D payout
-                st.session_state.bankroll['current'] += profit
-                st.success(f"🎉 TRÚNG! +₫{profit:,.0f} | AI đã ghi nhớ pattern")
-            else:
-                st.session_state.bankroll['current'] -= bet
-                st.warning(f"❌ Trượt! -₫{bet:,.0f} | AI đang điều chỉnh trọng số")
-            
-            # Log result for analytics
-            st.session_state.predictions_log.append({
-                'timestamp': datetime.now().isoformat(),
-                'prediction': p['main_3'],
-                'actual': actual,
-                'won': is_win,
-                'confidence': p.get('confidence', 0),
-                'method_rewarded': best_layer,
-                'risk_score': risk.get('score', 0)
-            })
-            
-            time.sleep(2)
-            st.rerun()
+            try:
+                # FIXED: Correct win condition for "3 số 5 tinh"
+                is_win = check_win_3so5tinh(p.get('main_3', []), actual)
+                
+                # Determine which method to reward (simplified heuristic)
+                layer_details = p.get('layer_details', {})
+                if layer_details:
+                    # Pick method whose top picks most match the actual result
+                    best_method = 'frequency'  # default
+                    best_match = 0
+                    for method, picks in layer_details.items():
+                        match = len(set(picks).intersection(set(actual)))
+                        if match > best_match:
+                            best_match = match
+                            best_method = method
+                else:
+                    best_method = 'frequency'
+                
+                # Update AI weights (SELF-LEARNING)
+                st.session_state.ai.update_weights(is_win, best_method)
+                
+                # Update bankroll
+                bet = st.session_state.bankroll['bet_per_round']
+                if is_win:
+                    # Typical 5D bet payout: 1.9x
+                    profit = bet * 1.9
+                    st.session_state.bankroll['current'] += profit
+                    st.success(f"🎉 TRÚNG! +₫{profit:,.0f} | AI đã ghi nhớ pattern")
+                else:
+                    st.session_state.bankroll['current'] -= bet
+                    st.warning(f"❌ Trượt! -₫{bet:,.0f} | AI đang điều chỉnh")
+                
+                # Log result for analytics
+                st.session_state.predictions_log.append({
+                    'timestamp': datetime.now().isoformat(),
+                    'prediction': p.get('main_3', []),
+                    'actual': actual,
+                    'won': is_win,
+                    'method_rewarded': best_method,
+                    'confidence': p.get('confidence', 0)
+                })
+                
+                # Keep log manageable
+                if len(st.session_state.predictions_log) > 100:
+                    st.session_state.predictions_log = st.session_state.predictions_log[-100:]
+                
+                time.sleep(2)
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ Lỗi ghi nhận: {str(e)}")
+        elif learn_btn and (not actual or len(actual) != 5 or not actual.isdigit()):
+            st.warning("⚠️ Vui lòng nhập đúng 5 chữ số!")
     
     # Footer
     st.markdown("---")
     st.markdown("""
-    <div style="text-align: center; color: #8b949e; font-size: 12px; padding: 20px;">
-        🎯 TITAN v37.5 PRO MAX | Multi-Layer Self-Learning AI<br>
+    <div style="text-align: center; color: #8b949e; padding: 20px; font-size: 12px;">
+        🎯 TITAN v37.5 PRO MAX | Multi-Layer AI<br>
         ⚠️ Không có AI nào chính xác 100% - Chơi có trách nhiệm
     </div>
     """, unsafe_allow_html=True)
