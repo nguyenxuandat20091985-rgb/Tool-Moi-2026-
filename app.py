@@ -1,6 +1,6 @@
 # ==============================================================================
-# TITAN v36.0 AI SELF-LEARNING - Main Application
-# Multi-Layer AI with Mobile-Optimized Grid UI
+# TITAN v37.0 ULTRA AI - Main Application
+# Synchronized with Multi-Layer Engine & Monte Carlo
 # ==============================================================================
 
 import streamlit as st
@@ -9,539 +9,223 @@ from datetime import datetime
 import re
 import time
 import json
+import random
 
-# Import the AI Engine
+# Import the AI Engine v37.0
 from algorithms import PredictionEngine
 
 # ==============================================================================
-# 1. PAGE CONFIG & CSS
+# 1. PAGE CONFIG & ENHANCED CSS
 # ==============================================================================
 
 st.set_page_config(
-    page_title="🎯 TITAN v36.0 AI",
+    page_title="🎯 TITAN v37.0 ULTRA AI",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Mobile-Optimized Grid CSS
 st.markdown("""
 <style>
-    /* Global Dark Theme */
     .stApp {
         background: linear-gradient(135deg, #010409 0%, #0d1117 100%);
         color: #e6edf3;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     
-    /* Hide Streamlit branding */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* Mobile Grid Container for Numbers */
+    /* Number Grid Optimization */
     .number-container {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin: 20px 0;
+        gap: 10px;
+        margin: 15px 0;
     }
     
     .number-box {
-        background: linear-gradient(135deg, #161b22, #0d1117);
-        border: 3px solid #ff4b4b;
-        border-radius: 15px;
-        padding: 20px 15px;
+        background: rgba(22, 27, 34, 0.8);
+        border: 2px solid #ff4b4b;
+        border-radius: 12px;
+        padding: 15px 5px;
         text-align: center;
-        box-shadow: 0 6px 20px rgba(255,75,75,0.3);
+        box-shadow: 0 4px 15px rgba(255,75,75,0.2);
     }
     
     .number-val {
-        font-size: 42px;
+        font-size: 38px;
         font-weight: 900;
         color: #ff4b4b;
-        text-shadow: 0 0 15px rgba(255,75,75,0.6);
     }
     
-    .number-label {
-        font-size: 12px;
-        color: #8b949e;
-        margin-top: 8px;
-        text-transform: uppercase;
-    }
-    
-    /* Support Numbers Grid */
     .support-container {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        margin: 20px 0;
+        gap: 8px;
     }
     
     .support-box {
-        background: linear-gradient(135deg, #161b22, #0d1117);
-        border: 2px solid #58a6ff;
-        border-radius: 12px;
-        padding: 15px 10px;
-        text-align: center;
-        color: #58a6ff;
-        font-weight: 800;
-        font-size: 32px;
-    }
-    
-    /* Status Cards */
-    .status-card {
-        padding: 15px;
-        border-radius: 12px;
-        text-align: center;
-        font-weight: bold;
-        font-size: 16px;
-        margin: 15px 0;
-    }
-    .status-green {
-        background: linear-gradient(135deg, #238636, #2ea043);
-        color: white;
-    }
-    .status-red {
-        background: linear-gradient(135deg, #da3633, #f85149);
-        color: white;
-    }
-    .status-yellow {
-        background: linear-gradient(135deg, #d29922, #f0b429);
-        color: #0d1117;
-    }
-    
-    /* AI Weights Display */
-    .weights-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-        margin: 10px 0;
-    }
-    .weight-item {
         background: #0d1117;
-        border: 1px solid #30363d;
+        border: 1px solid #58a6ff;
         border-radius: 8px;
-        padding: 10px;
+        padding: 10px 5px;
         text-align: center;
-    }
-    .weight-val {
-        font-size: 20px;
-        font-weight: bold;
         color: #58a6ff;
+        font-weight: bold;
+        font-size: 24px;
     }
-    .weight-label {
-        font-size: 11px;
-        color: #8b949e;
-    }
-    
-    /* Buttons */
-    .stButton > button {
-        background: linear-gradient(135deg, #238636, #2ea043);
-        color: white;
-        border: none;
+
+    /* Risk Metrics Styling */
+    .risk-box {
+        padding: 15px;
         border-radius: 10px;
-        font-weight: 700;
-        padding: 15px 35px;
-        font-size: 16px;
-        transition: all 0.3s;
+        margin-bottom: 20px;
+        text-align: center;
+        font-weight: bold;
     }
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(35,134,54,0.5);
-    }
-    
-    /* Mobile Responsive */
-    @media (max-width: 600px) {
-        .number-container {
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-        }
-        .number-box {
-            padding: 15px 10px;
-        }
-        .number-val {
-            font-size: 35px;
-        }
-        .support-container {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-        }
-        .support-box {
-            font-size: 28px;
-            padding: 12px 8px;
-        }
-        .weights-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
+    .risk-low { background: rgba(35, 134, 54, 0.2); border: 1px solid #238636; color: #39d353; }
+    .risk-medium { background: rgba(210, 153, 34, 0.2); border: 1px solid #d29922; color: #f0b429; }
+    .risk-high { background: rgba(218, 54, 51, 0.2); border: 1px solid #da3633; color: #f85149; }
+
+    /* AI Stats Sidebar */
+    .weight-item {
+        background: #161b22;
+        border-radius: 5px;
+        padding: 5px 10px;
+        margin-bottom: 5px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.85rem;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. SESSION STATE INITIALIZATION
+# 2. SESSION & MEMORY SYNC
 # ==============================================================================
 
 def init_session():
-    """Initialize all session state variables."""
     if "ai_engine" not in st.session_state:
         st.session_state.ai_engine = PredictionEngine()
-    
     if "lottery_db" not in st.session_state:
         st.session_state.lottery_db = []
-    
     if "last_prediction" not in st.session_state:
         st.session_state.last_prediction = None
-    
-    if "last_risk" not in st.session_state:
-        st.session_state.last_risk = (0, "LOW", [])
-    
+    if "predictions_log" not in st.session_state:
+        st.session_state.predictions_log = []
     if "bankroll" not in st.session_state:
-        st.session_state.bankroll = {
-            "initial": 1000000,
-            "current": 1000000,
-            "bet_per_round": 10000,
-            "history": []
-        }
+        st.session_state.bankroll = {"initial": 1000000, "current": 1000000}
+
+def format_money(val):
+    return f"₫{val:,.0f}"
 
 # ==============================================================================
-# 3. UI COMPONENTS
-# ==============================================================================
-
-def render_number_grid(numbers, title, box_class, val_class, label_class=None, labels=None):
-    """Render responsive number grid."""
-    st.markdown(f"**{title}**")
-    
-    html = '<div class="number-container">'
-    for i, num in enumerate(numbers):
-        label_html = f'<div class="{label_class}">{labels[i]}</div>' if labels and label_class else ''
-        html += f'''
-        <div class="{box_class}">
-            <div class="{val_class}">{num}</div>
-            {label_html}
-        </div>
-        '''
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
-
-def render_status_card(risk_score, risk_level):
-    """Render risk status card."""
-    if risk_level == "LOW":
-        status_class = "status-green"
-        icon = "✅"
-        action = "ĐÁNH"
-    elif risk_level == "HIGH":
-        status_class = "status-red"
-        icon = "🛑"
-        action = "DỪNG"
-    else:
-        status_class = "status-yellow"
-        icon = "⚠️"
-        action = "THEO DÕI"
-    
-    st.markdown(f"""
-    <div class="status-card {status_class}">
-        {icon} RISK: {risk_score}/100 | KHUYẾN NGHỊ: {action}
-    </div>
-    """, unsafe_allow_html=True)
-
-def render_ai_weights(weights):
-    """Display AI algorithm weights."""
-    st.markdown("**🧠 Trọng số thuật toán:**")
-    
-    html = '<div class="weights-grid">'
-    for algo, weight in weights.items():
-        html += f'''
-        <div class="weight-item">
-            <div class="weight-val">{weight}%</div>
-            <div class="weight-label">{algo}</div>
-        </div>
-        '''
-    html += '</div>'
-    st.markdown(html, unsafe_allow_html=True)
-
-# ==============================================================================
-# 4. MAIN APPLICATION
+# 3. MAIN INTERFACE
 # ==============================================================================
 
 def main():
-    # Initialize
     init_session()
     
-    # Header
-    st.title("🎯 TITAN v36.0 AI")
-    st.caption("Multi-Layer Self-Learning Prediction System")
-    
-    # Sidebar: AI Status
+    # Sidebar Info
     with st.sidebar:
-        st.markdown("### 🧠 Trạng thái AI")
-        
-        ai_status = st.session_state.ai_engine.get_ai_status()
-        
-        st.metric("🎯 Win Rate", f"{ai_status['recent_win_rate']}%")
-        st.metric("📊 Predictions", ai_status['predictions_tracked'])
-        st.metric("🧠 Pattern Memory", ai_status['pattern_memory_size'])
+        st.title("🧠 AI Status")
+        weights = st.session_state.ai_engine.weights
+        for algo, w in weights.items():
+            st.markdown(f"""<div class="weight-item"><span>{algo.upper()}</span><b>{w}%</b></div>""", unsafe_allow_html=True)
         
         st.markdown("---")
-        render_ai_weights(ai_status['weights'])
-        
-        st.markdown("---")
-        st.markdown("### 💰 Quản lý vốn")
-        st.metric("Vốn hiện tại", f"₫{st.session_state.bankroll['current']:,.0f}")
-        
-        if st.button("🗑️ Reset AI & Data"):
+        if st.button("🗑️ Reset Hệ Thống"):
             st.session_state.clear()
-            st.success("✅ Đã reset!")
-            time.sleep(1)
             st.rerun()
-        
-        st.markdown("---")
-        st.warning("⚠️ Risk >= 70: DỪNG ngay\n⚠️ Không có AI nào chính xác 100%")
+
+    st.title("🎯 TITAN v37.0 ULTRA")
     
-    # Main Tabs
-    tab1, tab2 = st.tabs(["🚀 DỰ ĐOÁN", "💰 VỐN & AI LOG"])
-    
-    # ==================== TAB 1: PREDICTION ====================
+    tab1, tab2 = st.tabs(["🚀 PHÂN TÍCH AI", "📊 NHẬT KÝ & VỐN"])
+
     with tab1:
-        st.header("🚀 Nhập & Phân Tích AI")
-        
-        # Quick Stats
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("📦 Tổng kỳ", len(st.session_state.lottery_db))
-        with col2:
-            if st.session_state.predictions_log if hasattr(st.session_state, 'predictions_log') else []:
-                logs = [l for l in st.session_state.predictions_log if l.get('result')]
-                if logs:
-                    rate = sum(1 for l in logs if l.get('won')) / len(logs) * 100
-                    st.metric("🎯 Win Rate", f"{rate:.1f}%")
-                else:
-                    st.metric("🎯 Win Rate", "Chưa có")
-            else:
-                st.metric("🎯 Win Rate", "Chưa có")
-        with col3:
-            profit = st.session_state.bankroll['current'] - st.session_state.bankroll['initial']
-            color = "🟢" if profit >= 0 else "🔴"
-            st.metric("💰 Lợi nhuận", f"{color} ₫{profit:,.0f}")
-        
         # Input Area
-        st.markdown("### 📥 Nhập kết quả kỳ trước")
-        raw_input = st.text_area(
-            "Nhập 5 chữ số (có thể nhiều kỳ, mỗi kỳ 1 dòng):",
-            height=100,
-            placeholder="87746\n56421\n69137\n...",
-            key="raw_input"
-        )
+        input_data = st.text_area("Nhập kết quả (5 số/dòng):", height=100, placeholder="87746\n56421...")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            analyze_btn = st.button("🚀 PHÂN TÍCH AI", type="primary", use_container_width=True)
-        with col2:
-            if st.button("📋 Demo Data", use_container_width=True):
-                demo_data = "\n".join([
-                    "87746", "56421", "69137", "00443", "04475",
-                    "64472", "16755", "58569", "62640", "99723"
-                ] * 2)
-                st.session_state.raw_input = demo_data
-                st.rerun()
-        
-        # Process Analysis
-        if analyze_btn and raw_input.strip():
-            with st.spinner("🧠 AI đang phân tích đa tầng..."):
-                try:
-                    # Clean and add data
-                    new_nums = re.findall(r'\d{5}', raw_input)
-                    added = 0
-                    db_set = set(st.session_state.lottery_db)
-                    
-                    for n in new_nums:
-                        if n not in db_set:
-                            st.session_state.lottery_db.insert(0, n)
-                            db_set.add(n)
-                            added += 1
-                    
-                    if added > 0:
-                        st.success(f"✅ Đã thêm {added} số mới")
-                    else:
-                        st.info("ℹ️ Dữ liệu đã có trong hệ thống")
-                    
-                    # AI Prediction
-                    if len(st.session_state.lottery_db) >= 20:
-                        pred = st.session_state.ai_engine.predict(st.session_state.lottery_db)
-                        risk = st.session_state.ai_engine.calculate_risk(st.session_state.lottery_db)
-                        
-                        st.session_state.last_prediction = pred
-                        st.session_state.last_risk = risk
-                        
-                        st.rerun()
-                    else:
-                        st.warning(f"⚠️ Cần ít nhất 20 kỳ (hiện có: {len(st.session_state.lottery_db)})")
-                        
-                except Exception as e:
-                    st.error(f"❌ Lỗi: {str(e)}")
-        
-        # Display Prediction
+        if st.button("🚀 KÍCH HOẠT AI", use_container_width=True, type="primary"):
+            new_nums = re.findall(r'\d{5}', input_data)
+            if new_nums:
+                # Cập nhật DB (loại bỏ trùng lặp)
+                for n in new_nums:
+                    if n not in st.session_state.lottery_db:
+                        st.session_state.lottery_db.append(n)
+                
+                # Chạy AI v37
+                with st.spinner("🧠 Đang giả lập Monte Carlo..."):
+                    pred = st.session_state.ai_engine.predict(st.session_state.lottery_db)
+                    st.session_state.last_prediction = pred
+                    st.rerun()
+            else:
+                st.warning("Vui lòng nhập đúng định dạng 5 chữ số.")
+
+        # Hiển thị Kết quả đồng bộ v37
         if st.session_state.last_prediction:
             p = st.session_state.last_prediction
-            r_score, r_level, r_reasons = st.session_state.last_risk
+            risk = p['risk_metrics']
             
-            # Status Card
-            render_status_card(r_score, r_level)
-            
-            # 3 Main Numbers - GRID DISPLAY
-            render_number_grid(
-                numbers=p['main_3'],
-                title="🔮 3 SỐ CHÍNH (VÀO MẠNH)",
-                box_class="number-box",
-                val_class="number-val",
-                label_class="number-label",
-                labels=["Số 1", "Số 2", "Số 3"]
-            )
-            
-            # Avoid Warning
-            if p.get('avoid'):
-                st.markdown(f"""
-                <div style="background: rgba(218,54,51,0.15); border-left: 4px solid #da3633; 
-                           padding: 12px; border-radius: 8px; margin: 15px 0;">
-                    <strong style="color: #f85149;">🚫 TRÁNH:</strong> {', '.join(p['avoid'])}
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # 4 Support Numbers - GRID DISPLAY
-            render_number_grid(
-                numbers=p['support_4'],
-                title="🎲 4 SỐ LÓT",
-                box_class="support-box",
-                val_class=""  # Color handled by CSS
-            )
-            
-            # Logic Explanation
-            if p.get('logic'):
-                st.info(f"💡 **AI Logic:** {p['logic']}")
-            
-            # Risk Reasons
-            if r_reasons:
-                st.warning("⚠️ **Cảnh báo:**\n" + "\n".join([f"• {r}" for r in r_reasons]))
-            
-            # Copy Code
-            st.code(','.join(p['main_3'] + p['support_4']), language=None)
-            st.caption("📋 Bấm để copy dàn 7 số")
-            
-            # Result Confirmation & AI Learning
-            st.markdown("---")
-            st.markdown("### ✅ Xác nhận kết quả & Dạy AI")
-            
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                actual = st.text_input("Kết quả thực tế (5 số):", key="actual_result", placeholder="12864")
-            with col2:
-                learn_btn = st.button("✅ DẠY AI", type="primary", use_container_width=True)
-            
-            if learn_btn and actual and len(actual) == 5 and actual.isdigit():
-                # Check win condition (3 số 5 tinh)
-                pred_set = set(p['main_3'])
-                result_set = set(actual)
-                is_win = len(pred_set.intersection(result_set)) >= 3
-                
-                # Determine which method to reward (simplified)
-                layer_scores = p.get('layer_scores', {})
-                if layer_scores:
-                    best_method = max(layer_scores, key=layer_scores.get)
-                else:
-                    best_method = 'frequency'
-                
-                # Update AI weights (SELF-LEARNING)
-                st.session_state.ai_engine.update_weights(is_win, best_method)
-                
-                # Update bankroll
-                bet = st.session_state.bankroll['bet_per_round']
-                if is_win:
-                    profit = bet * 1.9  # Typical 5D payout
-                    st.session_state.bankroll['current'] += profit
-                    st.success(f"🎉 TRÚNG! +₫{profit:,.0f} | AI đã ghi nhớ pattern này")
-                else:
-                    st.session_state.bankroll['current'] -= bet
-                    st.warning(f"❌ Trượt! -₫{bet:,.0f} | AI đang điều chỉnh trọng số")
-                
-                # Log result
-                if "predictions_log" not in st.session_state:
-                    st.session_state.predictions_log = []
-                
-                st.session_state.predictions_log.append({
-                    'timestamp': datetime.now().isoformat(),
-                    'prediction': p['main_3'],
-                    'actual': actual,
-                    'won': is_win,
-                    'method_rewarded': best_method
-                })
-                
-                time.sleep(2)
-                st.rerun()
-    
-    # ==================== TAB 2: BANKROLL & AI LOG ====================
-    with tab2:
-        st.header("💰 Vốn & AI Learning Log")
-        
-        # Bankroll Metrics
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Vốn ban đầu", f"₫{st.session_state.bankroll['initial']:,.0f}")
-        with col2:
-            st.metric("Vốn hiện tại", f"₫{st.session_state.bankroll['current']:,.0f}")
-        with col3:
-            profit = st.session_state.bankroll['current'] - st.session_state.bankroll['initial']
-            color = "🟢" if profit >= 0 else "🔴"
-            st.metric("Lợi nhuận", f"{color} ₫{profit:,.0f}")
-        
-        # AI Status
-        st.markdown("### 🧠 Trạng thái AI")
-        ai_status = st.session_state.ai_engine.get_ai_status()
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown("**Trọng số hiện tại:**")
-            render_ai_weights(ai_status['weights'])
-        with col2:
-            st.markdown("**Hiệu suất:**")
-            st.metric("Win Rate", f"{ai_status['recent_win_rate']}%")
-            st.metric("Predictions", ai_status['predictions_tracked'])
-            st.metric("Pattern Memory", ai_status['pattern_memory_size'])
-        
-        # History Log
-        st.markdown("### 📜 Lịch sử dự đoán")
-        if "predictions_log" in st.session_state and st.session_state.predictions_log:
-            df = pd.DataFrame(st.session_state.predictions_log)
-            df['timestamp'] = pd.to_datetime(df['timestamp']).dt.strftime('%H:%M %d/%m')
-            df['result'] = df.apply(lambda r: f"{r['prediction']} → {r['actual']}", axis=1)
-            df['status'] = df['won'].apply(lambda w: '✅' if w else '❌')
-            
-            display_cols = ['timestamp', 'result', 'status', 'method_rewarded']
-            st.dataframe(df[display_cols], hide_index=True, use_container_width=True)
-        else:
-            st.info("Chưa có dữ liệu lịch sử")
-        
-        # Export Data
-        st.markdown("---")
-        st.markdown("### 💾 Export Data")
-        
-        if st.button("📥 Export JSON"):
-            export_data = {
-                'lottery_db': st.session_state.lottery_db,
-                'bankroll': st.session_state.bankroll,
-                'ai_weights': st.session_state.ai_engine.weights,
-                'predictions_log': st.session_state.predictions_log if "predictions_log" in st.session_state else [],
-                'exported_at': datetime.now().isoformat()
-            }
-            st.download_button(
-                label="📥 Download",
-                data=json.dumps(export_data, indent=2, ensure_ascii=False),
-                file_name=f"titan_ai_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                mime="application/json"
-            )
+            # 1. Risk Display
+            r_class = f"risk-{risk['level'].lower()}"
+            st.markdown(f"""
+            <div class="risk-box {r_class}">
+                MỨC ĐỘ RỦI RO: {risk['score']}/100 - {risk['level']}<br>
+                <small>{' | '.join(risk['reasons']) if risk['reasons'] else 'Hệ thống ổn định'}</small>
+            </div>
+            """, unsafe_allow_html=True)
 
-# ==============================================================================
-# 5. ENTRY POINT
-# ==============================================================================
+            # 
+            
+            # 2. Main 3 Numbers
+            st.write("🔮 **3 SỐ CHÍNH (XÁC SUẤT CAO)**")
+            main_html = "".join([f'<div class="number-box"><div class="number-val">{n}</div></div>' for n in p['main_3']])
+            st.markdown(f'<div class="number-container">{main_html}</div>', unsafe_allow_html=True)
+
+            # 3. Support 4 Numbers
+            st.write("🎲 **4 SỐ LÓT (GIỮ VỐN)**")
+            sup_html = "".join([f'<div class="support-box">{n}</div>' for n in p['support_4']])
+            st.markdown(f'<div class="support-container">{sup_html}</div>', unsafe_allow_html=True)
+            
+            st.caption(f"💡 AI Logic: {p['logic']} | Confidence: {p['confidence']}%")
+
+            # 4. Xác nhận kết quả (Dạy AI)
+            st.markdown("---")
+            col_a, col_b = st.columns([2, 1])
+            actual = col_a.text_input("Nhập kết quả thực tế để dạy AI:", max_chars=5)
+            if col_b.button("✅ XÁC NHẬN", use_container_width=True):
+                if len(actual) == 5:
+                    # Kiểm tra thắng (trúng ít nhất 1 trong 3 số chính)
+                    is_win = any(d in actual for d in p['main_3'])
+                    
+                    # Cập nhật bộ nhớ AI
+                    st.session_state.ai_engine.update_weights(is_win)
+                    
+                    # Cập nhật Vốn
+                    bet = 10000 # Mặc định
+                    if is_win:
+                        st.session_state.bankroll['current'] += bet * 2
+                        st.balloons()
+                    else:
+                        st.session_state.bankroll['current'] -= bet
+                    
+                    # Lưu Log
+                    st.session_state.predictions_log.insert(0, {
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "pred": ",".join(p['main_3']),
+                        "actual": actual,
+                        "status": "THẮNG" if is_win else "THUA"
+                    })
+                    st.rerun()
+
+    with tab2:
+        c1, c2 = st.columns(2)
+        c1.metric("Vốn Hiện Tại", format_money(st.session_state.bankroll['current']))
+        
+        # Thống kê thắng thua
+        if st.session_state.predictions_log:
+            df = pd.DataFrame(st.session_state.predictions_log)
+            st.table(df)
+        else:
+            st.info("Chưa có lịch sử dự đoán.")
 
 if __name__ == "__main__":
     main()
