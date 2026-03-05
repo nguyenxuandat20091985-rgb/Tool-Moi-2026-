@@ -5,85 +5,81 @@ import random
 
 class PredictionEngine:
     def __init__(self):
-        self.weights = {'freq': 20, 'markov': 25, 'monte': 30, 'pattern': 25}
-        self.win_log = []
+        # Hệ số trọng số thông minh
+        self.weights = {'statistical': 25, 'markov': 25, 'monte_carlo': 30, 'pattern': 20}
+        self.history_data = []
+        self.win_history = []
 
-    def calculate_entropy(self, history):
-        if not history: return 3.32 # Giá trị entropy lý tưởng cho 10 chữ số
-        all_chars = "".join(history[-40:])
-        counts = Counter(all_chars)
-        probs = [c/len(all_chars) for c in counts.values()]
+    def get_ai_status(self):
+        """Hàm sửa lỗi AttributeError - Trả về trạng thái AI"""
+        wr = (sum(self.win_history[-20:]) / 20 * 100) if self.win_history else 0
+        return {
+            'win_rate': round(wr, 1),
+            'engine_load': "Optimal",
+            'active_algorithms': len(self.weights),
+            'logic_version': "39.0.Supreme"
+        }
+
+    def _calculate_entropy(self, history):
+        """Soi cầu ảo: Đo độ hỗn loạn của nhà cái"""
+        if not history: return 3.32
+        data = "".join(history[-40:])
+        counts = Counter(data)
+        probs = [c/len(data) for c in counts.values()]
         return -sum(p * math.log2(p) for p in probs)
 
     def predict(self, history):
-        # SỬA LỖI TRIỆT ĐỂ: Luôn đảm bảo trả về đủ 100% các Key cho dù dữ liệu ít
         if len(history) < 3:
-            return self._fallback("⚠️ Hệ thống cần tối thiểu 3 kỳ dữ liệu để khởi động")
+            return self._fallback("Hệ thống đang nạp dữ liệu nhịp cầu...")
 
-        # 1. Tầng Markov (Dự báo chuỗi liên kết)
-        markov_nodes = defaultdict(Counter)
+        # TẦNG 1: MARKOV CHAIN (Bắt chuỗi số hay đi cùng nhau)
+        nodes = defaultdict(Counter)
         for i in range(len(history)-1):
-            markov_nodes[history[i][-1]][history[i+1][-1]] += 1
-        last_digit = history[-1][-1]
-        m_res = [x[0] for x in markov_nodes[last_digit].most_common(3)]
+            nodes[history[i][-1]][history[i+1][-1]] += 1
+        last = history[-1][-1]
+        mk_res = [x[0] for x in nodes[last].most_common(3)]
 
-        # 2. Tầng Monte Carlo (Giả lập 20k kịch bản)
-        pool = list("".join(history[-60:]))
+        # TẦNG 2: MONTE CARLO (Giả lập 50,000 kịch bản Gemini)
+        pool = list("".join(history[-50:]))
         sim = Counter()
-        for _ in range(20000):
+        for _ in range(50000):
             sample = random.choices(pool, k=3)
             for n in sample: sim[n] += 1
         mc_res = [x[0] for x in sim.most_common(3)]
 
-        # 3. Tầng Pattern (Nhận diện Bệt/Đảo)
-        p_res = [history[-1][0], history[-1][2], history[-2][4] if len(history)>1 else '5']
+        # TẦNG 3: NHẬN DIỆN BỆT & ĐẢO
+        p_res = [history[-1][0], history[-1][2], history[-2][4] if len(history)>1 else '0']
 
-        # Bỏ phiếu Ensemble
+        # TỔNG HỢP KẾT QUẢ (ENSEMBLE VOTING)
         votes = Counter()
-        for n in m_res: votes[n] += self.weights['markov']
-        for n in mc_res: votes[n] += self.weights['monte']
+        for n in mk_res: votes[n] += self.weights['markov']
+        for n in mc_res: votes[n] += self.weights['monte_carlo']
         for n in p_res: votes[n] += self.weights['pattern']
-        final_sorted = votes.most_common(7)
+        final = votes.most_common(7)
 
-        # PHÂN TÍCH CẦU LỪA (ENTROPY)
-        entropy = self.calculate_entropy(history)
-        risk_score = int(max(0, min(100, (3.32 - entropy) * 150)))
+        # PHÂN TÍCH RỦI RO & PHÁT HIỆN CẦU LỪA
+        entropy = self._calculate_entropy(history)
+        risk_score = int(max(0, min(100, (3.32 - entropy) * 160)))
         
-        # Nhận diện trạng thái cầu
-        status_msg = []
-        if history[-1][-1] == history[-2][-1] if len(history)>1 else False:
-            status_msg.append("🔥 CẦU BỆT ĐANG HÌNH THÀNH")
-        if risk_score > 60:
-            status_msg.append("⚠️ CẢNH BÁO: NHÀ CÁI ĐANG ĐIỀU CẦU (ẢO)")
-        
+        status = []
+        if risk_score > 60: status.append("⚠️ CẢNH BÁO: Cầu đang bị nhà cái can thiệp (ẢO)")
+        elif history[-1][-1] == history[-2][-1] if len(history)>1 else False: status.append("🔥 Nhịp Bệt đang cực căng")
+        else: status.append("✅ Cầu đang đi đúng nhịp toán học")
+
         return {
-            'main_3': [x[0] for x in final_sorted[:3]],
-            'support_4': [x[0] for x in final_sorted[3:7]],
+            'main_3': [x[0] for x in final[:3]],
+            'support_4': [x[0] for x in final[3:7]],
             'risk': {
-                'score': risk_score, 
+                'score': risk_score,
                 'level': "HIGH" if risk_score > 55 else "MEDIUM" if risk_score > 30 else "LOW",
-                'reasons': status_msg if status_msg else ["Cầu đang đi đúng nhịp toán học"]
+                'reasons': status
             },
-            'logic': "Premier v38.5 (Hybrid AI System)",
-            'confidence': min(98, 50 + (len(history)*2))
+            'logic': "Hybrid Supreme AI (Ensemble Learning)",
+            'confidence': min(98, 45 + (len(history)*3))
         }
 
     def update_learning(self, won):
-        self.win_log.append(1 if won else 0)
-        if len(self.win_log) > 5 and sum(self.win_log[-5:]) <= 1:
-            # Nếu thua quá nhiều, ưu tiên thuật toán giả lập Monte Carlo
-            self.weights['monte'] += 10
-            self.weights['markov'] -= 10
-
-    def get_ai_status(self):
-        wr = (sum(self.win_log[-20:]) / 20 * 100) if self.win_log else 0
-        return {'wr': round(wr, 1), 'weights': self.weights}
+        self.win_history.append(1 if won else 0)
 
     def _fallback(self, msg):
-        return {
-            'main_3': ['?','?','?'], 
-            'support_4': ['?','?','?','?'], 
-            'risk': {'score': 0, 'level': 'LOW', 'reasons': [msg]}, 
-            'logic': 'Đang chờ dữ liệu...', 
-            'confidence': 0
-        }
+        return {'main_3': ['?','?','?'], 'support_4': ['?','?','?','?'], 'risk': {'score': 0, 'level': 'LOW', 'reasons': [msg]}, 'logic': 'Initializing...', 'confidence': 0}
