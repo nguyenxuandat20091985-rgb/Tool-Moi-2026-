@@ -1,271 +1,352 @@
 import streamlit as st
-import pandas as pd
-import re
+import numpy as np
 import random
-import math
 from collections import Counter, defaultdict
 
-# =========================
-# AI ENGINE
-# =========================
+st.set_page_config(page_title="TITAN GOD ENGINE v120", layout="wide")
 
-class TitanEngine:
+st.title("TITAN GOD ENGINE v120 – ULTIMATE AI")
 
-    def predict(self, history):
-
-        if len(history) < 3:
-            return None
-
-        # ---------- MARKOV CHAIN ----------
-        markov = defaultdict(Counter)
-
-        for i in range(len(history)-1):
-            last_digit = history[i][-1]
-            next_digit = history[i+1][-1]
-            markov[last_digit][next_digit] += 1
-
-        last = history[-1][-1]
-
-        mk_res = []
-
-        if last in markov:
-            mk_res = [x[0] for x in markov[last].most_common(3)]
-
-        # ---------- MONTE CARLO ----------
-        pool = list("".join(history[-80:]))
-
-        sim = Counter()
-
-        random.seed(42)
-
-        for _ in range(50000):
-            sample = random.choices(pool, k=3)
-            for n in sample:
-                sim[n] += 1
-
-        mc_res = [x[0] for x in sim.most_common(4)]
-
-        # ---------- PATTERN ----------
-        p_res = [
-            history[-1][0],
-            history[-1][2],
-            history[-1][4]
-        ]
-
-        # ---------- ENSEMBLE ----------
-        votes = Counter()
-
-        for n in mk_res:
-            votes[n] += 30
-
-        for n in mc_res:
-            votes[n] += 40
-
-        for n in p_res:
-            votes[n] += 20
-
-        final = votes.most_common(7)
-
-        main = [x[0] for x in final[:3]]
-        support = [x[0] for x in final[3:7]]
-
-        # ---------- RISK ----------
-        data = "".join(history[-40:])
-
-        counts = Counter(data)
-
-        probs = [c/len(data) for c in counts.values()]
-
-        entropy = -sum(p * math.log2(p) for p in probs)
-
-        risk_score = int(max(0, min(100, (3.32 - entropy) * 160)))
-
-        if risk_score > 60:
-            risk_lvl = "HIGH"
-        elif risk_score > 35:
-            risk_lvl = "MEDIUM"
-        else:
-            risk_lvl = "LOW"
-
-        return {
-            "main": main,
-            "support": support,
-            "risk": risk_score,
-            "risk_lvl": risk_lvl,
-            "freq": counts
-        }
-
-
-# =========================
-# STREAMLIT CONFIG
-# =========================
-
-st.set_page_config(
-    page_title="TITAN GOD ENGINE",
-    layout="wide"
-)
-
-# =========================
-# STYLE
-# =========================
-
-st.markdown("""
-<style>
-
-.stApp{
-background:#050505;
-color:white;
-}
-
-.header{
-font-size:32px;
-font-weight:900;
-text-align:center;
-color:#00f2ff;
-margin-top:10px;
-}
-
-.main-grid{
-display:flex;
-justify-content:center;
-gap:20px;
-margin-top:20px;
-}
-
-.card{
-background:#111;
-border:2px solid #00f2ff;
-border-radius:15px;
-width:90px;
-height:120px;
-display:flex;
-flex-direction:column;
-justify-content:center;
-align-items:center;
-box-shadow:0 0 15px rgba(0,242,255,0.4);
-}
-
-.num{
-font-size:45px;
-font-weight:900;
-}
-
-.tag{
-font-size:10px;
-color:#00f2ff;
-}
-
-.support{
-display:flex;
-gap:10px;
-justify-content:center;
-margin-top:20px;
-}
-
-.sup{
-background:#222;
-padding:10px 15px;
-border-radius:8px;
-font-size:22px;
-border:1px solid #555;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-# =========================
-# SESSION STATE
-# =========================
-
-if "engine" not in st.session_state:
-    st.session_state.engine = TitanEngine()
-
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-if "result" not in st.session_state:
-    st.session_state.result = None
-
-
-# =========================
-# UI
-# =========================
-
-st.markdown("<div class='header'>TITAN GOD ENGINE v50</div>", unsafe_allow_html=True)
+st.write("Nhập kết quả 5 số mỗi kỳ (mỗi dòng 1 kỳ)")
 
 raw = st.text_area(
-"Nhập kết quả 5 số mỗi kỳ",
-height=120,
-placeholder="Ví dụ:\n12345\n67890\n45678"
+"",
+"""18015
+49775
+14464
+23469
+99531
+"""
 )
 
-col1,col2 = st.columns(2)
+run = st.button("PHÂN TÍCH AI")
 
-with col1:
 
-    if st.button("PHÂN TÍCH"):
+##################################################
+# PARSE DATA
+##################################################
 
-        nums = re.findall(r'\d{5}', raw)
+def parse_data(text):
 
-        if nums:
+    rows = []
 
-            st.session_state.history = nums
+    for r in text.split("\n"):
 
-            res = st.session_state.engine.predict(nums)
+        r = r.strip()
 
-            st.session_state.result = res
+        if len(r) == 5 and r.isdigit():
 
-            st.rerun()
+            rows.append(r)
 
-with col2:
+    return rows
 
-    if st.button("RESET"):
 
-        st.session_state.history = []
+##################################################
+# FREQUENCY
+##################################################
 
-        st.session_state.result = None
+def digit_frequency(rows):
 
-        st.rerun()
+    digits = []
 
-# =========================
-# RESULT
-# =========================
+    for r in rows:
+        digits += list(r)
 
-if st.session_state.result:
+    return Counter(digits)
 
-    res = st.session_state.result
 
-    st.markdown("## 🔮 3 SỐ CHÍNH")
+##################################################
+# GAP ENGINE
+##################################################
 
-    main_html = ""
+def gap_analysis(rows):
 
-    for n in res["main"]:
+    gap = {str(i):0 for i in range(10)}
 
-        main_html += f"""
-        <div class='card'>
-        <div class='num'>{n}</div>
-        <div class='tag'>AI</div>
-        </div>
-        """
+    rev = rows[::-1]
 
-    st.markdown(f"<div class='main-grid'>{main_html}</div>", unsafe_allow_html=True)
+    for d in gap:
 
-    st.markdown("## 🎯 4 SỐ LÓT")
+        g = 0
 
-    sup_html=""
+        for r in rev:
 
-    for n in res["support"]:
+            if d in r:
+                break
 
-        sup_html += f"<div class='sup'>{n}</div>"
+            g += 1
 
-    st.markdown(f"<div class='support'>{sup_html}</div>", unsafe_allow_html=True)
+        gap[d] = g
 
-    st.markdown(f"## ⚠️ RỦI RO: {res['risk']}/100 - {res['risk_lvl']}")
+    return gap
 
-    st.markdown("## 📊 Digit Heatmap")
 
-    df = pd.DataFrame(
-        [{"digit":k,"freq":v} for k,v in res["freq"].items()]
-    )
+##################################################
+# POSITION ENGINE
+##################################################
 
-    st.bar_chart(df.set_index("digit"))
+def position_analysis(rows):
+
+    pos = [Counter() for _ in range(5)]
+
+    for r in rows:
+
+        for i,d in enumerate(r):
+
+            pos[i][d] += 1
+
+    score = {str(i):0 for i in range(10)}
+
+    for p in pos:
+
+        for d,c in p.items():
+
+            score[d] += c
+
+    return score
+
+
+##################################################
+# MARKOV ENGINE
+##################################################
+
+def markov_chain(rows):
+
+    table = defaultdict(lambda: Counter())
+
+    for r in rows:
+
+        for i in range(len(r)-1):
+
+            a = r[i]
+            b = r[i+1]
+
+            table[a][b] += 1
+
+    score = {str(i):0 for i in range(10)}
+
+    for a in table:
+
+        total = sum(table[a].values())
+
+        for b in table[a]:
+
+            score[b] += table[a][b] / total
+
+    return score
+
+
+##################################################
+# MONTE CARLO
+##################################################
+
+def monte_carlo(freq, sims=10000):
+
+    digits = list(freq.keys())
+
+    if len(digits) == 0:
+
+        digits = [str(i) for i in range(10)]
+        weights = [1]*10
+
+    else:
+
+        weights = list(freq.values())
+
+    prob = np.array(weights) / sum(weights)
+
+    counter = Counter()
+
+    for _ in range(sims):
+
+        draw = np.random.choice(digits,5,p=prob)
+
+        for d in draw:
+
+            counter[d] += 1
+
+    return counter
+
+
+##################################################
+# PATTERN ENGINE
+##################################################
+
+def pattern_engine(rows):
+
+    pattern = Counter()
+
+    for r in rows:
+
+        pattern.update(r)
+
+    score = {str(i):pattern.get(str(i),0) for i in range(10)}
+
+    return score
+
+
+##################################################
+# AI ENSEMBLE
+##################################################
+
+def ai_engine(rows):
+
+    freq = digit_frequency(rows)
+
+    gap = gap_analysis(rows)
+
+    pos = position_analysis(rows)
+
+    markov = markov_chain(rows)
+
+    monte = monte_carlo(freq)
+
+    pattern = pattern_engine(rows)
+
+    score = {str(i):0 for i in range(10)}
+
+    for i in range(10):
+
+        d = str(i)
+
+        score[d] += freq.get(d,0) * 1.2
+
+        score[d] += gap.get(d,0) * 2.5
+
+        score[d] += pos.get(d,0) * 1.3
+
+        score[d] += markov.get(d,0) * 3.0
+
+        score[d] += monte.get(d,0) * 0.01
+
+        score[d] += pattern.get(d,0) * 0.8
+
+        score[d] += random.random()
+
+    sort = sorted(score.items(), key=lambda x:x[1], reverse=True)
+
+    main = [x[0] for x in sort[:3]]
+
+    lot = [x[0] for x in sort[3:7]]
+
+    return main, lot, score
+
+
+##################################################
+# RISK ANALYSIS
+##################################################
+
+def risk(score):
+
+    values = list(score.values())
+
+    spread = max(values) - min(values)
+
+    if spread < 8:
+        return "LOW"
+
+    if spread < 16:
+        return "MEDIUM"
+
+    return "HIGH"
+
+
+##################################################
+# BACKTEST
+##################################################
+
+def backtest(rows):
+
+    if len(rows) < 25:
+
+        return 0
+
+    win = 0
+    total = 0
+
+    for i in range(20,len(rows)-1):
+
+        train = rows[:i]
+
+        main,_,_ = ai_engine(train)
+
+        next_draw = rows[i]
+
+        if any(d in next_draw for d in main):
+
+            win += 1
+
+        total += 1
+
+    if total == 0:
+
+        return 0
+
+    return round(win/total*100,2)
+
+
+##################################################
+# HEATMAP
+##################################################
+
+def heatmap(freq):
+
+    st.subheader("Digit Heatmap")
+
+    cols = st.columns(10)
+
+    for i in range(10):
+
+        d = str(i)
+
+        cols[i].metric(d,freq.get(d,0))
+
+
+##################################################
+# RUN
+##################################################
+
+if run:
+
+    rows = parse_data(raw)
+
+    if len(rows) == 0:
+
+        st.error("Dữ liệu không hợp lệ")
+
+    else:
+
+        main,lot,score = ai_engine(rows)
+
+        r = risk(score)
+
+        acc = backtest(rows)
+
+        freq = digit_frequency(rows)
+
+        st.subheader("🔮 3 SỐ CHÍNH")
+
+        c1,c2,c3 = st.columns(3)
+
+        c1.metric("AI",main[0])
+        c2.metric("AI",main[1])
+        c3.metric("AI",main[2])
+
+        st.subheader("🎯 4 SỐ LÓT")
+
+        c4,c5,c6,c7 = st.columns(4)
+
+        c4.metric("",lot[0])
+        c5.metric("",lot[1])
+        c6.metric("",lot[2])
+        c7.metric("",lot[3])
+
+        st.subheader("RISK LEVEL")
+
+        st.write(r)
+
+        st.subheader("BACKTEST ACCURACY")
+
+        st.write(str(acc)+" %")
+
+        heatmap(freq)
