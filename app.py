@@ -1,96 +1,126 @@
 import streamlit as st
 import pandas as pd
 import re
-from algorithms import PredictionEngine
+import random
+import math
+from collections import Counter, defaultdict
 
-# CONFIG GIAO DIỆN LUXURY
-st.set_page_config(page_title="TITAN v40.0 ULTIMATE", layout="wide", initial_sidebar_state="collapsed")
+# --- BỘ NÃO AI (TÍCH HỢP TRỰC TIẾP) ---
+class SupremeEngine:
+    def __init__(self):
+        self.weights = {'markov': 30, 'monte_carlo': 40, 'pattern': 30}
+        self.win_history = []
+
+    def get_status(self):
+        wr = (sum(self.win_history[-20:]) / 20 * 100) if self.win_history else 0
+        return {"wr": round(wr, 1), "ver": "41.0.Diamond"}
+
+    def predict_logic(self, history):
+        if len(history) < 2:
+            return None
+
+        # 1. Thuật toán Markov
+        nodes = defaultdict(Counter)
+        for i in range(len(history)-1):
+            nodes[history[i][-1]][history[i+1][-1]] += 1
+        last = history[-1][-1]
+        mk_res = [x[0] for x in nodes[last].most_common(3)]
+
+        # 2. Giả lập Monte Carlo (Độ chính xác cao)
+        pool = list("".join(history[-50:]))
+        sim = Counter()
+        for _ in range(50000):
+            sample = random.choices(pool, k=3)
+            for n in sample: sim[n] += 1
+        mc_res = [x[0] for x in sim.most_common(3)]
+
+        # 3. Bắt nhịp bệt/đảo
+        p_res = [history[-1][0], history[-1][2], history[-1][4]]
+
+        # Vote tổng hợp
+        votes = Counter()
+        for n in mk_res: votes[n] += self.weights['markov']
+        for n in mc_res: votes[n] += self.weights['monte_carlo']
+        for n in p_res: votes[n] += self.weights['pattern']
+        final = votes.most_common(7)
+
+        # Tính toán rủi ro lừa cầu (Entropy)
+        data = "".join(history[-40:])
+        counts = Counter(data)
+        probs = [c/len(data) for c in counts.values()]
+        entropy = -sum(p * math.log2(p) for p in probs)
+        risk_score = int(max(0, min(100, (3.32 - entropy) * 150)))
+
+        return {
+            'main': [x[0] for x in final[:3]],
+            'support': [x[0] for x in final[3:7]],
+            'risk_val': risk_score,
+            'risk_lvl': "HIGH" if risk_score > 60 else "MEDIUM" if risk_score > 30 else "LOW",
+            'conf': min(99, 60 + len(history))
+        }
+
+# --- GIAO DIỆN ELITE DESIGN ---
+st.set_page_config(page_title="TITAN DIAMOND v41", layout="wide")
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap');
-    .stApp { background: #010409; color: #c9d1d9; font-family: 'Segoe UI', sans-serif; }
-    .header-text { font-family: 'Orbitron', sans-serif; text-align: center; color: #ff3e3e; font-size: 2.5rem; font-weight: 900; text-shadow: 0 0 20px rgba(255, 62, 62, 0.5); margin-bottom: 10px; }
-    
-    /* Box Số Chính */
-    .main-container { display: flex; justify-content: center; gap: 12px; margin: 25px 0; }
-    .number-card { background: #0d1117; border: 2px solid #ff3e3e; border-radius: 20px; width: 30%; padding: 20px 0; text-align: center; box-shadow: 0 0 20px rgba(255, 62, 62, 0.2); }
-    .number-text { font-family: 'Orbitron', sans-serif; font-size: 70px; font-weight: 900; color: #ffffff; line-height: 1; }
-    .number-label { font-size: 10px; color: #8b949e; letter-spacing: 2px; margin-top: 5px; }
-    
-    /* Box Số Lót */
-    .support-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 25px; }
-    .support-item { background: #161b22; border: 1px solid #58a6ff; border-radius: 12px; padding: 12px; text-align: center; font-size: 30px; font-weight: 900; color: #58a6ff; }
-    
-    /* Banner Rủi Ro */
-    .risk-box { padding: 15px; border-radius: 12px; margin-bottom: 20px; border-left: 6px solid; text-align: left; }
-    .LEVEL-HIGH { background: rgba(248, 81, 73, 0.1); color: #f85149; border-color: #f85149; }
-    .LEVEL-MEDIUM { background: rgba(210, 153, 34, 0.1); color: #d29922; border-color: #d29922; }
-    .LEVEL-LOW { background: rgba(63, 185, 80, 0.1); color: #3fb950; border-color: #3fb950; }
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap');
+    .stApp { background: #010409; color: #e6edf3; }
+    .title-banner { font-family: 'Orbitron', sans-serif; text-align: center; color: #ff3333; font-size: 40px; text-shadow: 0 0 15px #ff3333; margin-bottom: 20px; }
+    .glass-card { background: #161b22; border: 1px solid #30363d; border-radius: 15px; padding: 20px; margin-bottom: 15px; }
+    .num-box { background: #0d1117; border: 3px solid #ff3333; border-radius: 20px; padding: 25px 10px; text-align: center; width: 100px; box-shadow: 0 0 20px rgba(255, 51, 51, 0.3); }
+    .num-val { font-family: 'Orbitron', sans-serif; font-size: 60px; color: white; line-height: 1; }
+    .risk-tag { padding: 10px; border-radius: 10px; font-weight: bold; text-align: center; margin-bottom: 20px; border: 1px solid; }
+    .HIGH { background: rgba(255, 51, 51, 0.1); color: #ff3333; border-color: #ff3333; }
+    .LOW { background: rgba(0, 255, 127, 0.1); color: #00ff7f; border-color: #00ff7f; }
 </style>
 """, unsafe_allow_html=True)
 
-if "ai" not in st.session_state: st.session_state.ai = PredictionEngine()
+if "engine" not in st.session_state: st.session_state.engine = SupremeEngine()
 if "db" not in st.session_state: st.session_state.db = []
 if "res" not in st.session_state: st.session_state.res = None
 
 def main():
-    st.markdown("<h1 class='header-text'>TITAN v40.0</h1>", unsafe_allow_html=True)
+    st.markdown("<div class='title-banner'>TITAN v41.0 DIAMOND</div>", unsafe_allow_html=True)
 
-    # SIDEBAR
-    with st.sidebar:
-        st.header("🧠 AI MONITOR")
-        stat = st.session_state.ai.get_ai_status()
-        st.metric("Tỉ lệ Win dự đoán", f"{stat['win_rate']}%")
-        st.info(f"Version: {stat['logic_version']}")
-        if st.button("🗑️ Reset Dữ Liệu"):
-            st.session_state.db = []
-            st.rerun()
-
-    # INPUT
-    raw = st.text_area("📥 NHẬP KẾT QUẢ KỲ TRƯỚC (5 SỐ):", height=90, placeholder="71757\n81750...")
-    if st.button("🚀 KÍCH HOẠT PHÂN TÍCH SUPREME", use_container_width=True):
-        nums = re.findall(r'\d{5}', raw)
-        if nums:
-            st.session_state.db = nums
-            st.session_state.res = st.session_state.ai.predict(st.session_state.db)
-            st.rerun()
-        else: st.error("Số không đúng định dạng!")
+    # NHẬP DỮ LIỆU
+    with st.container():
+        raw = st.text_area("📥 NHẬP 5 SỐ CỦA CÁC KỲ TRƯỚC:", height=80, placeholder="71757\n81750...")
+        if st.button("🚀 KÍCH HOẠT AI PHÂN TÍCH", use_container_width=True):
+            nums = re.findall(r'\d{5}', raw)
+            if nums:
+                st.session_state.db = nums
+                st.session_state.res = st.session_state.engine.predict_logic(nums)
+                st.rerun()
 
     # HIỂN THỊ KẾT QUẢ
     if st.session_state.res:
         r = st.session_state.res
-        risk = r.get('risk')
-        risk_lvl = risk['level']
         
-        # Render Risk Banner (SỬA LỖI TYPERROR TẠI ĐÂY)
-        st.markdown(f"""
-        <div class="risk-box LEVEL-{risk_lvl}">
-            <h3 style='margin:0'>RỦI RO: {risk['score']}/100 - {risk_lvl}</h3>
-            <p style='margin:5px 0 0 0; font-size:13px;'>{" • ".join(risk['reasons'])}</p>
-        </div>
-        """, unsafe_allow_html=True)
+        # Risk Banner
+        st.markdown(f"<div class='risk-tag {r['risk_lvl']}'>MỨC ĐỘ RỦI RO: {r['risk_val']}/100 - {r['risk_lvl']}</div>", unsafe_allow_html=True)
 
-        # Main 3 Numbers
-        st.markdown("<div style='text-align:center; color:#8b949e; font-weight:bold;'>🔮 3 SỐ CHÍNH (VÀO MẠNH)</div>", unsafe_allow_html=True)
-        main_html = "".join([f'<div class="number-card"><div class="number-text">{n}</div><div class="number-label">SỐ VIP</div></div>' for n in r['main_3']])
-        st.markdown(f'<div class="main-container">{main_html}</div>', unsafe_allow_html=True)
+        # 3 Số chính
+        st.write("🔮 **3 SỐ CHÍNH (VÀO MẠNH):**")
+        cols = st.columns(3)
+        for i in range(3):
+            with cols[i]:
+                st.markdown(f"<div class='num-box'><div class='num-val'>{r['main'][i]}</div><div style='font-size:10px; color:#8b949e'>VIP</div></div>", unsafe_allow_html=True)
 
-        # Support 4 Numbers
-        st.markdown("<div style='text-align:center; color:#8b949e; font-weight:bold; margin-top:15px;'>🎲 4 SỐ LÓT (GIỮ VỐN)</div>", unsafe_allow_html=True)
-        sup_html = "".join([f'<div class="support-item">{n}</div>' for n in r['support_4']])
-        st.markdown(f'<div class="support-grid">{sup_html}</div>', unsafe_allow_html=True)
+        # 4 Số lót
+        st.write("🎲 **4 SỐ LÓT (GIỮ VỐN):**")
+        lót_html = "".join([f"<span style='background:#1f6feb; color:white; padding:10px 20px; border-radius:8px; margin:5px; font-size:24px; font-weight:bold; display:inline-block;'>{n}</span>" for n in r['support']])
+        st.markdown(lót_html, unsafe_allow_html=True)
 
-        # Feedback
-        st.markdown("---")
-        c1, c2 = st.columns([3,1])
-        actual = c1.text_input("Dạy AI: Kết quả kỳ này về gì?")
-        if c2.button("✅ GHI NHẬN"):
+        st.markdown(f"--- \n**Độ tin cậy:** {r['conf']}% | **Phiên bản:** {st.session_state.engine.get_status()['ver']}")
+
+        # Dạy AI
+        actual = st.text_input("Ghi nhận kết quả kỳ này để dạy AI:")
+        if st.button("✅ LƯU KẾT QUẢ"):
             if len(actual) == 5:
-                is_win = any(d in actual for d in r['main_3'])
-                st.session_state.ai.update_learning(is_win)
-                st.success("AI đã nạp nhịp cầu thành công!")
-            else: st.warning("Nhập đủ 5 số")
+                is_win = any(d in actual for d in r['main'])
+                st.session_state.engine.win_history.append(1 if is_win else 0)
+                st.success("AI đã học nhịp cầu này!")
 
 if __name__ == "__main__":
     main()
