@@ -1,5 +1,5 @@
 # ==============================================================================
-# TITAN AI ENGINE v2.1 - FIXED TEXT VISIBILITY
+# TITAN AI ENGINE v2.2 - FIXED LOGIC BUG
 # ==============================================================================
 
 import streamlit as st
@@ -15,196 +15,86 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # ==============================================================================
-# 1. FIXED CSS - Visible Text Input
+# 1. CSS STYLING
 # ==============================================================================
 
-st.set_page_config(
-    page_title="🎯 TITAN AI ENGINE",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="🎯 TITAN AI ENGINE", page_icon="🧠", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
-    /* Global Styles */
-    .stApp {
-        background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
-        color: #e6edf3;
-        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    }
+    .stApp { background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%); color: #e6edf3; }
     #MainMenu, footer, header { visibility: hidden; }
     
-    /* Header Card */
     .header-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 20px;
-        padding: 30px;
-        text-align: center;
-        margin-bottom: 25px;
-        box-shadow: 0 10px 40px rgba(102,126,234,0.3);
+        border-radius: 20px; padding: 30px; text-align: center; margin-bottom: 25px;
     }
-    .header-title {
-        font-size: 32px;
-        font-weight: 900;
-        color: white;
-        margin: 0;
-    }
-    .header-subtitle {
-        font-size: 14px;
-        color: rgba(255,255,255,0.9);
-        margin-top: 8px;
-    }
+    .header-title { font-size: 32px; font-weight: 900; color: white; margin: 0; }
+    .header-subtitle { font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 8px; }
     
-    /* Main Numbers - Horizontal Grid */
     .main-numbers-container {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 15px;
-        margin: 25px 0;
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 25px 0;
     }
     .main-number-card {
         background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        border-radius: 20px;
-        padding: 30px 20px;
-        text-align: center;
-        box-shadow: 0 8px 30px rgba(245,87,108,0.4);
+        border-radius: 20px; padding: 30px 20px; text-align: center;
     }
-    .main-number {
-        font-size: 64px;
-        font-weight: 900;
-        color: white;
-        line-height: 1;
-    }
-    .number-label {
-        font-size: 12px;
-        color: rgba(255,255,255,0.9);
-        margin-top: 10px;
-        text-transform: uppercase;
-    }
+    .main-number { font-size: 64px; font-weight: 900; color: white; line-height: 1; }
+    .number-label { font-size: 12px; color: rgba(255,255,255,0.9); margin-top: 10px; text-transform: uppercase; }
     
-    /* Support Numbers */
     .support-container {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 12px;
-        margin: 25px 0;
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 25px 0;
     }
     .support-card {
         background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        border-radius: 15px;
-        padding: 22px 15px;
-        text-align: center;
+        border-radius: 15px; padding: 22px 15px; text-align: center;
     }
-    .support-number {
-        font-size: 38px;
-        font-weight: 800;
-        color: white;
-    }
-    .support-label {
-        font-size: 11px;
-        color: rgba(255,255,255,0.9);
-        margin-top: 8px;
-    }
+    .support-number { font-size: 38px; font-weight: 800; color: white; }
+    .support-label { font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 8px; }
     
-    /* Status Banner */
     .status-banner {
-        padding: 15px 25px;
-        border-radius: 12px;
-        text-align: center;
-        font-weight: 700;
-        font-size: 15px;
-        margin: 20px 0;
+        padding: 15px 25px; border-radius: 12px; text-align: center;
+        font-weight: 700; font-size: 15px; margin: 20px 0;
     }
-    .status-ok {
-        background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-        color: #065f46;
-    }
-    .status-warn {
-        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-        color: #7c2d12;
-    }
-    .status-stop {
-        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
-        color: white;
-    }
+    .status-ok { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #065f46; }
+    .status-warn { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #7c2d12; }
+    .status-stop { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white; }
     
-    /* Info Card */
     .info-card {
-        background: rgba(255,255,255,0.05);
-        border-left: 4px solid #667eea;
-        border-radius: 10px;
-        padding: 15px 20px;
-        margin: 15px 0;
+        background: rgba(255,255,255,0.05); border-left: 4px solid #667eea;
+        border-radius: 10px; padding: 15px 20px; margin: 15px 0;
     }
     
-    /* Buttons */
     .stButton > button {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white !important;
-        border: none;
-        border-radius: 12px;
-        font-weight: 700;
-        padding: 14px 32px;
-        font-size: 15px;
+        color: white !important; border: none; border-radius: 12px;
+        font-weight: 700; padding: 14px 32px; font-size: 15px;
     }
     
-    /* FIXED: Text Area - Visible Text */
     .stTextArea textarea {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border: 2px solid #667eea !important;
-        border-radius: 12px;
-        font-size: 16px;
+        background-color: #1e293b !important; color: #ffffff !important;
+        border: 2px solid #667eea !important; border-radius: 12px; font-size: 16px;
     }
-    .stTextArea textarea::placeholder {
-        color: #94a3b8 !important;
-        opacity: 0.7;
-    }
-    
-    /* FIXED: Text Input - Visible Text */
     .stTextInput input {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
+        background-color: #1e293b !important; color: #ffffff !important;
         border: 2px solid #667eea !important;
     }
-    .stTextInput input::placeholder {
-        color: #94a3b8 !important;
-    }
     
-    /* Mobile Responsive */
     @media (max-width: 600px) {
-        .main-numbers-container {
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-        .main-number {
-            font-size: 48px;
-        }
-        .support-container {
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-        }
-        .support-number {
-            font-size: 28px;
-        }
-        .header-title {
-            font-size: 24px;
-        }
+        .main-number { font-size: 48px; }
+        .support-number { font-size: 28px; }
+        .header-title { font-size: 24px; }
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. AI ENGINE (Keep same as before)
+# 2. AI ENGINE
 # ==============================================================================
 
 class TitanAI:
     def __init__(self):
-        self.weights = {
-            'frequency': 25, 'gap': 20, 'markov': 20,
-            'monte_carlo': 15, 'pattern': 12, 'hot_cold': 8
-        }
+        self.weights = {'frequency': 25, 'gap': 20, 'markov': 20, 'monte_carlo': 15, 'pattern': 12, 'hot_cold': 8}
     
     def analyze(self, history, max_simulations=2000):
         if not history or len(history) < 15:
@@ -212,6 +102,7 @@ class TitanAI:
         clean_data = self._clean_history(history)
         if len(clean_data) < 15:
             return self._fallback("Cần ít nhất 15 kỳ")
+        
         results = {}
         results['frequency'] = self._analyze_frequency(clean_data)
         results['gap'] = self._analyze_gap(clean_data)
@@ -219,16 +110,15 @@ class TitanAI:
         results['monte_carlo'] = self._analyze_monte_carlo(clean_data, max_simulations)
         results['pattern'] = self._analyze_pattern(clean_data)
         results['hot_cold'] = self._analyze_hot_cold(clean_data)
+        
         ensemble = self._ensemble_vote(results)
         stats_df = self._build_stats_df(clean_data, results)
         risk = self._calculate_risk(clean_data)
+        
         return {
-            'main_3': ensemble['main_3'],
-            'support_4': ensemble['support_4'],
-            'stats_df': stats_df,
-            'risk': risk,
-            'confidence': ensemble['confidence'],
-            'logic': self._build_logic(results, ensemble)
+            'main_3': ensemble['main_3'], 'support_4': ensemble['support_4'],
+            'stats_df': stats_df, 'risk': risk,
+            'confidence': ensemble['confidence'], 'logic': self._build_logic(results, ensemble)
         }
     
     def _clean_history(self, history):
@@ -451,16 +341,14 @@ class TitanAI:
     
     def _fallback(self, msg="Chưa đủ dữ liệu"):
         return {
-            'main_3': ['?', '?', '?'],
-            'support_4': ['0', '0', '0', '0'],
+            'main_3': ['?', '?', '?'], 'support_4': ['0', '0', '0', '0'],
             'stats_df': pd.DataFrame({'Digit': list('0123456789'), 'AI_Score': [0]*10}),
             'risk': {'score': 0, 'level': 'LOW', 'reason': msg},
-            'confidence': 0,
-            'logic': msg
+            'confidence': 0, 'logic': msg
         }
 
 # ==============================================================================
-# 3. MAIN APPLICATION
+# 3. MAIN APPLICATION - FIXED LOGIC
 # ==============================================================================
 
 def main():
@@ -511,21 +399,36 @@ def main():
         if st.button("🔄 Mới", use_container_width=True):
             st.rerun()
     
-    # Process
+    # FIXED: Process Analysis Logic
     if analyze_btn and raw_input.strip():
         with st.spinner("🧠 Đang phân tích..."):
+            # Extract 5-digit numbers
             numbers = re.findall(r'\d{5}', raw_input)
+            
             if not numbers:
                 st.error("❌ Không tìm thấy số 5 chữ số!")
             else:
-                existing = set(st.session_state.db)
-                added = sum(1 for n in numbers if n not in existing and not existing.add(n))
-                st.session_state.db = [n for n in numbers if n not in existing] + st.session_state.db
-                if len(st.session_state.db) > 500:
-                    st.session_state.db = st.session_state.db[:500]
-                if added > 0:
-                    st.success(f"✅ Đã thêm {added} số mới")
+                # FIXED: Properly count and add new numbers
+                existing_set = set(st.session_state.db)
+                new_numbers = []
+                
+                for n in numbers:
+                    if n not in existing_set:
+                        new_numbers.append(n)
+                        existing_set.add(n)
+                
+                # Add new numbers to database (newest first)
+                if new_numbers:
+                    st.session_state.db = new_numbers + st.session_state.db
+                    # Limit to 500
+                    if len(st.session_state.db) > 500:
+                        st.session_state.db = st.session_state.db[:500]
+                    
+                    st.success(f"✅ Đã thêm {len(new_numbers)} số mới")
+                
+                # Check if enough data
                 if len(st.session_state.db) >= 15:
+                    # Run AI analysis
                     st.session_state.result = st.session_state.ai.analyze(st.session_state.db)
                     st.rerun()
                 else:
@@ -588,7 +491,7 @@ def main():
                     is_win = set(main_3).issubset(set(actual))
                     st.success("🎉 TRÚNG!" if is_win else "❌ Trượt")
     
-    st.markdown('<div style="text-align:center;color:#8b949e;padding:20px;">TITAN AI v2.1 | Fixed Text Visibility</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;color:#8b949e;padding:20px;">TITAN AI v2.2 | Fixed Logic Bug</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
