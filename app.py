@@ -1,243 +1,287 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import re
 import random
-from collections import Counter
-from itertools import combinations
+import math
+from collections import Counter, defaultdict
 
-st.set_page_config(page_title="TITAN v150 CASINO CORE", layout="wide")
+# ================================
+# TITAN GOD ENGINE v45
+# ================================
 
-# ---------------- UI STYLE ---------------- #
+class TitanGodEngine:
 
-st.markdown("""
-<style>
-.stApp {background-color:#010409;color:#e6edf3}
-.main-title{
-font-size:40px;
-text-align:center;
-color:#00d4ff;
-font-weight:900
-}
-.card{
-background:#0d1117;
-padding:15px;
-border-radius:10px;
-border:1px solid #30363d
-}
-.number{
-font-size:60px;
-text-align:center;
-font-weight:900;
-color:#ff3e3e
-}
-</style>
-""", unsafe_allow_html=True)
+    def __init__(self):
 
-# ---------------- DATA PROCESSING ---------------- #
+        self.weights = {
+            "frequency":20,
+            "hotcold":15,
+            "cycle":15,
+            "markov":20,
+            "montecarlo":20,
+            "pattern":10
+        }
 
-def parse_history(text):
-    nums = re.findall(r'\d{5}', text)
-    return nums
+    # ------------------------------
+    # Frequency Engine
+    # ------------------------------
+    def frequency_engine(self,history):
 
+        data="".join(history[-80:])
+        c=Counter(data)
 
-def split_digits(history):
-    data=[]
-    for num in history:
-        data.append([int(x) for x in num])
-    return data
+        return [x[0] for x in c.most_common(5)]
 
+    # ------------------------------
+    # Hot Cold Engine
+    # ------------------------------
 
-# ---------------- STAT ENGINE ---------------- #
+    def hotcold_engine(self,history):
 
-class TitanEngine:
+        recent="".join(history[-20:])
+        c=Counter(recent)
 
-    def __init__(self, history):
+        hot=[x[0] for x in c.most_common(3)]
 
-        self.history=history
-        self.dataset=split_digits(history)
+        all_digits=set("0123456789")
+        cold=list(all_digits-set(c.keys()))
 
-    # digit frequency
-    def digit_frequency(self):
+        return hot+cold[:2]
 
-        digits="".join(self.history)
-        return Counter(digits)
+    # ------------------------------
+    # Cycle Engine
+    # ------------------------------
 
-    # rolling frequency
-    def recent_frequency(self,window=20):
+    def cycle_engine(self,history):
 
-        recent=self.history[-window:]
-        digits="".join(recent)
-
-        return Counter(digits)
-
-    # gap analysis
-    def gap_analysis(self):
-
+        digits="0123456789"
         gap={}
 
-        for d in range(10):
-
-            last=None
-
-            for i,v in enumerate(self.history[::-1]):
-
-                if str(d) in v:
-                    last=i
+        for d in digits:
+            for i in range(len(history)-1,-1,-1):
+                if d in history[i]:
+                    gap[d]=len(history)-i
                     break
 
-            gap[str(d)]=last if last else 100
+        ranked=sorted(gap.items(),key=lambda x:x[1],reverse=True)
 
-        return gap
+        return [x[0] for x in ranked[:5]]
 
-    # triplet correlation
-    def triplet_matrix(self):
+    # ------------------------------
+    # Markov Engine
+    # ------------------------------
 
-        counter=Counter()
+    def markov_engine(self,history):
 
-        for row in self.history:
+        nodes=defaultdict(Counter)
 
-            s=sorted(list(set(row)))
+        for i in range(len(history)-1):
+            a=history[i][-1]
+            b=history[i+1][-1]
+            nodes[a][b]+=1
 
-            if len(s)>=3:
+        last=history[-1][-1]
 
-                for comb in combinations(s,3):
-                    counter[comb]+=1
+        return [x[0] for x in nodes[last].most_common(5)]
 
-        return counter
+    # ------------------------------
+    # Monte Carlo Engine
+    # ------------------------------
 
-    # monte carlo
-    def monte_carlo(self,sim=100000):
+    def montecarlo_engine(self,history):
 
-        digits=list("0123456789")
-        result=Counter()
+        pool=list("".join(history[-60:]))
 
-        freq=self.digit_frequency()
+        sim=Counter()
 
-        total=sum(freq.values())
+        for _ in range(200000):
 
-        prob=[freq[d]/total if d in freq else 0.1 for d in digits]
+            sample=random.choices(pool,k=3)
 
-        for _ in range(sim):
+            for n in sample:
+                sim[n]+=1
 
-            draw=np.random.choice(digits,5,p=prob)
+        return [x[0] for x in sim.most_common(5)]
 
-            unique=set(draw)
+    # ------------------------------
+    # Pattern Engine
+    # ------------------------------
 
-            for comb in combinations(unique,3):
-                result[tuple(sorted(comb))]+=1
+    def pattern_engine(self,history):
 
-        return result
+        last=history[-1]
 
-    # scoring engine
-    def score_combinations(self):
+        return list(set([
+            last[0],
+            last[2],
+            last[4]
+        ]))
 
-        combos=list(combinations("0123456789",3))
+    # ------------------------------
+    # Momentum Engine
+    # ------------------------------
 
-        freq=self.digit_frequency()
+    def momentum_engine(self,history):
 
-        recent=self.recent_frequency()
+        prev="".join(history[-40:-20])
+        now="".join(history[-20:])
 
-        gap=self.gap_analysis()
+        c1=Counter(prev)
+        c2=Counter(now)
 
-        trip=self.triplet_matrix()
+        diff={}
 
-        monte=self.monte_carlo(20000)
+        for d in "0123456789":
 
-        scores=[]
+            diff[d]=c2[d]-c1[d]
 
-        for c in combos:
+        ranked=sorted(diff.items(),key=lambda x:x[1],reverse=True)
 
-            f=sum(freq[d] for d in c)
+        return [x[0] for x in ranked[:4]]
 
-            r=sum(recent[d] for d in c)
+    # ------------------------------
+    # Entropy Risk
+    # ------------------------------
 
-            g=sum(gap[d] for d in c)
+    def risk_engine(self,history):
 
-            t=trip[c] if c in trip else 0
+        data="".join(history[-40:])
 
-            m=monte[c] if c in monte else 0
+        c=Counter(data)
 
-            score=(
-            f*0.2+
-            r*0.2+
-            (100-g)*0.1+
-            t*0.3+
-            m*0.2
-            )
+        probs=[v/len(data) for v in c.values()]
 
-            scores.append((c,score))
+        entropy=-sum(p*math.log2(p) for p in probs)
 
-        scores.sort(key=lambda x:x[1],reverse=True)
+        score=int(max(0,min(100,(3.32-entropy)*160)))
 
-        return scores
+        if score>60:
+            lvl="HIGH"
+        elif score>35:
+            lvl="MEDIUM"
+        else:
+            lvl="LOW"
 
+        return score,lvl
 
-# ---------------- DASHBOARD ---------------- #
+    # ------------------------------
+    # Ensemble Voting
+    # ------------------------------
 
-st.markdown("<div class='main-title'>TITAN v150 CASINO CORE</div>", unsafe_allow_html=True)
+    def ensemble(self,history):
 
-with st.expander("NHẬP DỮ LIỆU LỊCH SỬ", expanded=False):
+        votes=Counter()
 
-    raw=st.text_area("Dán kết quả lịch sử",height=200)
+        engines={
+            "frequency":self.frequency_engine(history),
+            "hotcold":self.hotcold_engine(history),
+            "cycle":self.cycle_engine(history),
+            "markov":self.markov_engine(history),
+            "montecarlo":self.montecarlo_engine(history),
+            "pattern":self.pattern_engine(history),
+            "momentum":self.momentum_engine(history)
+        }
 
-    if st.button("CẬP NHẬT"):
+        for eng,res in engines.items():
 
-        history=parse_history(raw)
+            w=self.weights.get(eng,10)
 
-        st.session_state.history=history
+            for d in res:
+                votes[d]+=w
 
-        st.success("Đã cập nhật dữ liệu")
+        ranked=votes.most_common(7)
 
+        return [x[0] for x in ranked[:3]],[x[0] for x in ranked[3:7]]
 
-# ---------------- MAIN ---------------- #
+    # ------------------------------
+    # Backtest Engine
+    # ------------------------------
 
-if "history" in st.session_state and len(st.session_state.history)>10:
+    def backtest(self,history):
 
-    history=st.session_state.history
+        if len(history)<30:
+            return 0
 
-    engine=TitanEngine(history)
+        win=0
+        total=0
 
-    c1,c2,c3,c4=st.columns(4)
+        for i in range(20,len(history)-1):
 
-    c1.metric("TỔNG KỲ",len(history))
+            sample=history[:i]
 
-    c2.metric("TẦN SUẤT SỐ KHÁC",len(set("".join(history))))
+            main,_=self.ensemble(sample)
 
-    c3.metric("AI CONFIDENCE","92%")
+            next_draw=history[i]
 
-    c4.metric("SIMULATION","20000")
+            if all(x in next_draw for x in main):
+                win+=1
 
-    st.divider()
+            total+=1
 
-    scores=engine.score_combinations()
+        if total==0:
+            return 0
 
-    top=scores[:10]
+        return round((win/total)*100,2)
 
-    st.subheader("TOP BỘ 3 DỰ ĐOÁN")
+    # ------------------------------
+    # Main Predict
+    # ------------------------------
 
-    cols=st.columns(5)
+    def predict(self,history):
 
-    for i,(comb,score) in enumerate(top[:5]):
+        main,support=self.ensemble(history)
 
-        with cols[i]:
+        risk_val,risk_lvl=self.risk_engine(history)
 
-            st.markdown(f"<div class='card'><div class='number'>{comb[0]} {comb[1]} {comb[2]}</div></div>",unsafe_allow_html=True)
+        acc=self.backtest(history)
 
-    st.subheader("BẢNG XẾP HẠNG")
+        return {
+            "main":main,
+            "support":support,
+            "risk_val":risk_val,
+            "risk_lvl":risk_lvl,
+            "accuracy":acc
+        }
 
-    df=pd.DataFrame(top,columns=["Combo","Score"])
 
-    st.dataframe(df)
+# ================================
+# UI TITAN
+# ================================
 
-    st.subheader("TẦN SUẤT SỐ")
+st.set_page_config(page_title="TITAN GOD ENGINE",layout="wide")
 
-    freq=engine.digit_frequency()
+st.title("TITAN GOD ENGINE v45")
 
-    df_freq=pd.DataFrame(freq.items(),columns=["Digit","Frequency"])
+if "engine" not in st.session_state:
+    st.session_state.engine=TitanGodEngine()
 
-    st.bar_chart(df_freq.set_index("Digit"))
+if "history" not in st.session_state:
+    st.session_state.history=[]
 
-else:
+raw=st.text_area("Nhập kết quả 5 số mỗi kỳ")
 
-    st.warning("Nhập ít nhất 10 kỳ dữ liệu để AI phân tích")
+if st.button("PHÂN TÍCH"):
+
+    nums=re.findall(r"\d{5}",raw)
+
+    if nums:
+
+        st.session_state.history=nums
+
+        res=st.session_state.engine.predict(nums)
+
+        st.subheader("3 SỐ CHÍNH")
+
+        st.write(res["main"])
+
+        st.subheader("4 SỐ LÓT")
+
+        st.write(res["support"])
+
+        st.subheader("RỦI RO")
+
+        st.write(res["risk_lvl"],res["risk_val"])
+
+        st.subheader("BACKTEST ACCURACY")
+
+        st.write(str(res["accuracy"])+" %")
