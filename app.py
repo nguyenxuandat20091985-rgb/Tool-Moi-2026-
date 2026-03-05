@@ -5,152 +5,109 @@ import random
 import math
 from collections import Counter, defaultdict
 
-# ===============================
-# TITAN GOD ENGINE v50
-# ===============================
+# =========================
+# AI ENGINE
+# =========================
 
 class TitanEngine:
 
-    def __init__(self):
-        self.weights = {
-            "markov":25,
-            "monte":25,
-            "freq":20,
-            "cycle":15,
-            "pattern":15
-        }
+    def predict(self, history):
 
-    # ---------------------------
-    # Frequency
-    # ---------------------------
-    def frequency(self,history):
-        digits="".join(history)
-        return Counter(digits)
+        if len(history) < 3:
+            return None
 
-    # ---------------------------
-    # Cycle detection
-    # ---------------------------
-    def cycle_score(self,history):
-        last_seen={str(i):-1 for i in range(10)}
-        for i,h in enumerate(history[::-1]):
-            for d in set(h):
-                if last_seen[d]==-1:
-                    last_seen[d]=i
-
-        score={}
-        for d in last_seen:
-            score[d]=last_seen[d]
-
-        return score
-
-    # ---------------------------
-    # Markov
-    # ---------------------------
-    def markov(self,history):
-
-        nodes=defaultdict(Counter)
+        # ---------- MARKOV CHAIN ----------
+        markov = defaultdict(Counter)
 
         for i in range(len(history)-1):
-            a=history[i][-1]
-            b=history[i+1][-1]
-            nodes[a][b]+=1
+            last_digit = history[i][-1]
+            next_digit = history[i+1][-1]
+            markov[last_digit][next_digit] += 1
 
-        last=history[-1][-1]
+        last = history[-1][-1]
 
-        return [x[0] for x in nodes[last].most_common(5)]
+        mk_res = []
 
-    # ---------------------------
-    # Monte Carlo
-    # ---------------------------
-    def monte_carlo(self,history):
+        if last in markov:
+            mk_res = [x[0] for x in markov[last].most_common(3)]
 
-        pool=list("".join(history[-80:]))
+        # ---------- MONTE CARLO ----------
+        pool = list("".join(history[-80:]))
 
-        sim=Counter()
+        sim = Counter()
 
-        for _ in range(200000):
+        random.seed(42)
 
-            sample=random.choices(pool,k=3)
+        for _ in range(50000):
+            sample = random.choices(pool, k=3)
+            for n in sample:
+                sim[n] += 1
 
-            for s in sample:
-                sim[s]+=1
+        mc_res = [x[0] for x in sim.most_common(4)]
 
-        return [x[0] for x in sim.most_common(5)]
+        # ---------- PATTERN ----------
+        p_res = [
+            history[-1][0],
+            history[-1][2],
+            history[-1][4]
+        ]
 
-    # ---------------------------
-    # Pattern
-    # ---------------------------
-    def pattern(self,history):
+        # ---------- ENSEMBLE ----------
+        votes = Counter()
 
-        last=history[-1]
+        for n in mk_res:
+            votes[n] += 30
 
-        return [last[0],last[2],last[4]]
+        for n in mc_res:
+            votes[n] += 40
 
-    # ---------------------------
-    # Entropy
-    # ---------------------------
-    def entropy(self,history):
+        for n in p_res:
+            votes[n] += 20
 
-        data="".join(history[-50:])
+        final = votes.most_common(7)
 
-        counts=Counter(data)
+        main = [x[0] for x in final[:3]]
+        support = [x[0] for x in final[3:7]]
 
-        probs=[c/len(data) for c in counts.values()]
+        # ---------- RISK ----------
+        data = "".join(history[-40:])
 
-        ent=-sum(p*math.log2(p) for p in probs)
+        counts = Counter(data)
 
-        risk=int(max(0,min(100,(3.32-ent)*160)))
+        probs = [c/len(data) for c in counts.values()]
 
-        return risk
+        entropy = -sum(p * math.log2(p) for p in probs)
 
-    # ---------------------------
-    # Ensemble Prediction
-    # ---------------------------
-    def predict(self,history):
+        risk_score = int(max(0, min(100, (3.32 - entropy) * 160)))
 
-        freq=self.frequency(history)
+        if risk_score > 60:
+            risk_lvl = "HIGH"
+        elif risk_score > 35:
+            risk_lvl = "MEDIUM"
+        else:
+            risk_lvl = "LOW"
 
-        cycle=self.cycle_score(history)
-
-        mk=self.markov(history)
-
-        mc=self.monte_carlo(history)
-
-        pt=self.pattern(history)
-
-        votes=Counter()
-
-        for k,v in freq.items():
-            votes[k]+=v*self.weights["freq"]
-
-        for d,c in cycle.items():
-            votes[d]+=c*self.weights["cycle"]
-
-        for n in mk:
-            votes[n]+=self.weights["markov"]
-
-        for n in mc:
-            votes[n]+=self.weights["monte"]
-
-        for n in pt:
-            votes[n]+=self.weights["pattern"]
-
-        final=votes.most_common(7)
-
-        risk=self.entropy(history)
-
-        return{
-            "main":[x[0] for x in final[:3]],
-            "support":[x[0] for x in final[3:7]],
-            "risk":risk
+        return {
+            "main": main,
+            "support": support,
+            "risk": risk_score,
+            "risk_lvl": risk_lvl,
+            "freq": counts
         }
 
 
-# ===============================
-# UI
-# ===============================
+# =========================
+# STREAMLIT CONFIG
+# =========================
 
-st.set_page_config(page_title="TITAN GOD ENGINE",layout="wide")
+st.set_page_config(
+    page_title="TITAN GOD ENGINE",
+    layout="wide"
+)
+
+# =========================
+# STYLE
+# =========================
 
 st.markdown("""
 <style>
@@ -161,11 +118,11 @@ color:white;
 }
 
 .header{
-font-size:34px;
-text-align:center;
+font-size:32px;
 font-weight:900;
+text-align:center;
 color:#00f2ff;
-margin-bottom:10px;
+margin-top:10px;
 }
 
 .main-grid{
@@ -179,17 +136,17 @@ margin-top:20px;
 background:#111;
 border:2px solid #00f2ff;
 border-radius:15px;
-width:100px;
-height:130px;
+width:90px;
+height:120px;
 display:flex;
 flex-direction:column;
 justify-content:center;
 align-items:center;
-box-shadow:0 0 20px rgba(0,242,255,0.4);
+box-shadow:0 0 15px rgba(0,242,255,0.4);
 }
 
 .num{
-font-size:50px;
+font-size:45px;
 font-weight:900;
 }
 
@@ -200,8 +157,8 @@ color:#00f2ff;
 
 .support{
 display:flex;
-justify-content:center;
 gap:10px;
+justify-content:center;
 margin-top:20px;
 }
 
@@ -210,108 +167,105 @@ background:#222;
 padding:10px 15px;
 border-radius:8px;
 font-size:22px;
-border:1px solid #58a6ff;
-}
-
-.risk{
-text-align:center;
-font-size:20px;
-font-weight:bold;
-margin-top:25px;
+border:1px solid #555;
 }
 
 </style>
-""",unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# ===============================
-# SESSION
-# ===============================
+# =========================
+# SESSION STATE
+# =========================
 
 if "engine" not in st.session_state:
-    st.session_state.engine=TitanEngine()
+    st.session_state.engine = TitanEngine()
 
 if "history" not in st.session_state:
-    st.session_state.history=[]
+    st.session_state.history = []
 
 if "result" not in st.session_state:
-    st.session_state.result=None
+    st.session_state.result = None
 
-# ===============================
-# HEADER
-# ===============================
 
-st.markdown("<div class='header'>TITAN GOD ENGINE v50</div>",unsafe_allow_html=True)
+# =========================
+# UI
+# =========================
 
-# ===============================
-# INPUT
-# ===============================
+st.markdown("<div class='header'>TITAN GOD ENGINE v50</div>", unsafe_allow_html=True)
 
-with st.expander("📥 Nhập kết quả 5 số mỗi kỳ",expanded=True):
+raw = st.text_area(
+"Nhập kết quả 5 số mỗi kỳ",
+height=120,
+placeholder="Ví dụ:\n12345\n67890\n45678"
+)
 
-    raw=st.text_area("",height=120,placeholder="Ví dụ:\n12345\n67890\n45821")
+col1,col2 = st.columns(2)
+
+with col1:
 
     if st.button("PHÂN TÍCH"):
 
-        nums=re.findall(r'\d{5}',raw)
+        nums = re.findall(r'\d{5}', raw)
 
         if nums:
 
-            st.session_state.history=nums
+            st.session_state.history = nums
 
-            res=st.session_state.engine.predict(nums)
+            res = st.session_state.engine.predict(nums)
 
-            st.session_state.result=res
+            st.session_state.result = res
 
             st.rerun()
 
-# ===============================
+with col2:
+
+    if st.button("RESET"):
+
+        st.session_state.history = []
+
+        st.session_state.result = None
+
+        st.rerun()
+
+# =========================
 # RESULT
-# ===============================
+# =========================
 
 if st.session_state.result:
 
-    res=st.session_state.result
+    res = st.session_state.result
 
-    st.subheader("🔮 3 SỐ CHÍNH")
+    st.markdown("## 🔮 3 SỐ CHÍNH")
 
-    main_html="".join([
-    f"<div class='card'><div class='num'>{n}</div><div class='tag'>AI</div></div>"
-    for n in res["main"]
-    ])
+    main_html = ""
 
-    st.markdown(f"<div class='main-grid'>{main_html}</div>",unsafe_allow_html=True)
+    for n in res["main"]:
 
-    st.subheader("🎯 4 SỐ LÓT")
+        main_html += f"""
+        <div class='card'>
+        <div class='num'>{n}</div>
+        <div class='tag'>AI</div>
+        </div>
+        """
 
-    sup_html="".join([
-    f"<div class='sup'>{n}</div>"
-    for n in res["support"]
-    ])
+    st.markdown(f"<div class='main-grid'>{main_html}</div>", unsafe_allow_html=True)
 
-    st.markdown(f"<div class='support'>{sup_html}</div>",unsafe_allow_html=True)
+    st.markdown("## 🎯 4 SỐ LÓT")
 
-    risk=res["risk"]
+    sup_html=""
 
-    lvl="LOW"
+    for n in res["support"]:
 
-    if risk>60:
-        lvl="HIGH"
-    elif risk>35:
-        lvl="MEDIUM"
+        sup_html += f"<div class='sup'>{n}</div>"
 
-    st.markdown(f"<div class='risk'>RỦI RO: {risk}/100 - {lvl}</div>",unsafe_allow_html=True)
+    st.markdown(f"<div class='support'>{sup_html}</div>", unsafe_allow_html=True)
 
-    # Heatmap
+    st.markdown(f"## ⚠️ RỦI RO: {res['risk']}/100 - {res['risk_lvl']}")
 
-    freq=Counter("".join(st.session_state.history))
+    st.markdown("## 📊 Digit Heatmap")
 
-    df=pd.DataFrame({
-        "Digit":list(freq.keys()),
-        "Count":list(freq.values())
-    }).sort_values("Digit")
+    df = pd.DataFrame(
+        [{"digit":k,"freq":v} for k,v in res["freq"].items()]
+    )
 
-    st.subheader("📊 Digit Heatmap")
-
-    st.bar_chart(df.set_index("Digit"))
-
-    st.write(f"Data size: {len(st.session_state.history)} kỳ")
+    st.bar_chart(df.set_index("digit"))
