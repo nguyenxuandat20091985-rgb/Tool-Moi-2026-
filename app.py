@@ -1,6 +1,6 @@
 # ==============================================================================
-# TITAN AI ENGINE v3.0 - RESPONSIBLE GAMBLING VERSION
-# Phân tích thông minh + Quản lý vốn + Cảnh báo rủi ro
+# TITAN AI v4.0 - ACCURACY TESTING & PATTERN ANALYSIS
+# Chuyên test độ chính xác + Phân tích pattern nhà cái
 # ==============================================================================
 
 import streamlit as st
@@ -11,203 +11,89 @@ import random
 import re
 import math
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import warnings
 warnings.filterwarnings('ignore')
 
 # ==============================================================================
-# 1. CSS STYLING - Professional & Clean
+# 1. CSS STYLING
 # ==============================================================================
 
-st.set_page_config(
-    page_title="🎯 TITAN AI v3.0 | Responsible",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="🎯 TITAN AI v4.0 | Accuracy Test", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
-    /* Global */
-    .stApp {
-        background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
-        color: #e6edf3;
-        font-family: 'Segoe UI', system-ui, sans-serif;
-    }
+    .stApp { background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%); color: #e6edf3; }
     #MainMenu, footer, header { visibility: hidden; }
     
-    /* Header */
     .header-card {
         background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
-        border-radius: 20px;
-        padding: 30px;
-        text-align: center;
-        margin-bottom: 25px;
-        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 20px; padding: 30px; text-align: center; margin-bottom: 25px;
     }
-    .header-title {
-        font-size: 32px;
-        font-weight: 900;
-        color: white;
-        margin: 0;
-    }
-    .header-subtitle {
-        font-size: 14px;
-        color: rgba(255,255,255,0.8);
-        margin-top: 8px;
-    }
+    .header-title { font-size: 32px; font-weight: 900; color: white; margin: 0; }
+    .header-subtitle { font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 8px; }
     
-    /* Warning Banner */
-    .warning-banner {
-        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-        color: white;
-        padding: 15px 25px;
-        border-radius: 12px;
-        text-align: center;
-        font-weight: 700;
-        margin: 20px 0;
-        border: 2px solid #fca5a5;
-    }
-    
-    /* Status Cards */
-    .status-card {
-        padding: 15px 25px;
-        border-radius: 12px;
-        text-align: center;
-        font-weight: 700;
-        font-size: 15px;
-        margin: 20px 0;
-    }
-    .status-ok {
-        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-        color: white;
-        border: 2px solid #34d399;
-    }
-    .status-warn {
-        background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
-        color: white;
-        border: 2px solid #fbbf24;
-    }
-    .status-stop {
-        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
-        color: white;
-        border: 2px solid #f87171;
-    }
-    
-    /* Number Cards - Horizontal */
-    .numbers-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 12px;
-        margin: 20px 0;
-    }
-    .num-card {
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        border: 3px solid #60a5fa;
-        border-radius: 16px;
-        padding: 25px 20px;
-        text-align: center;
-        box-shadow: 0 4px 20px rgba(96,165,250,0.3);
-    }
-    .num-value {
-        font-size: 56px;
-        font-weight: 900;
-        color: #60a5fa;
-        line-height: 1;
-    }
-    .num-label {
-        font-size: 12px;
-        color: #94a3b8;
-        margin-top: 10px;
-        text-transform: uppercase;
-    }
-    
-    /* Support Numbers */
-    .support-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 10px;
-        margin: 20px 0;
-    }
-    .support-card {
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        border: 2px solid #34d399;
-        border-radius: 12px;
-        padding: 18px 12px;
-        text-align: center;
-    }
-    .support-value {
-        font-size: 36px;
-        font-weight: 800;
-        color: #34d399;
-    }
-    
-    /* Stats Grid */
     .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
-        margin: 20px 0;
+        display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0;
     }
     .stat-box {
-        background: rgba(255,255,255,0.05);
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        border: 1px solid rgba(255,255,255,0.1);
+        background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px;
+        text-align: center; border: 1px solid rgba(255,255,255,0.1);
     }
-    .stat-value {
-        font-size: 32px;
-        font-weight: 800;
-        color: #60a5fa;
-    }
-    .stat-label {
-        font-size: 12px;
-        color: #94a3b8;
-        margin-top: 8px;
-        text-transform: uppercase;
-    }
+    .stat-value { font-size: 32px; font-weight: 800; color: #60a5fa; }
+    .stat-label { font-size: 12px; color: #94a3b8; margin-top: 8px; text-transform: uppercase; }
     
-    /* Buttons */
-    .stButton > button {
-        background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
-        color: white !important;
-        border: none;
-        border-radius: 12px;
-        font-weight: 700;
-        padding: 14px 32px;
-        font-size: 15px;
+    .status-card {
+        padding: 15px 25px; border-radius: 12px; text-align: center;
+        font-weight: 700; font-size: 15px; margin: 20px 0;
     }
+    .status-ok { background: linear-gradient(135deg, #059669, #10b981); color: white; border: 2px solid #34d399; }
+    .status-warn { background: linear-gradient(135deg, #d97706, #f59e0b); color: white; border: 2px solid #fbbf24; }
+    .status-stop { background: linear-gradient(135deg, #dc2626, #ef4444); color: white; border: 2px solid #f87171; }
     
-    /* Text Input */
-    .stTextArea textarea, .stTextInput input {
-        background-color: #1e293b !important;
-        color: #ffffff !important;
-        border: 2px solid #475569 !important;
-        border-radius: 12px;
+    .numbers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+    .num-card {
+        background: linear-gradient(135deg, #1e293b, #334155); border: 3px solid #60a5fa;
+        border-radius: 16px; padding: 25px 20px; text-align: center;
     }
+    .num-value { font-size: 56px; font-weight: 900; color: #60a5fa; line-height: 1; }
+    .num-label { font-size: 12px; color: #94a3b8; margin-top: 10px; text-transform: uppercase; }
     
-    /* Info Box */
+    .support-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
+    .support-card {
+        background: linear-gradient(135deg, #1e293b, #334155); border: 2px solid #34d399;
+        border-radius: 12px; padding: 18px 12px; text-align: center;
+    }
+    .support-value { font-size: 36px; font-weight: 800; color: #34d399; }
+    
     .info-box {
-        background: rgba(96,165,250,0.1);
-        border-left: 4px solid #60a5fa;
-        border-radius: 10px;
-        padding: 15px 20px;
-        margin: 15px 0;
+        background: rgba(96,165,250,0.1); border-left: 4px solid #60a5fa;
+        border-radius: 10px; padding: 15px 20px; margin: 15px 0;
     }
     
-    /* Mobile */
+    .stButton > button {
+        background: linear-gradient(135deg, #1e3a8a, #7c3aed); color: white !important;
+        border: none; border-radius: 12px; font-weight: 700; padding: 14px 32px; font-size: 15px;
+    }
+    
+    .stTextArea textarea, .stTextInput input {
+        background-color: #1e293b !important; color: #ffffff !important;
+        border: 2px solid #475569 !important; border-radius: 12px;
+    }
+    
+    .accuracy-table { background: rgba(255,255,255,0.05) !important; border-radius: 12px; }
+    
     @media (max-width: 600px) {
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
         .num-value { font-size: 42px; }
         .support-value { font-size: 28px; }
         .numbers-grid, .support-grid { gap: 8px; }
-        .header-title { font-size: 24px; }
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. AI ENGINE - With Reality Check
+# 2. ENHANCED AI ENGINE - Pattern Detection Focus
 # ==============================================================================
 
 class TitanAI:
@@ -216,6 +102,7 @@ class TitanAI:
             'frequency': 25, 'gap': 20, 'markov': 20,
             'monte_carlo': 15, 'pattern': 12, 'hot_cold': 8
         }
+        self.accuracy_history = []  # Track prediction accuracy
     
     def analyze(self, history, max_simulations=2000):
         if not history or len(history) < 15:
@@ -230,15 +117,16 @@ class TitanAI:
         results['gap'] = self._analyze_gap(clean_data)
         results['markov'] = self._analyze_markov(clean_data)
         results['monte_carlo'] = self._analyze_monte_carlo(clean_data, max_simulations)
-        results['pattern'] = self._analyze_pattern(clean_data)
+        results['pattern'] = self._analyze_pattern_advanced(clean_data)
         results['hot_cold'] = self._analyze_hot_cold(clean_data)
+        
+        # Position-specific analysis (important for 5D)
+        results['position'] = self._analyze_by_position(clean_data)
         
         ensemble = self._ensemble_vote(results)
         stats_df = self._build_stats_df(clean_data, results)
         risk = self._calculate_risk(clean_data)
-        
-        # Add reality check
-        ensemble['reality_check'] = self._reality_check()
+        pattern_report = self._generate_pattern_report(clean_data)
         
         return {
             'main_3': ensemble['main_3'],
@@ -247,16 +135,57 @@ class TitanAI:
             'risk': risk,
             'confidence': ensemble['confidence'],
             'logic': self._build_logic(results, ensemble),
-            'reality_check': ensemble['reality_check']
+            'pattern_report': pattern_report,
+            'position_analysis': results['position']
         }
     
-    def _reality_check(self):
-        """Important reality check about lottery odds."""
+    def record_accuracy(self, prediction, actual_result, won):
+        """Record prediction accuracy for analysis."""
+        self.accuracy_history.append({
+            'timestamp': datetime.now(),
+            'prediction': prediction,
+            'actual': actual_result,
+            'won': won,
+            'confidence': prediction.get('confidence', 0)
+        })
+        
+        # Keep last 100 predictions
+        if len(self.accuracy_history) > 100:
+            self.accuracy_history.pop(0)
+    
+    def get_accuracy_stats(self):
+        """Get accuracy statistics."""
+        if not self.accuracy_history:
+            return {'total': 0, 'wins': 0, 'win_rate': 0, 'avg_confidence': 0}
+        
+        total = len(self.accuracy_history)
+        wins = sum(1 for h in self.accuracy_history if h['won'])
+        win_rate = wins / total * 100 if total > 0 else 0
+        avg_conf = sum(h['confidence'] for h in self.accuracy_history) / total
+        
+        # Accuracy by confidence bracket
+        by_confidence = {}
+        for bracket in ['50-69', '70-84', '85+']:
+            if bracket == '50-69':
+                subset = [h for h in self.accuracy_history if 50 <= h['confidence'] < 70]
+            elif bracket == '70-84':
+                subset = [h for h in self.accuracy_history if 70 <= h['confidence'] < 85]
+            else:
+                subset = [h for h in self.accuracy_history if h['confidence'] >= 85]
+            
+            if subset:
+                w = sum(1 for h in subset if h['won'])
+                by_confidence[bracket] = {
+                    'count': len(subset),
+                    'win_rate': round(w / len(subset) * 100, 1)
+                }
+        
         return {
-            'win_probability': '0.1% - 0.5%',  # Realistic odds for 3-of-5
-            'house_edge': '30% - 50%',  # Typical for online lottery
-            'recommendation': 'Chỉ chơi giải trí với tiền có thể mất',
-            'warning': 'Không có hệ thống nào thắng lâu dài'
+            'total': total,
+            'wins': wins,
+            'win_rate': round(win_rate, 1),
+            'avg_confidence': round(avg_conf, 1),
+            'by_confidence': by_confidence
         }
     
     def _clean_history(self, history):
@@ -339,38 +268,91 @@ class TitanAI:
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
         return {'scores': scores, 'top_3': top_3}
     
-    def _analyze_pattern(self, data):
+    def _analyze_pattern_advanced(self, data):
+        """Advanced pattern detection for 5D lottery."""
         if len(data) < 25:
-            return {'scores': {d: 10 for d in '0123456789'}, 'top_3': ['3','5','7']}
-        recent = data[:40] if len(data) >= 40 else data
+            return {'scores': {d: 10 for d in '0123456789'}, 'top_3': ['3','5','7'], 'patterns': []}
+        
+        recent = data[:50] if len(data) >= 50 else data
         candidates = Counter()
+        patterns_found = []
+        avoid = []
+        
+        # Pattern 1: Position streaks (cầu bệt theo vị trí)
         for pos in range(5):
             seq = [n[pos] if len(n) > pos else '0' for n in recent]
-            for i in range(len(seq) - 2):
+            i = 0
+            while i < len(seq) - 2:
                 if seq[i] == seq[i+1] == seq[i+2]:
                     d = seq[i]
-                    streak = 3
-                    while i + streak < len(seq) and seq[i + streak] == d:
-                        streak += 1
-                    candidates[d] += 4 if streak == 3 else -2
+                    streak_len = 3
+                    j = i + 3
+                    while j < len(seq) and seq[j] == d:
+                        streak_len += 1
+                        j += 1
+                    
+                    patterns_found.append(f'Bệt vị {pos}: {d} ({streak_len} kỳ)')
+                    
+                    if streak_len >= 5:
+                        avoid.append(d)  # Long streak likely to break
+                    elif streak_len >= 3:
+                        candidates[d] += 5  # Medium streak may continue
+                    i = j
+                else:
+                    i += 1
+        
+        # Pattern 2: Rhythm patterns (X _ X _ X)
         for pos in range(5):
             seq = [n[pos] if len(n) > pos else '0' for n in recent]
             for i in range(len(seq) - 4):
                 if seq[i] == seq[i+2] == seq[i+4] and seq[i] != seq[i+1]:
-                    candidates[seq[i]] += 3
+                    d = seq[i]
+                    patterns_found.append(f'Nhịp-2 vị {pos}: {d}')
+                    candidates[d] += 4
+        
+        # Pattern 3: Sum patterns
+        sums = [sum(int(d) for d in n) for n in recent[:30]]
+        if len(sums) > 10:
+            sum_freq = Counter(sums)
+            common_sums = [s for s, c in sum_freq.most_common(3)]
+            # Find numbers that appear in common sum ranges
+            for num in recent[:10]:
+                num_sum = sum(int(d) for d in num)
+                if num_sum in common_sums:
+                    for d in num:
+                        candidates[d] += 2
+        
+        # Pattern 4: Pair patterns (AB → BA reversal)
+        for i in range(len(recent) - 1):
+            a, b = recent[i], recent[i+1]
+            if len(a) >= 2 and len(b) >= 2:
+                if a[0:2] == b[1::-1]:
+                    patterns_found.append(f'Đảo cặp: {a[0:2]} → {b[0:2]}')
+                    for d in a[0:2]:
+                        candidates[d] += 3
+        
+        # Fallback
         if not candidates:
             all_digits = ''.join(recent)
             freq = Counter(all_digits)
             for d, c in freq.most_common(3):
                 candidates[d] += 3
+        
         scores = {d: candidates.get(d, 0) * 2 for d in '0123456789'}
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
+        
         while len(top_3) < 3:
             for d in '0123456789':
                 if d not in top_3:
                     top_3.append(d)
                     break
-        return {'scores': scores, 'top_3': top_3}
+        
+        return {
+            'scores': scores,
+            'top_3': top_3,
+            'patterns': patterns_found[:10],
+            'avoid': list(set(avoid))
+        }
     
     def _analyze_hot_cold(self, data):
         recent = data[:15] if len(data) >= 15 else data
@@ -392,31 +374,65 @@ class TitanAI:
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
         return {'scores': scores, 'top_3': top_3}
     
+    def _analyze_by_position(self, data):
+        """Analyze each position separately (important for 5D)."""
+        if len(data) < 20:
+            return {'pos_top': ['0']*5}
+        
+        pos_freq = [Counter() for _ in range(5)]
+        for num in data:
+            for i, digit in enumerate(num[:5]):
+                pos_freq[i][digit] += 1
+        
+        pos_top = []
+        for i in range(5):
+            if pos_freq[i]:
+                pos_top.append(pos_freq[i].most_common(1)[0][0])
+            else:
+                pos_top.append('0')
+        
+        return {
+            'pos_top': pos_top,
+            'pos_freq': [dict(pf.most_common(5)) for pf in pos_freq]
+        }
+    
     def _ensemble_vote(self, results):
         votes = Counter()
+        avoid_votes = []
+        
         for algo_name, result in results.items():
+            if algo_name == 'position':
+                continue
             weight = self.weights.get(algo_name, 10)
             for d in result.get('top_3', []):
                 votes[d] += weight
-        main_3 = [d for d, _ in votes.most_common(3)]
+            if result.get('avoid'):
+                avoid_votes.extend(result['avoid'])
+        
+        avoid_set = set(avoid_votes)
+        main_3 = [d for d, _ in votes.most_common(3) if d not in avoid_set]
+        
         while len(main_3) < 3:
             for d in '0123456789':
-                if d not in main_3:
+                if d not in main_3 and d not in avoid_set:
                     main_3.append(d)
                     break
-        remaining = [d for d, _ in votes.most_common(10) if d not in main_3]
+        
+        remaining = [d for d, _ in votes.most_common(10) if d not in main_3 and d not in avoid_set]
         support_4 = remaining[:4]
         while len(support_4) < 4:
             for d in '0123456789':
-                if d not in main_3 and d not in support_4:
+                if d not in main_3 and d not in support_4 and d not in avoid_set:
                     support_4.append(d)
                     break
+        
         if votes:
             top_votes = [c for _, c in votes.most_common(3)]
             confidence = min(95, 55 + sum(top_votes) / 3)
         else:
             confidence = 50
-        return {'main_3': main_3, 'support_4': support_4, 'confidence': int(confidence)}
+        
+        return {'main_3': main_3, 'support_4': support_4, 'confidence': int(confidence), 'avoid': list(avoid_set)}
     
     def _build_stats_df(self, data, results):
         rows = []
@@ -473,193 +489,109 @@ class TitanAI:
         freq_top = [d for d, _ in sorted(results['frequency']['scores'].items(), key=lambda x: -x[1])[:2]]
         if freq_top:
             parts.append(f"Tần suất: {','.join(freq_top)}")
+        if results['pattern'].get('patterns'):
+            parts.append(f"{len(results['pattern']['patterns'])} pattern")
         if ensemble['confidence'] >= 75:
             parts.append('Đồng thuận cao')
+        if ensemble.get('avoid'):
+            parts.append(f"Tránh: {','.join(ensemble['avoid'][:2])}")
         return ' | '.join(parts) if parts else 'Phân tích AI'
+    
+    def _generate_pattern_report(self, data):
+        """Generate detailed pattern report."""
+        recent = data[:30] if len(data) >= 30 else data
+        report = []
+        
+        # Check each position for streaks
+        for pos in range(5):
+            seq = [n[pos] if len(n) > pos else '0' for n in recent]
+            for i in range(len(seq) - 2):
+                if seq[i] == seq[i+1] == seq[i+2]:
+                    streak = 3
+                    j = i + 3
+                    while j < len(seq) and seq[j] == seq[i]:
+                        streak += 1
+                        j += 1
+                    if streak >= 3:
+                        report.append(f"Vị {pos}: Số {seq[i]} bệt {streak} kỳ")
+                    break
+        
+        return report[:5]
     
     def _fallback(self, msg="Chưa đủ dữ liệu"):
         return {
-            'main_3': ['?', '?', '?'],
-            'support_4': ['0', '0', '0', '0'],
+            'main_3': ['?', '?', '?'], 'support_4': ['0', '0', '0', '0'],
             'stats_df': pd.DataFrame({'Digit': list('0123456789'), 'AI_Score': [0]*10}),
             'risk': {'score': 0, 'level': 'LOW', 'reason': msg},
-            'confidence': 0,
-            'logic': msg,
-            'reality_check': self._reality_check()
+            'confidence': 0, 'logic': msg,
+            'pattern_report': [], 'position_analysis': {}
         }
 
 # ==============================================================================
-# 3. RESPONSIBLE GAMBLING FEATURES
-# ==============================================================================
-
-class ResponsibleGaming:
-    """Responsible gambling tracking and warnings."""
-    
-    def __init__(self):
-        self.session_start = datetime.now()
-        self.bets = []
-        self.daily_limit = 500000  # Default daily loss limit
-        self.session_limit = 100000  # Default session loss limit
-        self.max_bets_per_session = 20
-    
-    def add_bet(self, amount, won=False):
-        """Record a bet."""
-        self.bets.append({
-            'timestamp': datetime.now(),
-            'amount': amount,
-            'won': won
-        })
-    
-    def get_session_stats(self):
-        """Get current session statistics."""
-        if not self.bets:
-            return {
-                'total_bet': 0,
-                'total_won': 0,
-                'net': 0,
-                'bet_count': 0,
-                'win_rate': 0
-            }
-        
-        total_bet = sum(b['amount'] for b in self.bets)
-        total_won = sum(b['amount'] * 1.9 for b in self.bets if b['won'])
-        net = total_won - total_bet
-        wins = sum(1 for b in self.bets if b['won'])
-        
-        return {
-            'total_bet': total_bet,
-            'total_won': total_won,
-            'net': net,
-            'bet_count': len(self.bets),
-            'win_rate': wins / len(self.bets) * 100 if self.bets else 0
-        }
-    
-    def should_stop(self):
-        """Check if user should stop playing."""
-        stats = self.get_session_stats()
-        warnings = []
-        
-        # Check session loss limit
-        if stats['net'] < -self.session_limit:
-            warnings.append(f"⚠️已达 session loss limit (-{abs(stats['net']):,.0f})")
-        
-        # Check bet count
-        if stats['bet_count'] >= self.max_bets_per_session:
-            warnings.append("⚠️ Đã đủ số ván cược tối đa")
-        
-        # Check win rate (if too low, suggest stop)
-        if stats['bet_count'] >= 10 and stats['win_rate'] < 30:
-            warnings.append("⚠️ Win rate quá thấp - Nên dừng")
-        
-        # Check time
-        session_duration = datetime.now() - self.session_start
-        if session_duration > timedelta(hours=1):
-            warnings.append("⚠️ Đã chơi quá 1 tiếng - Nên nghỉ")
-        
-        return len(warnings) > 0, warnings, stats
-
-# ==============================================================================
-# 4. MAIN APPLICATION
+# 3. MAIN APPLICATION
 # ==============================================================================
 
 def main():
-    # Initialize session state
     if 'db' not in st.session_state:
         st.session_state.db = []
     if 'result' not in st.session_state:
         st.session_state.result = None
     if 'ai' not in st.session_state:
         st.session_state.ai = TitanAI()
-    if 'gaming' not in st.session_state:
-        st.session_state.gaming = ResponsibleGaming()
-    if 'bankroll' not in st.session_state:
-        st.session_state.bankroll = {
-            'initial': 1000000,
-            'current': 1000000,
-            'bet_per_round': 10000
-        }
+    if 'test_log' not in st.session_state:
+        st.session_state.test_log = []
     
-    # Header with WARNING
+    # Header
     st.markdown("""
     <div class="header-card">
-        <div class="header-title">🎯 TITAN AI v3.0</div>
-        <div class="header-subtitle">Phân tích thông minh | Chơi có trách nhiệm</div>
+        <div class="header-title">🎯 TITAN AI v4.0</div>
+        <div class="header-subtitle">Accuracy Testing & Pattern Analysis</div>
     </div>
     """, unsafe_allow_html=True)
     
-    # IMPORTANT WARNING
-    st.markdown("""
-    <div class="warning-banner">
-        ⚠️ CẢNH BÁO: Không có tool nào đảm bảo thắng. Chỉ chơi với tiền có thể mất.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Sidebar: Bankroll & Limits
+    # Sidebar: Accuracy Stats
     with st.sidebar:
-        st.markdown("### 💰 Quản lý vốn")
+        st.markdown("### 📊 Độ Chính Xác")
+        acc_stats = st.session_state.ai.get_accuracy_stats()
+        st.metric("Tổng lần test", acc_stats['total'])
+        st.metric("Trúng", acc_stats['wins'])
+        st.metric("Win Rate", f"{acc_stats['win_rate']}%")
+        st.metric("Avg Confidence", f"{acc_stats['avg_confidence']}%")
         
-        bankroll = st.session_state.bankroll
-        st.metric("Vốn ban đầu", f"₫{bankroll['initial']:,.0f}")
-        st.metric("Vốn hiện tại", f"₫{bankroll['current']:,.0f}")
-        
-        profit = bankroll['current'] - bankroll['initial']
-        color = "🟢" if profit >= 0 else "🔴"
-        st.metric("Lợi nhuận", f"{color} ₫{profit:,.0f}")
-        
-        st.markdown("---")
-        st.markdown("### ⚙️ Giới hạn")
-        
-        new_limit = st.number_input(
-            "Giới hạn thua/ngày:",
-            value=500000,
-            step=100000,
-            key="daily_limit_input"
-        )
-        st.session_state.gaming.daily_limit = new_limit
+        if acc_stats['by_confidence']:
+            st.markdown("---")
+            st.markdown("**Theo Confidence:**")
+            for bracket, data in acc_stats['by_confidence'].items():
+                st.write(f"{bracket}%: {data['win_rate']}% ({data['count']} lần)")
         
         st.markdown("---")
-        
-        if st.button("🗑️ Reset tất cả"):
-            st.session_state.db = []
-            st.session_state.result = None
-            st.session_state.bankroll['current'] = st.session_state.bankroll['initial']
-            st.session_state.gaming = ResponsibleGaming()
+        if st.button("🗑️ Reset test data"):
+            st.session_state.test_log = []
+            st.session_state.ai.accuracy_history = []
             st.success("✅ Đã reset!")
             time.sleep(0.5)
             st.rerun()
     
-    # Check if should stop
-    should_stop, stop_warnings, session_stats = st.session_state.gaming.should_stop()
-    
-    if should_stop:
-        st.markdown("""
-        <div class="status-card status-stop">
-            🛑 KHUYẾN NGHỊ: DỪNG CHƠI<br>
-            <small style="font-size: 12px; margin-top: 10px;">
-        """, unsafe_allow_html=True)
-        for warning in stop_warnings:
-            st.markdown(f"- {warning}")
-        st.markdown("</small></div>", unsafe_allow_html=True)
-    
-    # Session Stats
-    st.markdown("### 📊 Thống kê phiên")
+    # Accuracy Overview
+    acc_stats = st.session_state.ai.get_accuracy_stats()
+    st.markdown("### 📊 Thống kê Test")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Tổng cược", f"₫{session_stats['total_bet']:,.0f}")
+        st.metric("📦 Tổng kỳ data", len(st.session_state.db))
     with col2:
-        st.metric("Thắng", f"₫{session_stats['total_won']:,.0f}")
+        st.metric("🎯 Đã test", acc_stats['total'])
     with col3:
-        net_color = "🟢" if session_stats['net'] >= 0 else "🔴"
-        st.metric("Lời/Lỗ", f"{net_color} ₫{session_stats['net']:,.0f}")
+        color = "🟢" if acc_stats['win_rate'] >= 40 else "🟡" if acc_stats['win_rate'] >= 25 else "🔴"
+        st.metric("Win Rate", f"{color} {acc_stats['win_rate']}%")
     with col4:
-        st.metric("Win Rate", f"{session_stats['win_rate']:.1f}%")
+        st.metric("💯 Avg Conf", f"{acc_stats['avg_confidence']}%")
     
     # Input Section
     st.markdown("### 📥 Nhập kết quả lịch sử")
     raw_input = st.text_area(
         "Dán kết quả (mỗi kỳ 1 dòng, 5 chữ số):",
         height=120,
-        placeholder="12345\n67890\n54321\n...",
+        placeholder="87746\n56421\n69137\n...",
         key="data_input"
     )
     
@@ -676,17 +608,15 @@ def main():
         if st.button("🔄 Mới", use_container_width=True):
             st.rerun()
     
-    # Process Analysis
+    # Process
     if analyze_btn and raw_input.strip():
         with st.spinner("🧠 Đang phân tích..."):
             numbers = re.findall(r'\d{5}', raw_input)
-            
             if not numbers:
                 st.error("❌ Không tìm thấy số 5 chữ số!")
             else:
                 existing_set = set(st.session_state.db)
                 new_numbers = [n for n in numbers if n not in existing_set]
-                
                 if new_numbers:
                     st.session_state.db = new_numbers + st.session_state.db
                     if len(st.session_state.db) > 500:
@@ -704,13 +634,12 @@ def main():
         res = st.session_state.result
         risk = res['risk']
         
-        # Status
         if risk['level'] == 'OK':
-            status_class, status_text = 'status-ok', '✅ CÓ THỂ THAM KHẢO'
+            status_class, status_text = 'status-ok', '✅ CÓ THỂ TEST'
         elif risk['level'] == 'MEDIUM':
             status_class, status_text = 'status-warn', '⚠️ CẨN THẬN'
         else:
-            status_class, status_text = 'status-stop', '🛑 NÊN DỪNG'
+            status_class, status_text = 'status-stop', '🛑 RỦI RO CAO'
         
         st.markdown(f"""
         <div class="status-card {status_class}">
@@ -718,19 +647,8 @@ def main():
         </div>
         """, unsafe_allow_html=True)
         
-        # Reality Check
-        rc = res.get('reality_check', {})
-        st.markdown(f"""
-        <div class="info-box">
-            <strong>📊 Thực tế về xác suất:</strong><br>
-            • Xác suất trúng: {rc.get('win_probability', 'N/A')}<br>
-            • Nhà cái luôn có lợi thế: {rc.get('house_edge', 'N/A')}<br>
-            • {rc.get('recommendation', '')}
-        </div>
-        """, unsafe_allow_html=True)
-        
         # 3 Main Numbers
-        st.markdown("### 🔮 3 SỐ PHÂN TÍCH")
+        st.markdown("### 🔮 3 SỐ DỰ ĐOÁN")
         main_3 = res['main_3']
         st.markdown(f"""
         <div class="numbers-grid">
@@ -757,41 +675,65 @@ def main():
         if res['logic']:
             st.markdown(f'<div class="info-box">💡 <strong>Logic:</strong> {res["logic"]}</div>', unsafe_allow_html=True)
         
-        # Verification with Bankroll Update
+        # Pattern Report
+        if res.get('pattern_report'):
+            st.markdown("### 🔄 Pattern Phát Hiện")
+            for p in res['pattern_report']:
+                st.markdown(f"- {p}")
+        
+        # Test Verification
         st.markdown("---")
-        st.markdown("### ✅ Xác nhận kết quả")
+        st.markdown("### ✅ Test Độ Chính Xác")
         
         col1, col2 = st.columns([3, 1])
         with col1:
             actual = st.text_input("Kết quả thực tế:", key="actual_result", placeholder="12864")
         with col2:
-            if st.button("✅ Xác nhận", type="primary", use_container_width=True):
+            if st.button("✅ GHI NHẬN", type="primary", use_container_width=True):
                 if actual and len(actual) == 5 and actual.isdigit():
                     is_win = set(main_3).issubset(set(actual))
                     
-                    # Update bankroll
-                    bet = st.session_state.bankroll['bet_per_round']
-                    if is_win:
-                        profit = bet * 1.9
-                        st.session_state.bankroll['current'] += profit
-                        st.success(f"🎉 TRÚNG! +₫{profit:,.0f}")
-                    else:
-                        st.session_state.bankroll['current'] -= bet
-                        st.warning(f"❌ Trượt! -₫{bet:,.0f}")
+                    # Record for accuracy tracking
+                    st.session_state.ai.record_accuracy(res, actual, is_win)
                     
-                    # Record bet for responsible gaming
-                    st.session_state.gaming.add_bet(bet, is_win)
+                    # Add to test log
+                    st.session_state.test_log.append({
+                        'timestamp': datetime.now().isoformat(),
+                        'prediction': main_3,
+                        'actual': actual,
+                        'won': is_win,
+                        'confidence': res['confidence']
+                    })
+                    
+                    if is_win:
+                        st.success(f"🎉 TRÚNG! (Confidence: {res['confidence']}%)")
+                    else:
+                        missing = set(main_3) - set(actual)
+                        st.warning(f"❌ Trượt! Thiếu: {', '.join(missing)} (Confidence: {res['confidence']}%)")
                     
                     st.rerun()
     
-    # Footer with Responsible Gaming Message
+    # Test History Table
+    if st.session_state.test_log:
+        st.markdown("---")
+        st.markdown("### 📜 Lịch sử Test")
+        
+        df_test = pd.DataFrame(st.session_state.test_log[-20:])  # Last 20
+        df_test['timestamp'] = pd.to_datetime(df_test['timestamp']).dt.strftime('%H:%M %d/%m')
+        df_test['prediction'] = df_test['prediction'].apply(lambda x: ','.join(x))
+        df_test['status'] = df_test['won'].apply(lambda x: '✅' if x else '❌')
+        
+        display_cols = ['timestamp', 'prediction', 'actual', 'status', 'confidence']
+        st.dataframe(df_test[display_cols], hide_index=True, use_container_width=True,
+                    column_config={"confidence": st.column_config.NumberColumn(format="%d%%")})
+    
+    # Footer
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #94a3b8; padding: 20px; font-size: 12px;">
-        🎯 TITAN AI v3.0 | Responsible Gaming Version<br>
-        ⚠️ Công cụ phân tích - Không đảm bảo thắng<br>
-        🛑 Biết điểm dừng - Chơi có trách nhiệm<br>
-        💡 Nếu thua liên tiếp, hãy dừng lại và nghỉ ngơi
+        🎯 TITAN AI v4.0 | Accuracy Testing Version<br>
+        📊 Đang test độ chính xác thực tế<br>
+        💡 Giúp em cải thiện thuật toán
     </div>
     """, unsafe_allow_html=True)
 
