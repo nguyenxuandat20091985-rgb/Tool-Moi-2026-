@@ -1,5 +1,6 @@
 # ==============================================================================
-# TITAN AI ENGINE v2.2 - FIXED LOGIC BUG
+# TITAN AI ENGINE v3.0 - RESPONSIBLE GAMBLING VERSION
+# Phân tích thông minh + Quản lý vốn + Cảnh báo rủi ro
 # ==============================================================================
 
 import streamlit as st
@@ -10,95 +11,216 @@ import random
 import re
 import math
 import time
+from datetime import datetime, timedelta
 import warnings
-
 warnings.filterwarnings('ignore')
 
 # ==============================================================================
-# 1. CSS STYLING
+# 1. CSS STYLING - Professional & Clean
 # ==============================================================================
 
-st.set_page_config(page_title="🎯 TITAN AI ENGINE", page_icon="🧠", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="🎯 TITAN AI v3.0 | Responsible",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
 st.markdown("""
 <style>
-    .stApp { background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%); color: #e6edf3; }
+    /* Global */
+    .stApp {
+        background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
+        color: #e6edf3;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+    }
     #MainMenu, footer, header { visibility: hidden; }
     
+    /* Header */
     .header-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 20px; padding: 30px; text-align: center; margin-bottom: 25px;
+        background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+        border-radius: 20px;
+        padding: 30px;
+        text-align: center;
+        margin-bottom: 25px;
+        border: 1px solid rgba(255,255,255,0.1);
     }
-    .header-title { font-size: 32px; font-weight: 900; color: white; margin: 0; }
-    .header-subtitle { font-size: 14px; color: rgba(255,255,255,0.9); margin-top: 8px; }
+    .header-title {
+        font-size: 32px;
+        font-weight: 900;
+        color: white;
+        margin: 0;
+    }
+    .header-subtitle {
+        font-size: 14px;
+        color: rgba(255,255,255,0.8);
+        margin-top: 8px;
+    }
     
-    .main-numbers-container {
-        display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 25px 0;
+    /* Warning Banner */
+    .warning-banner {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: white;
+        padding: 15px 25px;
+        border-radius: 12px;
+        text-align: center;
+        font-weight: 700;
+        margin: 20px 0;
+        border: 2px solid #fca5a5;
     }
-    .main-number-card {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        border-radius: 20px; padding: 30px 20px; text-align: center;
-    }
-    .main-number { font-size: 64px; font-weight: 900; color: white; line-height: 1; }
-    .number-label { font-size: 12px; color: rgba(255,255,255,0.9); margin-top: 10px; text-transform: uppercase; }
     
-    .support-container {
-        display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 25px 0;
+    /* Status Cards */
+    .status-card {
+        padding: 15px 25px;
+        border-radius: 12px;
+        text-align: center;
+        font-weight: 700;
+        font-size: 15px;
+        margin: 20px 0;
+    }
+    .status-ok {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        color: white;
+        border: 2px solid #34d399;
+    }
+    .status-warn {
+        background: linear-gradient(135deg, #d97706 0%, #f59e0b 100%);
+        color: white;
+        border: 2px solid #fbbf24;
+    }
+    .status-stop {
+        background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+        color: white;
+        border: 2px solid #f87171;
+    }
+    
+    /* Number Cards - Horizontal */
+    .numbers-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin: 20px 0;
+    }
+    .num-card {
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        border: 3px solid #60a5fa;
+        border-radius: 16px;
+        padding: 25px 20px;
+        text-align: center;
+        box-shadow: 0 4px 20px rgba(96,165,250,0.3);
+    }
+    .num-value {
+        font-size: 56px;
+        font-weight: 900;
+        color: #60a5fa;
+        line-height: 1;
+    }
+    .num-label {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 10px;
+        text-transform: uppercase;
+    }
+    
+    /* Support Numbers */
+    .support-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin: 20px 0;
     }
     .support-card {
-        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-        border-radius: 15px; padding: 22px 15px; text-align: center;
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        border: 2px solid #34d399;
+        border-radius: 12px;
+        padding: 18px 12px;
+        text-align: center;
     }
-    .support-number { font-size: 38px; font-weight: 800; color: white; }
-    .support-label { font-size: 11px; color: rgba(255,255,255,0.9); margin-top: 8px; }
-    
-    .status-banner {
-        padding: 15px 25px; border-radius: 12px; text-align: center;
-        font-weight: 700; font-size: 15px; margin: 20px 0;
-    }
-    .status-ok { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: #065f46; }
-    .status-warn { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #7c2d12; }
-    .status-stop { background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%); color: white; }
-    
-    .info-card {
-        background: rgba(255,255,255,0.05); border-left: 4px solid #667eea;
-        border-radius: 10px; padding: 15px 20px; margin: 15px 0;
+    .support-value {
+        font-size: 36px;
+        font-weight: 800;
+        color: #34d399;
     }
     
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        margin: 20px 0;
+    }
+    .stat-box {
+        background: rgba(255,255,255,0.05);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .stat-value {
+        font-size: 32px;
+        font-weight: 800;
+        color: #60a5fa;
+    }
+    .stat-label {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 8px;
+        text-transform: uppercase;
+    }
+    
+    /* Buttons */
     .stButton > button {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white !important; border: none; border-radius: 12px;
-        font-weight: 700; padding: 14px 32px; font-size: 15px;
+        background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
+        color: white !important;
+        border: none;
+        border-radius: 12px;
+        font-weight: 700;
+        padding: 14px 32px;
+        font-size: 15px;
     }
     
-    .stTextArea textarea {
-        background-color: #1e293b !important; color: #ffffff !important;
-        border: 2px solid #667eea !important; border-radius: 12px; font-size: 16px;
-    }
-    .stTextInput input {
-        background-color: #1e293b !important; color: #ffffff !important;
-        border: 2px solid #667eea !important;
+    /* Text Input */
+    .stTextArea textarea, .stTextInput input {
+        background-color: #1e293b !important;
+        color: #ffffff !important;
+        border: 2px solid #475569 !important;
+        border-radius: 12px;
     }
     
+    /* Info Box */
+    .info-box {
+        background: rgba(96,165,250,0.1);
+        border-left: 4px solid #60a5fa;
+        border-radius: 10px;
+        padding: 15px 20px;
+        margin: 15px 0;
+    }
+    
+    /* Mobile */
     @media (max-width: 600px) {
-        .main-number { font-size: 48px; }
-        .support-number { font-size: 28px; }
+        .num-value { font-size: 42px; }
+        .support-value { font-size: 28px; }
+        .numbers-grid, .support-grid { gap: 8px; }
         .header-title { font-size: 24px; }
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. AI ENGINE
+# 2. AI ENGINE - With Reality Check
 # ==============================================================================
 
 class TitanAI:
     def __init__(self):
-        self.weights = {'frequency': 25, 'gap': 20, 'markov': 20, 'monte_carlo': 15, 'pattern': 12, 'hot_cold': 8}
+        self.weights = {
+            'frequency': 25, 'gap': 20, 'markov': 20,
+            'monte_carlo': 15, 'pattern': 12, 'hot_cold': 8
+        }
     
     def analyze(self, history, max_simulations=2000):
         if not history or len(history) < 15:
             return self._fallback()
+        
         clean_data = self._clean_history(history)
         if len(clean_data) < 15:
             return self._fallback("Cần ít nhất 15 kỳ")
@@ -115,10 +237,26 @@ class TitanAI:
         stats_df = self._build_stats_df(clean_data, results)
         risk = self._calculate_risk(clean_data)
         
+        # Add reality check
+        ensemble['reality_check'] = self._reality_check()
+        
         return {
-            'main_3': ensemble['main_3'], 'support_4': ensemble['support_4'],
-            'stats_df': stats_df, 'risk': risk,
-            'confidence': ensemble['confidence'], 'logic': self._build_logic(results, ensemble)
+            'main_3': ensemble['main_3'],
+            'support_4': ensemble['support_4'],
+            'stats_df': stats_df,
+            'risk': risk,
+            'confidence': ensemble['confidence'],
+            'logic': self._build_logic(results, ensemble),
+            'reality_check': ensemble['reality_check']
+        }
+    
+    def _reality_check(self):
+        """Important reality check about lottery odds."""
+        return {
+            'win_probability': '0.1% - 0.5%',  # Realistic odds for 3-of-5
+            'house_edge': '30% - 50%',  # Typical for online lottery
+            'recommendation': 'Chỉ chơi giải trí với tiền có thể mất',
+            'warning': 'Không có hệ thống nào thắng lâu dài'
         }
     
     def _clean_history(self, history):
@@ -341,46 +479,185 @@ class TitanAI:
     
     def _fallback(self, msg="Chưa đủ dữ liệu"):
         return {
-            'main_3': ['?', '?', '?'], 'support_4': ['0', '0', '0', '0'],
+            'main_3': ['?', '?', '?'],
+            'support_4': ['0', '0', '0', '0'],
             'stats_df': pd.DataFrame({'Digit': list('0123456789'), 'AI_Score': [0]*10}),
             'risk': {'score': 0, 'level': 'LOW', 'reason': msg},
-            'confidence': 0, 'logic': msg
+            'confidence': 0,
+            'logic': msg,
+            'reality_check': self._reality_check()
         }
 
 # ==============================================================================
-# 3. MAIN APPLICATION - FIXED LOGIC
+# 3. RESPONSIBLE GAMBLING FEATURES
+# ==============================================================================
+
+class ResponsibleGaming:
+    """Responsible gambling tracking and warnings."""
+    
+    def __init__(self):
+        self.session_start = datetime.now()
+        self.bets = []
+        self.daily_limit = 500000  # Default daily loss limit
+        self.session_limit = 100000  # Default session loss limit
+        self.max_bets_per_session = 20
+    
+    def add_bet(self, amount, won=False):
+        """Record a bet."""
+        self.bets.append({
+            'timestamp': datetime.now(),
+            'amount': amount,
+            'won': won
+        })
+    
+    def get_session_stats(self):
+        """Get current session statistics."""
+        if not self.bets:
+            return {
+                'total_bet': 0,
+                'total_won': 0,
+                'net': 0,
+                'bet_count': 0,
+                'win_rate': 0
+            }
+        
+        total_bet = sum(b['amount'] for b in self.bets)
+        total_won = sum(b['amount'] * 1.9 for b in self.bets if b['won'])
+        net = total_won - total_bet
+        wins = sum(1 for b in self.bets if b['won'])
+        
+        return {
+            'total_bet': total_bet,
+            'total_won': total_won,
+            'net': net,
+            'bet_count': len(self.bets),
+            'win_rate': wins / len(self.bets) * 100 if self.bets else 0
+        }
+    
+    def should_stop(self):
+        """Check if user should stop playing."""
+        stats = self.get_session_stats()
+        warnings = []
+        
+        # Check session loss limit
+        if stats['net'] < -self.session_limit:
+            warnings.append(f"⚠️已达 session loss limit (-{abs(stats['net']):,.0f})")
+        
+        # Check bet count
+        if stats['bet_count'] >= self.max_bets_per_session:
+            warnings.append("⚠️ Đã đủ số ván cược tối đa")
+        
+        # Check win rate (if too low, suggest stop)
+        if stats['bet_count'] >= 10 and stats['win_rate'] < 30:
+            warnings.append("⚠️ Win rate quá thấp - Nên dừng")
+        
+        # Check time
+        session_duration = datetime.now() - self.session_start
+        if session_duration > timedelta(hours=1):
+            warnings.append("⚠️ Đã chơi quá 1 tiếng - Nên nghỉ")
+        
+        return len(warnings) > 0, warnings, stats
+
+# ==============================================================================
+# 4. MAIN APPLICATION
 # ==============================================================================
 
 def main():
+    # Initialize session state
     if 'db' not in st.session_state:
         st.session_state.db = []
     if 'result' not in st.session_state:
         st.session_state.result = None
     if 'ai' not in st.session_state:
         st.session_state.ai = TitanAI()
+    if 'gaming' not in st.session_state:
+        st.session_state.gaming = ResponsibleGaming()
+    if 'bankroll' not in st.session_state:
+        st.session_state.bankroll = {
+            'initial': 1000000,
+            'current': 1000000,
+            'bet_per_round': 10000
+        }
     
-    # Header
+    # Header with WARNING
     st.markdown("""
     <div class="header-card">
-        <div class="header-title">🎯 TITAN AI ENGINE</div>
-        <div class="header-subtitle">Multi-Algorithm Prediction System</div>
+        <div class="header-title">🎯 TITAN AI v3.0</div>
+        <div class="header-subtitle">Phân tích thông minh | Chơi có trách nhiệm</div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar
+    # IMPORTANT WARNING
+    st.markdown("""
+    <div class="warning-banner">
+        ⚠️ CẢNH BÁO: Không có tool nào đảm bảo thắng. Chỉ chơi với tiền có thể mất.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sidebar: Bankroll & Limits
     with st.sidebar:
-        st.metric("📦 Tổng kỳ", len(st.session_state.db))
-        if st.button("🗑️ Xóa dữ liệu"):
+        st.markdown("### 💰 Quản lý vốn")
+        
+        bankroll = st.session_state.bankroll
+        st.metric("Vốn ban đầu", f"₫{bankroll['initial']:,.0f}")
+        st.metric("Vốn hiện tại", f"₫{bankroll['current']:,.0f}")
+        
+        profit = bankroll['current'] - bankroll['initial']
+        color = "🟢" if profit >= 0 else "🔴"
+        st.metric("Lợi nhuận", f"{color} ₫{profit:,.0f}")
+        
+        st.markdown("---")
+        st.markdown("### ⚙️ Giới hạn")
+        
+        new_limit = st.number_input(
+            "Giới hạn thua/ngày:",
+            value=500000,
+            step=100000,
+            key="daily_limit_input"
+        )
+        st.session_state.gaming.daily_limit = new_limit
+        
+        st.markdown("---")
+        
+        if st.button("🗑️ Reset tất cả"):
             st.session_state.db = []
             st.session_state.result = None
-            st.success("✅ Đã xóa!")
+            st.session_state.bankroll['current'] = st.session_state.bankroll['initial']
+            st.session_state.gaming = ResponsibleGaming()
+            st.success("✅ Đã reset!")
             time.sleep(0.5)
             st.rerun()
+    
+    # Check if should stop
+    should_stop, stop_warnings, session_stats = st.session_state.gaming.should_stop()
+    
+    if should_stop:
+        st.markdown("""
+        <div class="status-card status-stop">
+            🛑 KHUYẾN NGHỊ: DỪNG CHƠI<br>
+            <small style="font-size: 12px; margin-top: 10px;">
+        """, unsafe_allow_html=True)
+        for warning in stop_warnings:
+            st.markdown(f"- {warning}")
+        st.markdown("</small></div>", unsafe_allow_html=True)
+    
+    # Session Stats
+    st.markdown("### 📊 Thống kê phiên")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Tổng cược", f"₫{session_stats['total_bet']:,.0f}")
+    with col2:
+        st.metric("Thắng", f"₫{session_stats['total_won']:,.0f}")
+    with col3:
+        net_color = "🟢" if session_stats['net'] >= 0 else "🔴"
+        st.metric("Lời/Lỗ", f"{net_color} ₫{session_stats['net']:,.0f}")
+    with col4:
+        st.metric("Win Rate", f"{session_stats['win_rate']:.1f}%")
     
     # Input Section
     st.markdown("### 📥 Nhập kết quả lịch sử")
     raw_input = st.text_area(
-        "Dán kết quả tại đây (mỗi kỳ 1 dòng, 5 chữ số):",
+        "Dán kết quả (mỗi kỳ 1 dòng, 5 chữ số):",
         height=120,
         placeholder="12345\n67890\n54321\n...",
         key="data_input"
@@ -399,36 +676,24 @@ def main():
         if st.button("🔄 Mới", use_container_width=True):
             st.rerun()
     
-    # FIXED: Process Analysis Logic
+    # Process Analysis
     if analyze_btn and raw_input.strip():
         with st.spinner("🧠 Đang phân tích..."):
-            # Extract 5-digit numbers
             numbers = re.findall(r'\d{5}', raw_input)
             
             if not numbers:
                 st.error("❌ Không tìm thấy số 5 chữ số!")
             else:
-                # FIXED: Properly count and add new numbers
                 existing_set = set(st.session_state.db)
-                new_numbers = []
+                new_numbers = [n for n in numbers if n not in existing_set]
                 
-                for n in numbers:
-                    if n not in existing_set:
-                        new_numbers.append(n)
-                        existing_set.add(n)
-                
-                # Add new numbers to database (newest first)
                 if new_numbers:
                     st.session_state.db = new_numbers + st.session_state.db
-                    # Limit to 500
                     if len(st.session_state.db) > 500:
                         st.session_state.db = st.session_state.db[:500]
-                    
                     st.success(f"✅ Đã thêm {len(new_numbers)} số mới")
                 
-                # Check if enough data
                 if len(st.session_state.db) >= 15:
-                    # Run AI analysis
                     st.session_state.result = st.session_state.ai.analyze(st.session_state.db)
                     st.rerun()
                 else:
@@ -439,59 +704,96 @@ def main():
         res = st.session_state.result
         risk = res['risk']
         
+        # Status
         if risk['level'] == 'OK':
-            status_class, status_text = 'status-ok', '✅ CÓ THỂ ĐÁNH'
+            status_class, status_text = 'status-ok', '✅ CÓ THỂ THAM KHẢO'
         elif risk['level'] == 'MEDIUM':
-            status_class, status_text = 'status-warn', '⚠️ THEO DÕI'
+            status_class, status_text = 'status-warn', '⚠️ CẨN THẬN'
         else:
             status_class, status_text = 'status-stop', '🛑 NÊN DỪNG'
         
         st.markdown(f"""
-        <div class="status-banner {status_class}">
+        <div class="status-card {status_class}">
             {status_text} | Risk: {risk['score']}/100 | {risk['reason']}
         </div>
         """, unsafe_allow_html=True)
         
+        # Reality Check
+        rc = res.get('reality_check', {})
+        st.markdown(f"""
+        <div class="info-box">
+            <strong>📊 Thực tế về xác suất:</strong><br>
+            • Xác suất trúng: {rc.get('win_probability', 'N/A')}<br>
+            • Nhà cái luôn có lợi thế: {rc.get('house_edge', 'N/A')}<br>
+            • {rc.get('recommendation', '')}
+        </div>
+        """, unsafe_allow_html=True)
+        
         # 3 Main Numbers
-        st.markdown("### 🔮 3 SỐ CHÍNH")
+        st.markdown("### 🔮 3 SỐ PHÂN TÍCH")
         main_3 = res['main_3']
         st.markdown(f"""
-        <div class="main-numbers-container">
-            <div class="main-number-card"><div class="main-number">{main_3[0]}</div><div class="number-label">SỐ 1</div></div>
-            <div class="main-number-card"><div class="main-number">{main_3[1]}</div><div class="number-label">SỐ 2</div></div>
-            <div class="main-number-card"><div class="main-number">{main_3[2]}</div><div class="number-label">SỐ 3</div></div>
+        <div class="numbers-grid">
+            <div class="num-card"><div class="num-value">{main_3[0]}</div><div class="num-label">Số 1</div></div>
+            <div class="num-card"><div class="num-value">{main_3[1]}</div><div class="num-label">Số 2</div></div>
+            <div class="num-card"><div class="num-value">{main_3[2]}</div><div class="num-label">Số 3</div></div>
         </div>
         """, unsafe_allow_html=True)
         
         # 4 Support Numbers
-        st.markdown("### 🎲 4 SỐ LÓT")
+        st.markdown("### 🎲 4 SỐ THAM KHẢO")
         support_4 = res['support_4']
         st.markdown(f"""
-        <div class="support-container">
-            <div class="support-card"><div class="support-number">{support_4[0]}</div><div class="support-label">Lót 1</div></div>
-            <div class="support-card"><div class="support-number">{support_4[1]}</div><div class="support-label">Lót 2</div></div>
-            <div class="support-card"><div class="support-number">{support_4[2]}</div><div class="support-label">Lót 3</div></div>
-            <div class="support-card"><div class="support-number">{support_4[3]}</div><div class="support-label">Lót 4</div></div>
+        <div class="support-grid">
+            <div class="support-card"><div class="support-value">{support_4[0]}</div></div>
+            <div class="support-card"><div class="support-value">{support_4[1]}</div></div>
+            <div class="support-card"><div class="support-value">{support_4[2]}</div></div>
+            <div class="support-card"><div class="support-value">{support_4[3]}</div></div>
         </div>
         """, unsafe_allow_html=True)
         
         st.code(','.join(main_3 + support_4), language=None)
         
         if res['logic']:
-            st.markdown(f'<div class="info-card"><strong>💡 Logic:</strong> {res["logic"]}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="info-box">💡 <strong>Logic:</strong> {res["logic"]}</div>', unsafe_allow_html=True)
         
-        # Verification
+        # Verification with Bankroll Update
         st.markdown("---")
+        st.markdown("### ✅ Xác nhận kết quả")
+        
         col1, col2 = st.columns([3, 1])
         with col1:
             actual = st.text_input("Kết quả thực tế:", key="actual_result", placeholder="12864")
         with col2:
-            if st.button("✅ Kiểm tra", type="primary", use_container_width=True):
+            if st.button("✅ Xác nhận", type="primary", use_container_width=True):
                 if actual and len(actual) == 5 and actual.isdigit():
                     is_win = set(main_3).issubset(set(actual))
-                    st.success("🎉 TRÚNG!" if is_win else "❌ Trượt")
+                    
+                    # Update bankroll
+                    bet = st.session_state.bankroll['bet_per_round']
+                    if is_win:
+                        profit = bet * 1.9
+                        st.session_state.bankroll['current'] += profit
+                        st.success(f"🎉 TRÚNG! +₫{profit:,.0f}")
+                    else:
+                        st.session_state.bankroll['current'] -= bet
+                        st.warning(f"❌ Trượt! -₫{bet:,.0f}")
+                    
+                    # Record bet for responsible gaming
+                    st.session_state.gaming.add_bet(bet, is_win)
+                    
+                    st.rerun()
     
-    st.markdown('<div style="text-align:center;color:#8b949e;padding:20px;">TITAN AI v2.2 | Fixed Logic Bug</div>', unsafe_allow_html=True)
+    # Footer with Responsible Gaming Message
+    st.markdown("---")
+    st.markdown("""
+    <div style="text-align: center; color: #94a3b8; padding: 20px; font-size: 12px;">
+        🎯 TITAN AI v3.0 | Responsible Gaming Version<br>
+        ⚠️ Công cụ phân tích - Không đảm bảo thắng<br>
+        🛑 Biết điểm dừng - Chơi có trách nhiệm<br>
+        💡 Nếu thua liên tiếp, hãy dừng lại và nghỉ ngơi
+    </div>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
