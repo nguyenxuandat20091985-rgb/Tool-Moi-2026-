@@ -1,5 +1,6 @@
 # ==============================================================================
-# TITAN AI v4.1 - FIXED KeyError Bug
+# TITAN AI v5.0 - HOUSE PATTERN DETECTOR
+# Chuyên phát hiện: Đảo cầu | Bệt cầu | Xoay cầu | Bẫy nhà cái
 # ==============================================================================
 
 import streamlit as st
@@ -18,7 +19,7 @@ warnings.filterwarnings('ignore')
 # 1. CSS STYLING
 # ==============================================================================
 
-st.set_page_config(page_title="🎯 TITAN AI v4.1 | Accuracy Test", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="🎯 TITAN AI v5.0 | House Pattern", page_icon="🔍", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
@@ -28,13 +29,23 @@ st.markdown("""
     .header-card {
         background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
         border-radius: 20px; padding: 30px; text-align: center; margin-bottom: 25px;
+        border: 2px solid rgba(124,58,237,0.3);
     }
     .header-title { font-size: 32px; font-weight: 900; color: white; margin: 0; }
     .header-subtitle { font-size: 14px; color: rgba(255,255,255,0.8); margin-top: 8px; }
     
-    .stats-grid {
-        display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0;
+    .pattern-alert {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: white; padding: 15px 25px; border-radius: 12px;
+        text-align: center; font-weight: 700; margin: 20px 0;
+        border: 2px solid #fca5a5; animation: pulse 2s infinite;
     }
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 10px rgba(220,38,38,0.5); }
+        50% { box-shadow: 0 0 20px rgba(220,38,38,0.8); }
+    }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
     .stat-box {
         background: rgba(255,255,255,0.05); border-radius: 12px; padding: 20px;
         text-align: center; border: 1px solid rgba(255,255,255,0.1);
@@ -70,6 +81,12 @@ st.markdown("""
         border-radius: 10px; padding: 15px 20px; margin: 15px 0;
     }
     
+    .pattern-box {
+        background: rgba(239,68,68,0.1); border: 2px solid #ef4444;
+        border-radius: 12px; padding: 15px; margin: 15px 0;
+    }
+    .pattern-title { font-weight: 700; color: #ef4444; margin-bottom: 10px; }
+    
     .stButton > button {
         background: linear-gradient(135deg, #1e3a8a, #7c3aed); color: white !important;
         border: none; border-radius: 12px; font-weight: 700; padding: 14px 32px; font-size: 15px;
@@ -89,7 +106,353 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. AI ENGINE - FIXED
+# 2. HOUSE PATTERN DETECTION ENGINE
+# ==============================================================================
+
+class HousePatternDetector:
+    """
+    Specialized detector for house manipulation patterns:
+    - Bệt cầu (streaks)
+    - Đảo cầu (reversals)
+    - Xoay cầu (rotations)
+    - Bẫy nhịp (rhythm traps)
+    """
+    
+    def __init__(self):
+        self.detected_patterns = []
+        self.risk_level = 0
+    
+    def detect_all_patterns(self, data):
+        """Run all pattern detection algorithms."""
+        patterns = {}
+        patterns['bet_cau'] = self._detect_bet_cau(data)  # Bệt cầu
+        patterns['dao_cau'] = self._detect_dao_cau(data)  # Đảo cầu
+        patterns['xoay_cau'] = self._detect_xoay_cau(data)  # Xoay cầu
+        patterns['nhip_bay'] = self._detect_nhip_bay(data)  # Bẫy nhịp
+        patterns['tong_control'] = self._detect_sum_control(data)  # Kiểm soát tổng
+        
+        # Calculate overall house control risk
+        self.risk_level = self._calculate_house_control_risk(patterns)
+        self.detected_patterns = patterns
+        
+        return patterns
+    
+    def _detect_bet_cau(self, data):
+        """
+        Phát hiện bệt cầu (streaks) - Nhà cái ra cùng số nhiều kỳ liên tiếp
+        """
+        if len(data) < 20:
+            return {'detected': False, 'patterns': [], 'risk': 0}
+        
+        recent = data[:50] if len(data) >= 50 else data
+        patterns = []
+        risk = 0
+        
+        for pos in range(5):
+            seq = [n[pos] if len(n) > pos else '0' for n in recent]
+            i = 0
+            while i < len(seq) - 2:
+                if seq[i] == seq[i+1] == seq[i+2]:
+                    d = seq[i]
+                    streak = 3
+                    j = i + 3
+                    while j < len(seq) and seq[j] == d:
+                        streak += 1
+                        j += 1
+                    
+                    if streak >= 3:
+                        patterns.append({
+                            'type': 'Bệt cầu',
+                            'position': pos,
+                            'digit': d,
+                            'streak': streak,
+                            'description': f'Vị {pos}: Số {d} bệt {streak} kỳ'
+                        })
+                        # Risk increases with streak length
+                        if streak >= 5:
+                            risk += 40
+                        elif streak >= 4:
+                            risk += 25
+                        else:
+                            risk += 15
+                    i = j
+                else:
+                    i += 1
+        
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns,
+            'risk': min(100, risk),
+            'max_streak': max([p['streak'] for p in patterns]) if patterns else 0
+        }
+    
+    def _detect_dao_cau(self, data):
+        """
+        Phát hiện đảo cầu (reversals) - AB → BA → AB
+        """
+        if len(data) < 20:
+            return {'detected': False, 'patterns': [], 'risk': 0}
+        
+        recent = data[:50] if len(data) >= 50 else data
+        patterns = []
+        risk = 0
+        
+        # Check 2-digit reversals
+        for i in range(len(recent) - 3):
+            a, b = recent[i], recent[i+1]
+            c, d = recent[i+2], recent[i+3]
+            
+            if len(a) >= 2 and len(b) >= 2:
+                # AB → BA pattern
+                if a[0:2] == b[1::-1]:
+                    patterns.append({
+                        'type': 'Đảo cầu 2 số',
+                        'position': i,
+                        'pattern': f'{a[0:2]} → {b[0:2]}',
+                        'description': f'Kỳ {i}: {a[0:2]} đảo thành {b[0:2]}'
+                    })
+                    risk += 10
+                
+                # AB → BA → AB pattern (full reversal cycle)
+                if len(c) >= 2 and len(d) >= 2:
+                    if a[0:2] == b[1::-1] == c[0:2]:
+                        patterns.append({
+                            'type': 'Đảo cầu hoàn chỉnh',
+                            'position': i,
+                            'pattern': f'{a[0:2]} → {b[0:2]} → {c[0:2]}',
+                            'description': f'Chu kỳ đảo: {a[0:2]} → {b[0:2]} → {c[0:2]}'
+                        })
+                        risk += 25
+        
+        # Check position swaps
+        for pos1 in range(4):
+            for pos2 in range(pos1+1, 5):
+                seq1 = [n[pos1] if len(n) > pos1 else '0' for n in recent[:20]]
+                seq2 = [n[pos2] if len(n) > pos2 else '0' for n in recent[:20]]
+                
+                # Check if digits swap between positions
+                swaps = 0
+                for i in range(len(seq1) - 1):
+                    if seq1[i] == seq2[i+1] and seq2[i] == seq1[i+1]:
+                        swaps += 1
+                
+                if swaps >= 3:
+                    patterns.append({
+                        'type': 'Đảo vị trí',
+                        'positions': [pos1, pos2],
+                        'swaps': swaps,
+                        'description': f'Vị {pos1} và {pos2} đảo {swaps} lần'
+                    })
+                    risk += 15
+        
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns[:10],
+            'risk': min(100, risk)
+        }
+    
+    def _detect_xoay_cau(self, data):
+        """
+        Phát hiện xoay cầu (rotations) - Số xoay vòng theo chu kỳ
+        """
+        if len(data) < 30:
+            return {'detected': False, 'patterns': [], 'risk': 0}
+        
+        recent = data[:60] if len(data) >= 60 else data
+        patterns = []
+        risk = 0
+        
+        # Check for rotating digits across positions
+        for pos in range(5):
+            seq = [n[pos] if len(n) > pos else '0' for n in recent]
+            
+            # Check for repeating cycles (3-period, 4-period, 5-period)
+            for cycle_len in [3, 4, 5]:
+                if len(seq) >= cycle_len * 3:
+                    cycle_matches = 0
+                    for i in range(len(seq) - cycle_len * 3):
+                        base = seq[i:i+cycle_len]
+                        match = True
+                        for j in range(1, 3):
+                            if seq[i+j*cycle_len:i+(j+1)*cycle_len] != base:
+                                match = False
+                                break
+                        if match:
+                            cycle_matches += 1
+                    
+                    if cycle_matches >= 2:
+                        patterns.append({
+                            'type': 'Xoay cầu chu kỳ',
+                            'position': pos,
+                            'cycle_length': cycle_len,
+                            'matches': cycle_matches,
+                            'description': f'Vị {pos}: Chu kỳ {cycle_len} kỳ lặp {cycle_matches} lần'
+                        })
+                        risk += 20
+        
+        # Check for digit rotation (0→1→2→3...)
+        for pos in range(5):
+            seq = [int(n[pos]) if len(n) > pos and n[pos].isdigit() else 0 for n in recent[:30]]
+            increment_matches = 0
+            for i in range(len(seq) - 1):
+                diff = (seq[i+1] - seq[i]) % 10
+                if diff == 1 or diff == 9:  # +1 or -1 rotation
+                    increment_matches += 1
+            
+            if increment_matches >= 15:
+                patterns.append({
+                    'type': 'Xoay số liên tiếp',
+                    'position': pos,
+                    'matches': increment_matches,
+                    'description': f'Vị {pos}: {increment_matches} lần xoay +1/-1'
+                })
+                risk += 15
+        
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns[:10],
+            'risk': min(100, risk)
+        }
+    
+    def _detect_nhip_bay(self, data):
+        """
+        Phát hiện bẫy nhịp (rhythm traps) - Nhà cái tạo nhịp để dụ
+        """
+        if len(data) < 20:
+            return {'detected': False, 'patterns': [], 'risk': 0}
+        
+        recent = data[:50] if len(data) >= 50 else data
+        patterns = []
+        risk = 0
+        
+        # Check for rhythm-2 that breaks (trap)
+        for pos in range(5):
+            seq = [n[pos] if len(n) > pos else '0' for n in recent]
+            for i in range(len(seq) - 5):
+                # X _ X _ X pattern
+                if seq[i] == seq[i+2] == seq[i+4] and seq[i] != seq[i+1]:
+                    d = seq[i]
+                    # Check if next breaks the pattern (trap)
+                    if i+5 < len(seq) and seq[i+5] != d:
+                        patterns.append({
+                            'type': 'Bẫy nhịp 2',
+                            'position': pos,
+                            'digit': d,
+                            'description': f'Vị {pos}: Số {d} nhịp 2 bị gãy ở kỳ {i+5}'
+                        })
+                        risk += 15
+        
+        # Check for false streaks (3-4 then breaks)
+        for pos in range(5):
+            seq = [n[pos] if len(n) > pos else '0' for n in recent]
+            i = 0
+            while i < len(seq) - 3:
+                if seq[i] == seq[i+1] == seq[i+2]:
+                    d = seq[i]
+                    # Check if streak breaks at 3-4 (common trap)
+                    if i+3 < len(seq) and seq[i+3] != d:
+                        patterns.append({
+                            'type': 'Bẫy bệt ngắn',
+                            'position': pos,
+                            'digit': d,
+                            'description': f'Vị {pos}: Số {d} bệt 3 kỳ rồi gãy (bẫy)'
+                        })
+                        risk += 12
+                    i += 3
+                else:
+                    i += 1
+        
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns[:10],
+            'risk': min(100, risk)
+        }
+    
+    def _detect_sum_control(self, data):
+        """
+        Phát hiện kiểm soát tổng (sum control) - Nhà cái kiểm soát tổng các số
+        """
+        if len(data) < 20:
+            return {'detected': False, 'patterns': [], 'risk': 0}
+        
+        recent = data[:50] if len(data) >= 50 else data
+        sums = [sum(int(d) for d in n) for n in recent if len(n) == 5 and n.isdigit()]
+        
+        if len(sums) < 10:
+            return {'detected': False, 'patterns': [], 'risk': 0}
+        
+        patterns = []
+        risk = 0
+        
+        # Check for unusually stable sums
+        sum_std = np.std(sums)
+        if sum_std < 2.5:
+            patterns.append({
+                'type': 'Kiểm soát tổng',
+                'std_dev': round(sum_std, 2),
+                'avg_sum': round(np.mean(sums), 1),
+                'description': f'Độ lệch chuẩn tổng: {sum_std:.2f} (quá ổn định)'
+            })
+            risk += 30
+        
+        # Check for sum range control
+        sum_range = max(sums) - min(sums)
+        if sum_range < 10 and len(sums) >= 30:
+            patterns.append({
+                'type': 'Giới hạn tổng',
+                'range': sum_range,
+                'description': f'Tổng chỉ dao động trong khoảng {sum_range} (bất thường)'
+            })
+            risk += 20
+        
+        # Check for repeating sums
+        sum_freq = Counter(sums)
+        most_common_sum, most_common_count = sum_freq.most_common(1)[0]
+        if most_common_count > len(sums) * 0.2:  # Same sum > 20% of time
+            patterns.append({
+                'type': 'Tổng lặp',
+                'sum': most_common_sum,
+                'count': most_common_count,
+                'description': f'Tổng {most_common_sum} xuất hiện {most_common_count} lần ({most_common_count/len(sums)*100:.0f}%)'
+            })
+            risk += 15
+        
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns,
+            'risk': min(100, risk)
+        }
+    
+    def _calculate_house_control_risk(self, patterns):
+        """Calculate overall house control risk level."""
+        total_risk = 0
+        
+        if patterns['bet_cau']['detected']:
+            total_risk += patterns['bet_cau']['risk'] * 0.3
+        if patterns['dao_cau']['detected']:
+            total_risk += patterns['dao_cau']['risk'] * 0.2
+        if patterns['xoay_cau']['detected']:
+            total_risk += patterns['xoay_cau']['risk'] * 0.2
+        if patterns['nhip_bay']['detected']:
+            total_risk += patterns['nhip_bay']['risk'] * 0.15
+        if patterns['tong_control']['detected']:
+            total_risk += patterns['tong_control']['risk'] * 0.15
+        
+        return min(100, int(total_risk))
+    
+    def get_house_control_level(self):
+        """Get house control level description."""
+        if self.risk_level >= 70:
+            return 'RẤT CAO', '🚫 Nhà cái đang điều khiển mạnh - NÊN DỪNG'
+        elif self.risk_level >= 50:
+            return 'CAO', '⚠️ Có dấu hiệu điều khiển - CẨN THẬN'
+        elif self.risk_level >= 30:
+            return 'TRUNG BÌNH', '⚠️ Một số pattern bất thường'
+        else:
+            return 'THẤP', '✅ Nhịp số tự nhiên'
+
+# ==============================================================================
+# 3. ENHANCED AI ENGINE WITH PATTERN AWARENESS
 # ==============================================================================
 
 class TitanAI:
@@ -99,6 +462,7 @@ class TitanAI:
             'monte_carlo': 15, 'pattern': 12, 'hot_cold': 8
         }
         self.accuracy_history = []
+        self.pattern_detector = HousePatternDetector()
     
     def analyze(self, history, max_simulations=2000):
         if not history or len(history) < 15:
@@ -108,6 +472,11 @@ class TitanAI:
         if len(clean_data) < 15:
             return self._fallback("Cần ít nhất 15 kỳ")
         
+        # Detect house patterns FIRST
+        house_patterns = self.pattern_detector.detect_all_patterns(clean_data)
+        house_control_level, house_warning = self.pattern_detector.get_house_control_level()
+        
+        # Run standard analysis
         results = {}
         results['frequency'] = self._analyze_frequency(clean_data)
         results['gap'] = self._analyze_gap(clean_data)
@@ -115,12 +484,16 @@ class TitanAI:
         results['monte_carlo'] = self._analyze_monte_carlo(clean_data, max_simulations)
         results['pattern'] = self._analyze_pattern_advanced(clean_data)
         results['hot_cold'] = self._analyze_hot_cold(clean_data)
-        results['position'] = self._analyze_by_position(clean_data)
         
-        ensemble = self._ensemble_vote(results)
+        # Adjust weights based on house patterns
+        if house_patterns['bet_cau']['detected'] and house_patterns['bet_cau']['risk'] >= 40:
+            # Reduce frequency weight during strong streaks (likely to break)
+            self.weights['frequency'] = 15
+            self.weights['pattern'] = 25
+        
+        ensemble = self._ensemble_vote(results, house_patterns)
         stats_df = self._build_stats_df(clean_data, results)
-        risk = self._calculate_risk(clean_data)
-        pattern_report = self._generate_pattern_report(clean_data)
+        risk = self._calculate_risk(clean_data, house_patterns)
         
         return {
             'main_3': ensemble['main_3'],
@@ -128,13 +501,13 @@ class TitanAI:
             'stats_df': stats_df,
             'risk': risk,
             'confidence': ensemble['confidence'],
-            'logic': self._build_logic(results, ensemble),
-            'pattern_report': pattern_report,
-            'position_analysis': results['position']
+            'logic': self._build_logic(results, ensemble, house_patterns),
+            'house_patterns': house_patterns,
+            'house_control_level': house_control_level,
+            'house_warning': house_warning
         }
     
     def record_accuracy(self, prediction, actual_result, won):
-        """Record prediction accuracy for analysis."""
         self.accuracy_history.append({
             'timestamp': datetime.now(),
             'prediction': prediction,
@@ -146,22 +519,14 @@ class TitanAI:
             self.accuracy_history.pop(0)
     
     def get_accuracy_stats(self):
-        """Get accuracy statistics - FIXED: Always return all keys."""
         if not self.accuracy_history:
-            return {
-                'total': 0,
-                'wins': 0,
-                'win_rate': 0,
-                'avg_confidence': 0,
-                'by_confidence': {}  # FIXED: Always include this key
-            }
+            return {'total': 0, 'wins': 0, 'win_rate': 0, 'avg_confidence': 0, 'by_confidence': {}}
         
         total = len(self.accuracy_history)
         wins = sum(1 for h in self.accuracy_history if h['won'])
         win_rate = wins / total * 100 if total > 0 else 0
         avg_conf = sum(h['confidence'] for h in self.accuracy_history) / total
         
-        # Accuracy by confidence bracket
         by_confidence = {}
         for bracket in ['50-69', '70-84', '85+']:
             if bracket == '50-69':
@@ -173,17 +538,11 @@ class TitanAI:
             
             if subset:
                 w = sum(1 for h in subset if h['won'])
-                by_confidence[bracket] = {
-                    'count': len(subset),
-                    'win_rate': round(w / len(subset) * 100, 1)
-                }
+                by_confidence[bracket] = {'count': len(subset), 'win_rate': round(w / len(subset) * 100, 1)}
         
         return {
-            'total': total,
-            'wins': wins,
-            'win_rate': round(win_rate, 1),
-            'avg_confidence': round(avg_conf, 1),
-            'by_confidence': by_confidence  # Always return this
+            'total': total, 'wins': wins, 'win_rate': round(win_rate, 1),
+            'avg_confidence': round(avg_conf, 1), 'by_confidence': by_confidence
         }
     
     def _clean_history(self, history):
@@ -302,24 +661,6 @@ class TitanAI:
                     patterns_found.append(f'Nhịp-2 vị {pos}: {d}')
                     candidates[d] += 4
         
-        sums = [sum(int(d) for d in n) for n in recent[:30]]
-        if len(sums) > 10:
-            sum_freq = Counter(sums)
-            common_sums = [s for s, c in sum_freq.most_common(3)]
-            for num in recent[:10]:
-                num_sum = sum(int(d) for d in num)
-                if num_sum in common_sums:
-                    for d in num:
-                        candidates[d] += 2
-        
-        for i in range(len(recent) - 1):
-            a, b = recent[i], recent[i+1]
-            if len(a) >= 2 and len(b) >= 2:
-                if a[0:2] == b[1::-1]:
-                    patterns_found.append(f'Đảo cặp: {a[0:2]} → {b[0:2]}')
-                    for d in a[0:2]:
-                        candidates[d] += 3
-        
         if not candidates:
             all_digits = ''.join(recent)
             freq = Counter(all_digits)
@@ -356,39 +697,32 @@ class TitanAI:
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
         return {'scores': scores, 'top_3': top_3}
     
-    def _analyze_by_position(self, data):
-        if len(data) < 20:
-            return {'pos_top': ['0']*5}
-        pos_freq = [Counter() for _ in range(5)]
-        for num in data:
-            for i, digit in enumerate(num[:5]):
-                pos_freq[i][digit] += 1
-        pos_top = []
-        for i in range(5):
-            if pos_freq[i]:
-                pos_top.append(pos_freq[i].most_common(1)[0][0])
-            else:
-                pos_top.append('0')
-        return {'pos_top': pos_top, 'pos_freq': [dict(pf.most_common(5)) for pf in pos_freq]}
-    
-    def _ensemble_vote(self, results):
+    def _ensemble_vote(self, results, house_patterns):
         votes = Counter()
         avoid_votes = []
+        
+        # If house control is high, avoid streaking numbers
+        if house_patterns['bet_cau']['detected'] and house_patterns['bet_cau']['risk'] >= 40:
+            for p in house_patterns['bet_cau']['patterns']:
+                if p['streak'] >= 4:
+                    avoid_votes.append(p['digit'])
+        
         for algo_name, result in results.items():
-            if algo_name == 'position':
-                continue
             weight = self.weights.get(algo_name, 10)
             for d in result.get('top_3', []):
                 votes[d] += weight
             if result.get('avoid'):
                 avoid_votes.extend(result['avoid'])
+        
         avoid_set = set(avoid_votes)
         main_3 = [d for d, _ in votes.most_common(3) if d not in avoid_set]
+        
         while len(main_3) < 3:
             for d in '0123456789':
                 if d not in main_3 and d not in avoid_set:
                     main_3.append(d)
                     break
+        
         remaining = [d for d, _ in votes.most_common(10) if d not in main_3 and d not in avoid_set]
         support_4 = remaining[:4]
         while len(support_4) < 4:
@@ -396,11 +730,13 @@ class TitanAI:
                 if d not in main_3 and d not in support_4 and d not in avoid_set:
                     support_4.append(d)
                     break
+        
         if votes:
             top_votes = [c for _, c in votes.most_common(3)]
             confidence = min(95, 55 + sum(top_votes) / 3)
         else:
             confidence = 50
+        
         return {'main_3': main_3, 'support_4': support_4, 'confidence': int(confidence), 'avoid': list(avoid_set)}
     
     def _build_stats_df(self, data, results):
@@ -421,67 +757,53 @@ class TitanAI:
         df = pd.DataFrame(rows)
         return df.sort_values('AI_Score', ascending=False).reset_index(drop=True)
     
-    def _calculate_risk(self, data):
+    def _calculate_risk(self, data, house_patterns):
+        base_risk = 0
+        reasons = []
+        
+        # Add house control risk
+        house_risk = self.pattern_detector.risk_level
+        if house_risk >= 50:
+            base_risk += house_risk * 0.5
+            reasons.append(f'Nhà cái điều khiển: {house_risk}%')
+        
+        # Standard risk calculation
         if len(data) < 20:
             return {'score': 30, 'level': 'MEDIUM', 'reason': 'Dữ liệu ít'}
+        
         all_digits = ''.join(data[:50])
         counts = Counter(all_digits)
         total = len(all_digits)
-        score = 0
-        reasons = []
+        
         entropy = sum(- (c/total) * math.log2(c/total) for c in counts.values() if c > 0)
         if entropy < 2.8:
-            score += 25
+            base_risk += 25
             reasons.append('Kết quả quá đều')
         elif entropy > 3.4:
-            score += 15
+            base_risk += 15
             reasons.append('Biến động mạnh')
-        for pos in range(5):
-            seq = [n[pos] if len(n) > pos else '0' for n in data[:30]]
-            max_streak, curr = 1, 1
-            for i in range(1, len(seq)):
-                if seq[i] == seq[i-1]:
-                    curr += 1
-                    max_streak = max(max_streak, curr)
-                else:
-                    curr = 1
-            if max_streak >= 5:
-                score += 30
-                reasons.append(f'Cầu bệt {max_streak} kỳ')
-                break
-        score = min(100, score)
-        level = 'HIGH' if score >= 50 else 'MEDIUM' if score >= 25 else 'OK'
-        return {'score': score, 'level': level, 'reason': '; '.join(reasons) if reasons else 'Ổn định'}
+        
+        base_risk = min(100, int(base_risk))
+        level = 'HIGH' if base_risk >= 50 else 'MEDIUM' if base_risk >= 25 else 'OK'
+        
+        return {'score': base_risk, 'level': level, 'reason': '; '.join(reasons) if reasons else 'Ổn định'}
     
-    def _build_logic(self, results, ensemble):
+    def _build_logic(self, results, ensemble, house_patterns):
         parts = []
         freq_top = [d for d, _ in sorted(results['frequency']['scores'].items(), key=lambda x: -x[1])[:2]]
         if freq_top:
             parts.append(f"Tần suất: {','.join(freq_top)}")
-        if results['pattern'].get('patterns'):
-            parts.append(f"{len(results['pattern']['patterns'])} pattern")
+        
+        if house_patterns['bet_cau']['detected']:
+            parts.append(f"Bệt: {house_patterns['bet_cau']['max_streak']} kỳ")
+        
         if ensemble['confidence'] >= 75:
             parts.append('Đồng thuận cao')
+        
         if ensemble.get('avoid'):
             parts.append(f"Tránh: {','.join(ensemble['avoid'][:2])}")
+        
         return ' | '.join(parts) if parts else 'Phân tích AI'
-    
-    def _generate_pattern_report(self, data):
-        recent = data[:30] if len(data) >= 30 else data
-        report = []
-        for pos in range(5):
-            seq = [n[pos] if len(n) > pos else '0' for n in recent]
-            for i in range(len(seq) - 2):
-                if seq[i] == seq[i+1] == seq[i+2]:
-                    streak = 3
-                    j = i + 3
-                    while j < len(seq) and seq[j] == seq[i]:
-                        streak += 1
-                        j += 1
-                    if streak >= 3:
-                        report.append(f"Vị {pos}: Số {seq[i]} bệt {streak} kỳ")
-                    break
-        return report[:5]
     
     def _fallback(self, msg="Chưa đủ dữ liệu"):
         return {
@@ -489,11 +811,11 @@ class TitanAI:
             'stats_df': pd.DataFrame({'Digit': list('0123456789'), 'AI_Score': [0]*10}),
             'risk': {'score': 0, 'level': 'LOW', 'reason': msg},
             'confidence': 0, 'logic': msg,
-            'pattern_report': [], 'position_analysis': {}
+            'house_patterns': {}, 'house_control_level': 'N/A', 'house_warning': ''
         }
 
 # ==============================================================================
-# 3. MAIN APPLICATION
+# 4. MAIN APPLICATION
 # ==============================================================================
 
 def main():
@@ -509,54 +831,48 @@ def main():
     # Header
     st.markdown("""
     <div class="header-card">
-        <div class="header-title">🎯 TITAN AI v4.1</div>
-        <div class="header-subtitle">Accuracy Testing & Pattern Analysis - FIXED</div>
+        <div class="header-title">🎯 TITAN AI v5.0</div>
+        <div class="header-subtitle">House Pattern Detector | Phát hiện bẫy nhà cái</div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Sidebar: Accuracy Stats
+    # Sidebar
     with st.sidebar:
         st.markdown("### 📊 Độ Chính Xác")
         acc_stats = st.session_state.ai.get_accuracy_stats()
         st.metric("Tổng lần test", acc_stats['total'])
         st.metric("Trúng", acc_stats['wins'])
         st.metric("Win Rate", f"{acc_stats['win_rate']}%")
-        st.metric("Avg Confidence", f"{acc_stats['avg_confidence']}%")
-        
-        if acc_stats.get('by_confidence'):  # Safe check
-            st.markdown("---")
-            st.markdown("**Theo Confidence:**")
-            for bracket, data in acc_stats['by_confidence'].items():
-                st.write(f"{bracket}%: {data['win_rate']}% ({data['count']} lần)")
         
         st.markdown("---")
-        if st.button("🗑️ Reset test data"):
+        if st.button("🗑️ Reset"):
             st.session_state.test_log = []
             st.session_state.ai.accuracy_history = []
             st.success("✅ Đã reset!")
             time.sleep(0.5)
             st.rerun()
     
-    # Accuracy Overview
+    # Stats Overview
     acc_stats = st.session_state.ai.get_accuracy_stats()
-    st.markdown("### 📊 Thống kê Test")
+    st.markdown("### 📊 Thống kê")
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("📦 Tổng kỳ data", len(st.session_state.db))
+        st.metric("📦 Tổng kỳ", len(st.session_state.db))
     with col2:
         st.metric("🎯 Đã test", acc_stats['total'])
     with col3:
         color = "🟢" if acc_stats['win_rate'] >= 40 else "🟡" if acc_stats['win_rate'] >= 25 else "🔴"
         st.metric("Win Rate", f"{color} {acc_stats['win_rate']}%")
     with col4:
-        st.metric("💯 Avg Conf", f"{acc_stats['avg_confidence']}%")
+        if st.session_state.result:
+            st.metric("🏠 House Control", f"{st.session_state.ai.pattern_detector.risk_level}%")
     
-    # Input Section
-    st.markdown("### 📥 Nhập kết quả lịch sử")
+    # Input
+    st.markdown("### 📥 Nhập kết quả")
     raw_input = st.text_area(
         "Dán kết quả (mỗi kỳ 1 dòng, 5 chữ số):",
-        height=120,
-        placeholder="87746\n56421\n69137\n...",
+        height=150,
+        placeholder="09215\n23823\n45976\n...",
         key="data_input"
     )
     
@@ -575,7 +891,7 @@ def main():
     
     # Process
     if analyze_btn and raw_input.strip():
-        with st.spinner("🧠 Đang phân tích..."):
+        with st.spinner("🧠 Đang phân tích pattern nhà cái..."):
             numbers = re.findall(r'\d{5}', raw_input)
             if not numbers:
                 st.error("❌ Không tìm thấy số 5 chữ số!")
@@ -599,6 +915,16 @@ def main():
         res = st.session_state.result
         risk = res['risk']
         
+        # House Control Warning
+        if st.session_state.ai.pattern_detector.risk_level >= 50:
+            st.markdown(f"""
+            <div class="pattern-alert">
+                🚨 CẢNH BÁO: Nhà cái đang điều khiển ({st.session_state.ai.pattern_detector.risk_level}%)<br>
+                <small>{res['house_warning']}</small>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Status
         if risk['level'] == 'OK':
             status_class, status_text = 'status-ok', '✅ CÓ THỂ TEST'
         elif risk['level'] == 'MEDIUM':
@@ -611,6 +937,39 @@ def main():
             {status_text} | Risk: {risk['score']}/100 | {risk['reason']}
         </div>
         """, unsafe_allow_html=True)
+        
+        # House Patterns Detail
+        if res.get('house_patterns'):
+            st.markdown("### 🔍 Pattern Nhà Cái Phát Hiện")
+            
+            hp = res['house_patterns']
+            
+            if hp['bet_cau']['detected']:
+                st.markdown(f"""
+                <div class="pattern-box">
+                    <div class="pattern-title">📊 Bệt Cầu ({hp['bet_cau']['risk']}% risk)</div>
+                """, unsafe_allow_html=True)
+                for p in hp['bet_cau']['patterns'][:5]:
+                    st.markdown(f"- {p['description']}")
+                st.markdown("</div>", unsafe_allow_html=True)
+            
+            if hp['dao_cau']['detected']:
+                st.markdown(f"""
+                <div class="pattern-box">
+                    <div class="pattern-title">🔄 Đảo Cầu ({hp['dao_cau']['risk']}% risk)</div>
+                """, unsafe_allow_html=True)
+                for p in hp['dao_cau']['patterns'][:5]:
+                    st.markdown(f"- {p['description']}")
+                st.markdown("</div>", unsafe_allow_html=True)
+            
+            if hp['nhip_bay']['detected']:
+                st.markdown(f"""
+                <div class="pattern-box">
+                    <div class="pattern-title">⚠️ Bẫy Nhịp ({hp['nhip_bay']['risk']}% risk)</div>
+                """, unsafe_allow_html=True)
+                for p in hp['nhip_bay']['patterns'][:5]:
+                    st.markdown(f"- {p['description']}")
+                st.markdown("</div>", unsafe_allow_html=True)
         
         # 3 Main Numbers
         st.markdown("### 🔮 3 SỐ DỰ ĐOÁN")
@@ -640,12 +999,6 @@ def main():
         if res['logic']:
             st.markdown(f'<div class="info-box">💡 <strong>Logic:</strong> {res["logic"]}</div>', unsafe_allow_html=True)
         
-        # Pattern Report
-        if res.get('pattern_report'):
-            st.markdown("### 🔄 Pattern Phát Hiện")
-            for p in res['pattern_report']:
-                st.markdown(f"- {p}")
-        
         # Test Verification
         st.markdown("---")
         st.markdown("### ✅ Test Độ Chính Xác")
@@ -663,16 +1016,17 @@ def main():
                         'prediction': main_3,
                         'actual': actual,
                         'won': is_win,
-                        'confidence': res['confidence']
+                        'confidence': res['confidence'],
+                        'house_risk': st.session_state.ai.pattern_detector.risk_level
                     })
                     if is_win:
-                        st.success(f"🎉 TRÚNG! (Confidence: {res['confidence']}%)")
+                        st.success(f"🎉 TRÚNG! (Conf: {res['confidence']}%, House: {st.session_state.ai.pattern_detector.risk_level}%)")
                     else:
                         missing = set(main_3) - set(actual)
-                        st.warning(f"❌ Trượt! Thiếu: {', '.join(missing)} (Confidence: {res['confidence']}%)")
+                        st.warning(f"❌ Trượt! Thiếu: {', '.join(missing)}")
                     st.rerun()
     
-    # Test History Table
+    # Test History
     if st.session_state.test_log:
         st.markdown("---")
         st.markdown("### 📜 Lịch sử Test")
@@ -680,17 +1034,16 @@ def main():
         df_test['timestamp'] = pd.to_datetime(df_test['timestamp']).dt.strftime('%H:%M %d/%m')
         df_test['prediction'] = df_test['prediction'].apply(lambda x: ','.join(x))
         df_test['status'] = df_test['won'].apply(lambda x: '✅' if x else '❌')
-        display_cols = ['timestamp', 'prediction', 'actual', 'status', 'confidence']
-        st.dataframe(df_test[display_cols], hide_index=True, use_container_width=True,
-                    column_config={"confidence": st.column_config.NumberColumn(format="%d%%")})
+        display_cols = ['timestamp', 'prediction', 'actual', 'status', 'confidence', 'house_risk']
+        st.dataframe(df_test[display_cols], hide_index=True, use_container_width=True)
     
     # Footer
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #94a3b8; padding: 20px; font-size: 12px;">
-        🎯 TITAN AI v4.1 | Fixed KeyError Bug<br>
-        📊 Đang test độ chính xác thực tế<br>
-        💡 Giúp em cải thiện thuật toán
+        🎯 TITAN AI v5.0 | House Pattern Detector<br>
+        🔍 Phát hiện: Bệt cầu | Đảo cầu | Xoay cầu | Bẫy nhịp<br>
+        ⚠️ Khi House Control >= 50%: Nên dừng
     </div>
     """, unsafe_allow_html=True)
 
