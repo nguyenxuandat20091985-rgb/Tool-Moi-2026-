@@ -1,6 +1,5 @@
 # ==============================================================================
-# TITAN AI v4.0 - ACCURACY TESTING & PATTERN ANALYSIS
-# Chuyên test độ chính xác + Phân tích pattern nhà cái
+# TITAN AI v4.1 - FIXED KeyError Bug
 # ==============================================================================
 
 import streamlit as st
@@ -19,7 +18,7 @@ warnings.filterwarnings('ignore')
 # 1. CSS STYLING
 # ==============================================================================
 
-st.set_page_config(page_title="🎯 TITAN AI v4.0 | Accuracy Test", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="🎯 TITAN AI v4.1 | Accuracy Test", page_icon="📊", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
@@ -81,19 +80,16 @@ st.markdown("""
         border: 2px solid #475569 !important; border-radius: 12px;
     }
     
-    .accuracy-table { background: rgba(255,255,255,0.05) !important; border-radius: 12px; }
-    
     @media (max-width: 600px) {
         .stats-grid { grid-template-columns: repeat(2, 1fr); }
         .num-value { font-size: 42px; }
         .support-value { font-size: 28px; }
-        .numbers-grid, .support-grid { gap: 8px; }
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 2. ENHANCED AI ENGINE - Pattern Detection Focus
+# 2. AI ENGINE - FIXED
 # ==============================================================================
 
 class TitanAI:
@@ -102,7 +98,7 @@ class TitanAI:
             'frequency': 25, 'gap': 20, 'markov': 20,
             'monte_carlo': 15, 'pattern': 12, 'hot_cold': 8
         }
-        self.accuracy_history = []  # Track prediction accuracy
+        self.accuracy_history = []
     
     def analyze(self, history, max_simulations=2000):
         if not history or len(history) < 15:
@@ -119,8 +115,6 @@ class TitanAI:
         results['monte_carlo'] = self._analyze_monte_carlo(clean_data, max_simulations)
         results['pattern'] = self._analyze_pattern_advanced(clean_data)
         results['hot_cold'] = self._analyze_hot_cold(clean_data)
-        
-        # Position-specific analysis (important for 5D)
         results['position'] = self._analyze_by_position(clean_data)
         
         ensemble = self._ensemble_vote(results)
@@ -148,15 +142,19 @@ class TitanAI:
             'won': won,
             'confidence': prediction.get('confidence', 0)
         })
-        
-        # Keep last 100 predictions
         if len(self.accuracy_history) > 100:
             self.accuracy_history.pop(0)
     
     def get_accuracy_stats(self):
-        """Get accuracy statistics."""
+        """Get accuracy statistics - FIXED: Always return all keys."""
         if not self.accuracy_history:
-            return {'total': 0, 'wins': 0, 'win_rate': 0, 'avg_confidence': 0}
+            return {
+                'total': 0,
+                'wins': 0,
+                'win_rate': 0,
+                'avg_confidence': 0,
+                'by_confidence': {}  # FIXED: Always include this key
+            }
         
         total = len(self.accuracy_history)
         wins = sum(1 for h in self.accuracy_history if h['won'])
@@ -185,7 +183,7 @@ class TitanAI:
             'wins': wins,
             'win_rate': round(win_rate, 1),
             'avg_confidence': round(avg_conf, 1),
-            'by_confidence': by_confidence
+            'by_confidence': by_confidence  # Always return this
         }
     
     def _clean_history(self, history):
@@ -269,16 +267,13 @@ class TitanAI:
         return {'scores': scores, 'top_3': top_3}
     
     def _analyze_pattern_advanced(self, data):
-        """Advanced pattern detection for 5D lottery."""
         if len(data) < 25:
             return {'scores': {d: 10 for d in '0123456789'}, 'top_3': ['3','5','7'], 'patterns': []}
-        
         recent = data[:50] if len(data) >= 50 else data
         candidates = Counter()
         patterns_found = []
         avoid = []
         
-        # Pattern 1: Position streaks (cầu bệt theo vị trí)
         for pos in range(5):
             seq = [n[pos] if len(n) > pos else '0' for n in recent]
             i = 0
@@ -290,18 +285,15 @@ class TitanAI:
                     while j < len(seq) and seq[j] == d:
                         streak_len += 1
                         j += 1
-                    
                     patterns_found.append(f'Bệt vị {pos}: {d} ({streak_len} kỳ)')
-                    
                     if streak_len >= 5:
-                        avoid.append(d)  # Long streak likely to break
+                        avoid.append(d)
                     elif streak_len >= 3:
-                        candidates[d] += 5  # Medium streak may continue
+                        candidates[d] += 5
                     i = j
                 else:
                     i += 1
         
-        # Pattern 2: Rhythm patterns (X _ X _ X)
         for pos in range(5):
             seq = [n[pos] if len(n) > pos else '0' for n in recent]
             for i in range(len(seq) - 4):
@@ -310,19 +302,16 @@ class TitanAI:
                     patterns_found.append(f'Nhịp-2 vị {pos}: {d}')
                     candidates[d] += 4
         
-        # Pattern 3: Sum patterns
         sums = [sum(int(d) for d in n) for n in recent[:30]]
         if len(sums) > 10:
             sum_freq = Counter(sums)
             common_sums = [s for s, c in sum_freq.most_common(3)]
-            # Find numbers that appear in common sum ranges
             for num in recent[:10]:
                 num_sum = sum(int(d) for d in num)
                 if num_sum in common_sums:
                     for d in num:
                         candidates[d] += 2
         
-        # Pattern 4: Pair patterns (AB → BA reversal)
         for i in range(len(recent) - 1):
             a, b = recent[i], recent[i+1]
             if len(a) >= 2 and len(b) >= 2:
@@ -331,7 +320,6 @@ class TitanAI:
                     for d in a[0:2]:
                         candidates[d] += 3
         
-        # Fallback
         if not candidates:
             all_digits = ''.join(recent)
             freq = Counter(all_digits)
@@ -340,19 +328,13 @@ class TitanAI:
         
         scores = {d: candidates.get(d, 0) * 2 for d in '0123456789'}
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
-        
         while len(top_3) < 3:
             for d in '0123456789':
                 if d not in top_3:
                     top_3.append(d)
                     break
         
-        return {
-            'scores': scores,
-            'top_3': top_3,
-            'patterns': patterns_found[:10],
-            'avoid': list(set(avoid))
-        }
+        return {'scores': scores, 'top_3': top_3, 'patterns': patterns_found[:10], 'avoid': list(set(avoid))}
     
     def _analyze_hot_cold(self, data):
         recent = data[:15] if len(data) >= 15 else data
@@ -375,31 +357,23 @@ class TitanAI:
         return {'scores': scores, 'top_3': top_3}
     
     def _analyze_by_position(self, data):
-        """Analyze each position separately (important for 5D)."""
         if len(data) < 20:
             return {'pos_top': ['0']*5}
-        
         pos_freq = [Counter() for _ in range(5)]
         for num in data:
             for i, digit in enumerate(num[:5]):
                 pos_freq[i][digit] += 1
-        
         pos_top = []
         for i in range(5):
             if pos_freq[i]:
                 pos_top.append(pos_freq[i].most_common(1)[0][0])
             else:
                 pos_top.append('0')
-        
-        return {
-            'pos_top': pos_top,
-            'pos_freq': [dict(pf.most_common(5)) for pf in pos_freq]
-        }
+        return {'pos_top': pos_top, 'pos_freq': [dict(pf.most_common(5)) for pf in pos_freq]}
     
     def _ensemble_vote(self, results):
         votes = Counter()
         avoid_votes = []
-        
         for algo_name, result in results.items():
             if algo_name == 'position':
                 continue
@@ -408,16 +382,13 @@ class TitanAI:
                 votes[d] += weight
             if result.get('avoid'):
                 avoid_votes.extend(result['avoid'])
-        
         avoid_set = set(avoid_votes)
         main_3 = [d for d, _ in votes.most_common(3) if d not in avoid_set]
-        
         while len(main_3) < 3:
             for d in '0123456789':
                 if d not in main_3 and d not in avoid_set:
                     main_3.append(d)
                     break
-        
         remaining = [d for d, _ in votes.most_common(10) if d not in main_3 and d not in avoid_set]
         support_4 = remaining[:4]
         while len(support_4) < 4:
@@ -425,13 +396,11 @@ class TitanAI:
                 if d not in main_3 and d not in support_4 and d not in avoid_set:
                     support_4.append(d)
                     break
-        
         if votes:
             top_votes = [c for _, c in votes.most_common(3)]
             confidence = min(95, 55 + sum(top_votes) / 3)
         else:
             confidence = 50
-        
         return {'main_3': main_3, 'support_4': support_4, 'confidence': int(confidence), 'avoid': list(avoid_set)}
     
     def _build_stats_df(self, data, results):
@@ -498,11 +467,8 @@ class TitanAI:
         return ' | '.join(parts) if parts else 'Phân tích AI'
     
     def _generate_pattern_report(self, data):
-        """Generate detailed pattern report."""
         recent = data[:30] if len(data) >= 30 else data
         report = []
-        
-        # Check each position for streaks
         for pos in range(5):
             seq = [n[pos] if len(n) > pos else '0' for n in recent]
             for i in range(len(seq) - 2):
@@ -515,7 +481,6 @@ class TitanAI:
                     if streak >= 3:
                         report.append(f"Vị {pos}: Số {seq[i]} bệt {streak} kỳ")
                     break
-        
         return report[:5]
     
     def _fallback(self, msg="Chưa đủ dữ liệu"):
@@ -544,8 +509,8 @@ def main():
     # Header
     st.markdown("""
     <div class="header-card">
-        <div class="header-title">🎯 TITAN AI v4.0</div>
-        <div class="header-subtitle">Accuracy Testing & Pattern Analysis</div>
+        <div class="header-title">🎯 TITAN AI v4.1</div>
+        <div class="header-subtitle">Accuracy Testing & Pattern Analysis - FIXED</div>
     </div>
     """, unsafe_allow_html=True)
     
@@ -558,7 +523,7 @@ def main():
         st.metric("Win Rate", f"{acc_stats['win_rate']}%")
         st.metric("Avg Confidence", f"{acc_stats['avg_confidence']}%")
         
-        if acc_stats['by_confidence']:
+        if acc_stats.get('by_confidence'):  # Safe check
             st.markdown("---")
             st.markdown("**Theo Confidence:**")
             for bracket, data in acc_stats['by_confidence'].items():
@@ -692,11 +657,7 @@ def main():
             if st.button("✅ GHI NHẬN", type="primary", use_container_width=True):
                 if actual and len(actual) == 5 and actual.isdigit():
                     is_win = set(main_3).issubset(set(actual))
-                    
-                    # Record for accuracy tracking
                     st.session_state.ai.record_accuracy(res, actual, is_win)
-                    
-                    # Add to test log
                     st.session_state.test_log.append({
                         'timestamp': datetime.now().isoformat(),
                         'prediction': main_3,
@@ -704,25 +665,21 @@ def main():
                         'won': is_win,
                         'confidence': res['confidence']
                     })
-                    
                     if is_win:
                         st.success(f"🎉 TRÚNG! (Confidence: {res['confidence']}%)")
                     else:
                         missing = set(main_3) - set(actual)
                         st.warning(f"❌ Trượt! Thiếu: {', '.join(missing)} (Confidence: {res['confidence']}%)")
-                    
                     st.rerun()
     
     # Test History Table
     if st.session_state.test_log:
         st.markdown("---")
         st.markdown("### 📜 Lịch sử Test")
-        
-        df_test = pd.DataFrame(st.session_state.test_log[-20:])  # Last 20
+        df_test = pd.DataFrame(st.session_state.test_log[-20:])
         df_test['timestamp'] = pd.to_datetime(df_test['timestamp']).dt.strftime('%H:%M %d/%m')
         df_test['prediction'] = df_test['prediction'].apply(lambda x: ','.join(x))
         df_test['status'] = df_test['won'].apply(lambda x: '✅' if x else '❌')
-        
         display_cols = ['timestamp', 'prediction', 'actual', 'status', 'confidence']
         st.dataframe(df_test[display_cols], hide_index=True, use_container_width=True,
                     column_config={"confidence": st.column_config.NumberColumn(format="%d%%")})
@@ -731,7 +688,7 @@ def main():
     st.markdown("---")
     st.markdown("""
     <div style="text-align: center; color: #94a3b8; padding: 20px; font-size: 12px;">
-        🎯 TITAN AI v4.0 | Accuracy Testing Version<br>
+        🎯 TITAN AI v4.1 | Fixed KeyError Bug<br>
         📊 Đang test độ chính xác thực tế<br>
         💡 Giúp em cải thiện thuật toán
     </div>
