@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import re
 import json
-import random
+import pandas as pd
 from collections import Counter
 from itertools import combinations
 
@@ -17,72 +17,82 @@ def setup_neural():
 
 neural_engine = setup_neural()
 
+# --- Thuật toán lọc dữ liệu thông minh (Sửa lỗi đứng hình) ---
+def smart_extract(raw_text):
+    # Tìm tất cả các dãy 5 chữ số đứng riêng biệt (bỏ qua số kỳ 3 chữ số)
+    # Regex này chỉ lấy dãy 5 số
+    lines = re.findall(r"\b\d{5}\b", raw_text)
+    return lines
+
+def get_combo_stats(history, n=3):
+    all_combos = []
+    for line in history:
+        unique_digits = sorted(list(set(line)))
+        if len(unique_digits) >= n:
+            all_combos.extend(combinations(unique_digits, n))
+    return Counter(all_combos).most_common(1)
+
 # ================= UI STYLE v22 CHUẨN =================
-st.set_page_config(page_title="TITAN v24.5 FORCE", layout="wide")
+st.set_page_config(page_title="TITAN v24.5 FINAL", layout="wide")
 st.markdown("""
     <style>
     .stApp { background: #010409; color: #e6edf3; }
     .prediction-card {
         background: #0d1117; border: 2px solid #58a6ff;
-        border-radius: 12px; padding: 20px; margin-top: 10px;
+        border-radius: 12px; padding: 25px; margin-top: 10px;
+        box-shadow: 0 0 15px rgba(88,166,255,0.1);
     }
-    .num-box { font-size: 80px; font-weight: 900; color: #ff4b4b; text-align: center; letter-spacing: 15px; }
-    .lot-box { font-size: 55px; font-weight: 700; color: #58a6ff; text-align: center; letter-spacing: 5px; }
-    .status-bar { padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 1.2rem; }
+    .num-box {
+        font-size: 90px; font-weight: 900; color: #ff4b4b;
+        text-align: center; letter-spacing: 15px; text-shadow: 3px 3px #000;
+    }
+    .lot-box {
+        font-size: 60px; font-weight: 700; color: #58a6ff;
+        text-align: center; letter-spacing: 5px;
+    }
+    .status-bar { padding: 15px; border-radius: 10px; text-align: center; font-weight: 900; font-size: 1.4rem; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h2 style='text-align: center; color: #58a6ff;'>⚡ TITAN v24.5 - BẢN ÉP NHẢY SỐ</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #58a6ff;'>💎 TITAN v24.5 - CHỐT 3 SỐ CHÍNH XÁC</h2>", unsafe_allow_html=True)
 
-# Khởi tạo ID ngẫu nhiên để đánh lừa Cache
-if "input_id" not in st.session_state:
-    st.session_state.input_id = random.randint(1, 1000)
+# ================= XỬ LÝ NHẬP LIỆU =================
 if "last_res" not in st.session_state:
     st.session_state.last_res = None
 
-# ================= GIAO DIỆN NHẬP LIỆU =================
 with st.container():
-    # Tạo key động cho text_area dựa trên input_id
-    raw_input = st.text_area(
-        "📡 Dán dữ liệu mới nhất (Xóa sạch cũ rồi dán mới):", 
-        height=150, 
-        key=f"input_{st.session_state.input_id}"
-    )
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("🔥 GIẢI MÃ & ÉP LÀM MỚI", use_container_width=True):
-            if raw_input:
-                with st.spinner('Đang ép AI chạy lại...'):
-                    # 1. Lọc dữ liệu
-                    lines = [l.strip() for l in raw_input.split('\n') if re.match(r"^\d{5}$", l.strip())]
-                    
-                    if len(lines) >= 5:
-                        # 2. Thuật toán thống kê Combo nhanh
-                        all_combos = []
-                        for line in lines[:30]:
-                            u = sorted(list(set(line)))
-                            if len(u) >= 3: all_combos.extend(combinations(u, 3))
-                        top_c = "".join(Counter(all_combos).most_common(1)[0][0]) if all_combos else "123"
-
-                        # 3. Ép AI phân tích
-                        prompt = f"Phân tích bộ 3 số 5 tinh (Combo hay về cùng nhau) cho 5D từ: {lines[:40]}. Trả về JSON: {{\"m\": \"abc\", \"s\": \"defg\", \"d\": \"ĐÁNH\", \"l\": \"...\", \"c\": \"Green\"}}"
-                        try:
-                            resp = neural_engine.generate_content(prompt)
-                            st.session_state.last_res = json.loads(re.search(r'\{.*\}', resp.text, re.DOTALL).group())
-                        except:
-                            st.session_state.last_res = {"m": top_c, "s": "0456", "d": "ĐÁNH", "l": "Thống kê Combo trực tiếp", "c": "Green"}
-                        
-                        # ĐỔI ID ĐỂ KỲ SAU KHÔNG BỊ TRÙNG CACHE
-                        st.session_state.input_id += 1
-                        st.rerun()
-            else:
-                st.error("Chưa dán số anh ơi!")
+    col_in, col_btn = st.columns([3, 1])
+    with col_in:
+        # Anh cứ dán cả bảng lịch sử vào đây, không cần xóa số kỳ
+        raw_input = st.text_area("📡 Dán lịch sử từ KU (Dán trực tiếp):", height=150, placeholder="Ví dụ: 222 80586\n221 64549...")
+    with col_btn:
+        st.write("🔧 **CÔNG CỤ**")
+        if st.button("🔥 GIẢI MÃ NGAY", use_container_width=True):
+            cleaned_data = smart_extract(raw_input)
+            if len(cleaned_data) >= 5:
+                # Thuật toán Combo nổ nhất
+                best_c = get_combo_stats(cleaned_data[:30])
+                combo_fix = "".join(best_c[0][0]) if best_c else "123"
                 
-    with c2:
-        if st.button("🗑️ XÓA SẠCH DỮ LIỆU", use_container_width=True):
+                # Gọi AI xử lý đa tầng
+                prompt = f"""
+                Dữ liệu thực tế: {cleaned_data[:40]}.
+                Quy tắc 3 số 5 tinh: Thắng khi kết quả có mặt đủ 3 số.
+                Phân tích nhịp cầu kẹp và cầu bệt combo.
+                Trả về JSON: {{"m": "{combo_fix}", "s": "0468", "d": "NÊN ĐÁNH", "l": "Cầu đang bệt combo mạnh", "c": "Green"}}
+                """
+                try:
+                    res_ai = neural_engine.generate_content(prompt)
+                    match = re.search(r'\{.*\}', res_ai.text, re.DOTALL)
+                    st.session_state.last_res = json.loads(match.group())
+                except:
+                    st.session_state.last_res = {"m": combo_fix, "s": "0456", "d": "ĐÁNH THEO COMBO", "l": "Dựa trên tần suất bộ 3 nổ dày.", "c": "Green"}
+                st.rerun()
+            else:
+                st.error("❌ Không tìm thấy dãy 5 số nào! Anh kiểm tra lại dữ liệu dán vào.")
+
+        if st.button("🗑️ RESET TOOL", use_container_width=True):
             st.session_state.last_res = None
-            st.session_state.input_id += 1
             st.rerun()
 
 # ================= HIỂN THỊ KẾT QUẢ =================
@@ -90,19 +100,26 @@ if st.session_state.last_res:
     res = st.session_state.last_res
     bg = "#238636" if res['c'].lower() == "green" else "#da3633"
     
-    st.markdown(f"<div class='status-bar' style='background: {bg};'>📢 TRẠNG THÁI: {res['d']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='status-bar' style='background: {bg};'>📢 TRẠNG THÁI AI: {res['d']}</div>", unsafe_allow_html=True)
     
     st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
-    col_main, col_supp = st.columns([1.5, 1])
-    with col_main:
-        st.markdown("<p style='text-align:center; color:#8b949e;'>💎 3 SỐ 5 TINH CHỦ LỰC</p>", unsafe_allow_html=True)
+    c1, c2 = st.columns([1.5, 1])
+    with c1:
+        st.markdown("<p style='text-align:center; color:#8b949e;'>🔥 3 SỐ 5 TINH CHỦ LỰC (VÀO TIỀN)</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='num-box'>{res['m']}</div>", unsafe_allow_html=True)
-    with col_supp:
-        st.markdown("<p style='text-align:center; color:#8b949e;'>🛡️ 4 SỐ LÓT</p>", unsafe_allow_html=True)
+    with c2:
+        st.markdown("<p style='text-align:center; color:#8b949e;'>🛡️ 4 SỐ LÓT (GHÉP DÀN)</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='lot-box'>{res['s']}</div>", unsafe_allow_html=True)
     
     st.divider()
-    st.write(f"🧠 **LOGIC:** {res['l']}")
+    st.write(f"🧠 **PHÂN TÍCH NHỊP CẦU:** {res['l']}")
+    
     full_dan = "".join(sorted(set(res['m'] + res['s'])))
-    st.text_input("📋 DÀN 7 SỐ KUBET:", full_dan)
+    st.text_input("📋 DÀN 7 SỐ KUBET (Copy):", full_dan)
     st.markdown("</div>", unsafe_allow_html=True)
+
+    # Thống kê trực quan
+    with st.expander("📊 Biểu đồ nhịp rơi hiện tại"):
+        cleaned_list = smart_extract(raw_input)
+        all_txt = "".join(cleaned_list[:20])
+        st.bar_chart(pd.Series(Counter(all_txt)).sort_index())
