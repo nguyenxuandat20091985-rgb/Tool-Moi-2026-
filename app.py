@@ -1,22 +1,30 @@
 # ==============================================================================
-# TITAN AI v5.0 - Main Application
+# TITAN AI v5.0 - Main Application (FIXED)
 # ==============================================================================
 
 import streamlit as st
 import pandas as pd
 import time
 from datetime import datetime
-from config import Config
-from database import DatabaseManager
-from algorithms import TitanAI
 
+# Import với error handling
+try:
+    from config import Config
+    from database import DatabaseManager
+    from algorithms import TitanAI
+except ImportError as e:
+    st.error(f"❌ Lỗi import: {str(e)}")
+    st.stop()
+
+# Page config
 st.set_page_config(
-    page_title=Config.APP_TITLE,
-    page_icon=Config.PAGE_ICON,
+    page_title="🎯 TITAN AI v5.0",
+    page_icon="🔍",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
+# CSS
 st.markdown("""
 <style>
     .stApp { background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%); color: #e6edf3; }
@@ -43,25 +51,41 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def main():
+    # Initialize session state SAFELY
     if 'db_manager' not in st.session_state:
-        st.session_state.db_manager = DatabaseManager()
+        try:
+            st.session_state.db_manager = DatabaseManager()
+        except Exception as e:
+            st.error(f"❌ Lỗi khởi tạo DB: {str(e)}")
+            st.stop()
+    
     if 'ai_engine' not in st.session_state:
-        st.session_state.ai_engine = TitanAI()
+        try:
+            st.session_state.ai_engine = TitanAI()
+        except Exception as e:
+            st.error(f"❌ Lỗi khởi tạo AI: {str(e)}")
+            st.stop()
+    
     if 'result' not in st.session_state:
         st.session_state.result = None
     
-    st.markdown(f"""
+    # Header
+    st.markdown("""
     <div class="header-card">
-        <div class="header-title">{Config.APP_TITLE}</div>
-        <div class="header-subtitle">{Config.APP_SUBTITLE}</div>
+        <div class="header-title">🎯 TITAN AI v5.0</div>
+        <div class="header-subtitle">House Pattern Detector</div>
     </div>
     """, unsafe_allow_html=True)
     
+    # Sidebar
     with st.sidebar:
         st.markdown("### 📊 Thống kê")
-        acc_stats = st.session_state.db_manager.get_accuracy_stats()
-        st.metric("Test", acc_stats['total'])
-        st.metric("Win", f"{acc_stats['win_rate']}%")
+        try:
+            acc_stats = st.session_state.db_manager.get_accuracy_stats()
+            st.metric("Test", acc_stats.get('total', 0))
+            st.metric("Win", f"{acc_stats.get('win_rate', 0)}%")
+        except:
+            st.write("Chưa có dữ liệu")
         
         if st.button("🗑️ Reset"):
             st.session_state.db_manager.clear()
@@ -69,19 +93,25 @@ def main():
             time.sleep(0.5)
             st.rerun()
     
-    acc_stats = st.session_state.db_manager.get_accuracy_stats()
-    db_stats = st.session_state.db_manager.get_statistics()
+    # Stats - FIXED: Check if db_manager exists
+    try:
+        acc_stats = st.session_state.db_manager.get_accuracy_stats()
+        db_stats = st.session_state.db_manager.get_statistics()
+    except:
+        acc_stats = {'total': 0, 'win_rate': 0}
+        db_stats = {'total_numbers': 0, 'total_tests': 0}
     
     st.markdown("### 📊 Thống kê")
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("📦 Kỳ", db_stats['total_numbers'])
+        st.metric("📦 Kỳ", db_stats.get('total_numbers', 0))
     with col2:
-        st.metric("🎯 Test", acc_stats['total'])
+        st.metric("🎯 Test", acc_stats.get('total', 0))
     with col3:
-        color = "🟢" if acc_stats['win_rate'] >= 40 else "🟡" if acc_stats['win_rate'] >= 25 else "🔴"
-        st.metric("Win Rate", f"{color} {acc_stats['win_rate']}%")
+        color = "🟢" if acc_stats.get('win_rate', 0) >= 40 else "🟡" if acc_stats.get('win_rate', 0) >= 25 else "🔴"
+        st.metric("Win Rate", f"{color} {acc_stats.get('win_rate', 0)}%")
     
+    # Input
     st.markdown("### 📥 Nhập kết quả")
     raw_input = st.text_area(
         "Dán kết quả (5 số/dòng):",
@@ -98,6 +128,7 @@ def main():
             st.session_state.data_input = "\n".join(["87746", "56421", "69137", "00443", "04475"] * 10)
             st.rerun()
     
+    # Process
     if analyze_btn and raw_input.strip():
         with st.spinner("🧠 Đang phân tích..."):
             try:
@@ -111,91 +142,107 @@ def main():
                     if count > 0:
                         st.success(f"✅ Thêm {count} số mới")
                     
-                    if len(st.session_state.db_manager.data) >= Config.MIN_HISTORY_LENGTH:
+                    if len(st.session_state.db_manager.data) >= 15:
                         st.session_state.result = st.session_state.ai_engine.analyze(st.session_state.db_manager.data)
                         st.rerun()
                     else:
-                        st.warning(f"⚠️ Cần {Config.MIN_HISTORY_LENGTH}+ kỳ")
+                        st.warning(f"⚠️ Cần 15+ kỳ (hiện có: {len(st.session_state.db_manager.data)})")
                         
             except Exception as e:
                 st.error(f"❌ Lỗi: {str(e)}")
     
-    if st.session_state.result and st.session_state.result.get('success'):
+    # Display Results
+    if st.session_state.result:
         res = st.session_state.result
-        risk = res['risk']
-        
-        if st.session_state.ai_engine.pattern_detector.risk_level >= 50:
+        if res.get('success'):
+            risk = res.get('risk', {})
+            
+            # House Control Warning
+            try:
+                house_risk = st.session_state.ai_engine.pattern_detector.risk_level
+                if house_risk >= 50:
+                    st.markdown(f"""
+                    <div class="pattern-alert">
+                        🚨 CẢNH BÁO: House Control {house_risk}%<br>
+                        {res.get('house_warning', '')}
+                    </div>
+                    """, unsafe_allow_html=True)
+            except:
+                pass
+            
+            # Status
+            risk_level = risk.get('level', 'OK')
+            if risk_level == 'OK':
+                status_class, status_text = 'status-ok', '✅ CÓ THỂ TEST'
+            elif risk_level == 'MEDIUM':
+                status_class, status_text = 'status-warn', '⚠️ CẨN THẬN'
+            else:
+                status_class, status_text = 'status-stop', '🛑 RỦI RO'
+            
             st.markdown(f"""
-            <div class="pattern-alert">
-                🚨 CẢNH BÁO: House Control {st.session_state.ai_engine.pattern_detector.risk_level}%<br>
-                {res['house_warning']}
+            <div class="status-card {status_class}">
+                {status_text} | Risk: {risk.get('score', 0)}/100 | {risk.get('reason', '')}
             </div>
             """, unsafe_allow_html=True)
-        
-        if risk['level'] == 'OK':
-            status_class, status_text = 'status-ok', '✅ CÓ THỂ TEST'
-        elif risk['level'] == 'MEDIUM':
-            status_class, status_text = 'status-warn', '⚠️ CẨN THẬN'
-        else:
-            status_class, status_text = 'status-stop', '🛑 RỦI RO'
-        
-        st.markdown(f"""
-        <div class="status-card {status_class}">
-            {status_text} | Risk: {risk['score']}/100 | {risk['reason']}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("### 🔮 3 SỐ CHÍNH")
-        main_3 = res['main_3']
-        st.markdown(f"""
-        <div class="numbers-grid">
-            <div class="num-card"><div class="num-value">{main_3[0]}</div><div class="num-label">Số 1</div></div>
-            <div class="num-card"><div class="num-value">{main_3[1]}</div><div class="num-label">Số 2</div></div>
-            <div class="num-card"><div class="num-value">{main_3[2]}</div><div class="num-label">Số 3</div></div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("### 🎲 4 SỐ LÓT")
-        support_4 = res['support_4']
-        st.markdown(f"""
-        <div class="support-grid">
-            <div class="support-card"><div class="support-value">{support_4[0]}</div></div>
-            <div class="support-card"><div class="support-value">{support_4[1]}</div></div>
-            <div class="support-card"><div class="support-value">{support_4[2]}</div></div>
-            <div class="support-card"><div class="support-value">{support_4[3]}</div></div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.code(','.join(main_3 + support_4), language=None)
-        
-        if res['logic']:
-            st.markdown(f'<div class="info-box">💡 **Logic:** {res["logic"]}</div>', unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("### ✅ Test")
-        
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            actual = st.text_input("Kết quả thực tế:", key="actual_result", placeholder="12864")
-        with col2:
-            if st.button("✅ GHI", type="primary", use_container_width=True):
-                if actual and len(actual) == 5 and actual.isdigit():
-                    is_win = set(main_3).issubset(set(actual))
-                    
-                    st.session_state.db_manager.record_test(
-                        prediction=main_3,
-                        actual=actual,
-                        won=is_win,
-                        confidence=res['confidence'],
-                        house_risk=st.session_state.ai_engine.pattern_detector.risk_level
-                    )
-                    
-                    if is_win:
-                        st.success(f"🎉 TRÚNG! ({res['confidence']}%)")
-                    else:
-                        st.warning(f"❌ Trượt!")
-                    st.rerun()
+            
+            # 3 Main Numbers
+            st.markdown("### 🔮 3 SỐ CHÍNH")
+            main_3 = res.get('main_3', ['?', '?', '?'])
+            st.markdown(f"""
+            <div class="numbers-grid">
+                <div class="num-card"><div class="num-value">{main_3[0]}</div><div class="num-label">Số 1</div></div>
+                <div class="num-card"><div class="num-value">{main_3[1]}</div><div class="num-label">Số 2</div></div>
+                <div class="num-card"><div class="num-value">{main_3[2]}</div><div class="num-label">Số 3</div></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 4 Support Numbers
+            st.markdown("### 🎲 4 SỐ LÓT")
+            support_4 = res.get('support_4', ['0', '0', '0', '0'])
+            st.markdown(f"""
+            <div class="support-grid">
+                <div class="support-card"><div class="support-value">{support_4[0]}</div></div>
+                <div class="support-card"><div class="support-value">{support_4[1]}</div></div>
+                <div class="support-card"><div class="support-value">{support_4[2]}</div></div>
+                <div class="support-card"><div class="support-value">{support_4[3]}</div></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.code(','.join(main_3 + support_4), language=None)
+            
+            if res.get('logic'):
+                st.markdown(f'<div class="info-box">💡 **Logic:** {res["logic"]}</div>', unsafe_allow_html=True)
+            
+            # Test
+            st.markdown("---")
+            st.markdown("### ✅ Test")
+            
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                actual = st.text_input("Kết quả thực tế:", key="actual_result", placeholder="12864")
+            with col2:
+                if st.button("✅ GHI", type="primary", use_container_width=True):
+                    if actual and len(actual) == 5 and actual.isdigit():
+                        is_win = set(main_3).issubset(set(actual))
+                        
+                        try:
+                            st.session_state.db_manager.record_test(
+                                prediction=main_3,
+                                actual=actual,
+                                won=is_win,
+                                confidence=res.get('confidence', 0),
+                                house_risk=st.session_state.ai_engine.pattern_detector.risk_level
+                            )
+                            
+                            if is_win:
+                                st.success(f"🎉 TRÚNG! ({res.get('confidence', 0)}%)")
+                            else:
+                                st.warning(f"❌ Trượt!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Lỗi ghi: {str(e)}")
     
+    # Footer
     st.markdown("---")
     st.markdown("<div style='text-align:center;color:#8b949e;padding:20px;'>TITAN AI v5.0 | ⚠️ Chơi có trách nhiệm</div>", unsafe_allow_html=True)
 
