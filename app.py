@@ -1,145 +1,198 @@
+# ==============================================================================
+# TITAN AI v5.0 - Main Application
+# ==============================================================================
+
 import streamlit as st
-import google.generativeai as genai
-import re
-import json
-import os
 import pandas as pd
-from collections import Counter
-from itertools import combinations
+import time
 from datetime import datetime
+from config import Config
+from database import DatabaseManager
+from algorithms import TitanAI
 
-# ================= CẤU HÌNH HỆ THỐNG =================
-API_KEY = "AIzaSyChq-KF-DXqPQUpxDsVIvx5D4_jRH1ERqM"
-DB_FILE = "titan_permanent_pro.json"
+# Page config
+st.set_page_config(
+    page_title=Config.APP_TITLE,
+    page_icon=Config.PAGE_ICON,
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-def setup_neural():
-    try:
-        genai.configure(api_key=API_KEY)
-        return genai.GenerativeModel('gemini-1.5-flash')
-    except: return None
-
-neural_engine = setup_neural()
-
-# --- Thuật toán xử lý dữ liệu thông minh ---
-def clean_data(raw_text):
-    # Regex cực mạnh: Chỉ lấy dãy đúng 5 số, bỏ qua số kỳ, bỏ qua chữ
-    return re.findall(r"\b\d{5}\b", raw_text)
-
-def get_matrix_combo(history, n=3):
-    all_combos = []
-    # Lấy 30 kỳ gần nhất để soi combo nổ cùng nhau
-    for line in history[:30]:
-        unique_digits = sorted(list(set(line)))
-        if len(unique_digits) >= n:
-            all_combos.extend(combinations(unique_digits, n))
-    top = Counter(all_combos).most_common(1)
-    return "".join(top[0][0]) if top else "123"
-
-def load_db():
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, "r") as f:
-            try: return json.load(f)
-            except: return []
-    return []
-
-def save_db(data):
-    with open(DB_FILE, "w") as f:
-        json.dump(data[-3000:], f)
-
-if "history" not in st.session_state:
-    st.session_state.history = load_db()
-if "last_prediction" not in st.session_state:
-    st.session_state.last_prediction = None
-
-# ================= GIAO DIỆN v22 STYLE PRO =================
-st.set_page_config(page_title="TITAN v24.7 PRO", layout="wide")
+# CSS (same as before - include all CSS from v5.0)
 st.markdown("""
-    <style>
-    .stApp { background: #010409; color: #e6edf3; }
-    .prediction-card {
-        background: #0d1117; border: 2px solid #58a6ff;
-        border-radius: 15px; padding: 25px; margin-top: 10px;
-        box-shadow: 0 4px 25px rgba(88, 166, 255, 0.25);
-    }
-    .num-box {
-        font-size: 100px; font-weight: 900; color: #ff5858;
-        text-align: center; letter-spacing: 15px; text-shadow: 4px 4px #000;
-    }
-    .lot-box {
-        font-size: 65px; font-weight: 700; color: #58a6ff;
-        text-align: center; letter-spacing: 8px;
-    }
-    .status-bar { padding: 15px; border-radius: 12px; text-align: center; font-weight: 900; font-size: 1.5rem; }
-    </style>
+<style>
+    /* Include all CSS from v5.0 here */
+    .stApp { background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%); color: #e6edf3; }
+    #MainMenu, footer, header { visibility: hidden; }
+    /* ... rest of CSS ... */
+</style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1 style='text-align: center; color: #58a6ff;'>💎 TITAN v24.7 - SIÊU TRÍ TUỆ</h1>", unsafe_allow_html=True)
+# ==============================================================================
+# MAIN APPLICATION
+# ==============================================================================
 
-# ================= PHẦN 1: NHẬP LIỆU =================
-with st.container():
-    c_in, c_st = st.columns([2.5, 1])
-    with c_in:
-        raw_input = st.text_area("📥 Dán dữ liệu (Dán thẳng từ KU, tool tự lọc số kỳ):", height=150)
-    with c_st:
-        st.write(f"📊 Database: **{len(st.session_state.history)} kỳ**")
-        btn_run = st.button("🚀 GIẢI MÃ NGAY", use_container_width=True)
-        if st.button("🗑 RESET", use_container_width=True):
-            st.session_state.history = []
-            st.session_state.last_prediction = None
-            if os.path.exists(DB_FILE): os.remove(DB_FILE)
+def main():
+    # Initialize session state
+    if 'db_manager' not in st.session_state:
+        st.session_state.db_manager = DatabaseManager()
+    if 'ai_engine' not in st.session_state:
+        st.session_state.ai_engine = TitanAI()
+    if 'result' not in st.session_state:
+        st.session_state.result = None
+    
+    # Header
+    st.markdown(f"""
+    <div class="header-card">
+        <div class="header-title">{Config.APP_TITLE}</div>
+        <div class="header-subtitle">{Config.APP_SUBTITLE}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sidebar
+    with st.sidebar:
+        st.markdown("### 📊 Độ Chính Xác")
+        acc_stats = st.session_state.db_manager.get_accuracy_stats()
+        st.metric("Tổng lần test", acc_stats['total'])
+        st.metric("Trúng", acc_stats['wins'])
+        st.metric("Win Rate", f"{acc_stats['win_rate']}%")
+        
+        st.markdown("---")
+        if st.button("🗑️ Reset"):
+            st.session_state.db_manager.clear()
+            st.session_state.ai_engine.accuracy_history = []
+            st.success("✅ Đã reset!")
+            time.sleep(0.5)
             st.rerun()
-
-if btn_run and raw_input:
-    cleaned = clean_data(raw_input)
-    if len(cleaned) >= 5:
-        st.session_state.history = cleaned + [x for x in st.session_state.history if x not in cleaned]
-        save_db(st.session_state.history)
+    
+    # Stats Overview
+    acc_stats = st.session_state.db_manager.get_accuracy_stats()
+    st.markdown("### 📊 Thống kê")
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("📦 Tổng kỳ", len(st.session_state.db_manager.data))
+    with col2:
+        st.metric("🎯 Đã test", acc_stats['total'])
+    with col3:
+        color = "🟢" if acc_stats['win_rate'] >= 40 else "🟡" if acc_stats['win_rate'] >= 25 else "🔴"
+        st.metric("Win Rate", f"{color} {acc_stats['win_rate']}%")
+    with col4:
+        if st.session_state.result:
+            st.metric("🏠 House Control", f"{st.session_state.ai_engine.pattern_detector.risk_level}%")
+    
+    # Input Section
+    st.markdown("### 📥 Nhập kết quả")
+    raw_input = st.text_area(
+        "Dán kết quả (mỗi kỳ 1 dòng, 5 chữ số):",
+        height=150,
+        placeholder="09215\n23823\n45976\n...",
+        key="data_input"
+    )
+    
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        analyze_btn = st.button("🚀 PHÂN TÍCH", type="primary", use_container_width=True)
+    with col2:
+        if st.button("📋 Demo", use_container_width=True):
+            demo = "\n".join(["87746", "56421", "69137", "00443", "04475"] * 10)
+            st.session_state.data_input = demo
+            st.rerun()
+    with col3:
+        if st.button("🔄 Mới", use_container_width=True):
+            st.rerun()
+    
+    # Process Analysis
+    if analyze_btn and raw_input.strip():
+        with st.spinner("🧠 Đang phân tích pattern nhà cái..."):
+            numbers = st.session_state.db_manager.clean_data(raw_input)
+            
+            if not numbers:
+                st.error("❌ Không tìm thấy số 5 chữ số!")
+            else:
+                updated_data, count_added = st.session_state.db_manager.add_numbers(
+                    numbers, 
+                    st.session_state.db_manager.data
+                )
+                st.session_state.db_manager.data = updated_data
+                
+                if count_added > 0:
+                    st.success(f"✅ Đã thêm {count_added} số mới")
+                
+                if len(st.session_state.db_manager.data) >= Config.MIN_HISTORY_LENGTH:
+                    st.session_state.result = st.session_state.ai_engine.analyze(
+                        st.session_state.db_manager.data
+                    )
+                    st.rerun()
+                else:
+                    st.warning(f"⚠️ Cần ít nhất {Config.MIN_HISTORY_LENGTH} kỳ")
+    
+    # Display Results (same as v5.0)
+    if st.session_state.result:
+        res = st.session_state.result
+        risk = res['risk']
         
-        # 1. Thuật toán Matrix dự phòng (Luôn chạy được)
-        combo_matrix = get_matrix_combo(st.session_state.history)
-        all_nums = "".join(st.session_state.history[:20])
-        top_7 = [x[0] for x in Counter(all_nums).most_common(7)]
-        supp_default = "".join(top_7[3:]) if len(top_7) > 3 else "0468"
-
-        # 2. AI Hybrid
-        prompt = f"Phân tích 3 số 5 tinh. Dữ liệu: {st.session_state.history[:40]}. Trả JSON: {{'main': 'abc', 'supp': 'defg', 'dec': 'ĐÁNH/DỪNG', 'log': '...', 'col': 'Green'}}"
+        # House Control Warning
+        if st.session_state.ai_engine.pattern_detector.risk_level >= 50:
+            st.markdown(f"""
+            <div class="pattern-alert">
+                🚨 CẢNH BÁO: Nhà cái đang điều khiển ({st.session_state.ai_engine.pattern_detector.risk_level}%)<br>
+                <small>{res['house_warning']}</small>
+            </div>
+            """, unsafe_allow_html=True)
         
-        try:
-            res_ai = neural_engine.generate_content(prompt)
-            match = re.search(r'\{.*\}', res_ai.text, re.DOTALL)
-            st.session_state.last_prediction = json.loads(match.group())
-        except:
-            # CHẾ ĐỘ DỰ PHÒNG KHI AI LỖI (Sửa lỗi báo đỏ)
-            st.session_state.last_prediction = {
-                "main": combo_matrix, "supp": supp_default, 
-                "dec": "CHẾ ĐỘ DỰ PHÒNG", "log": "Dữ liệu Matrix Combo nổ mạnh nhất.", 
-                "col": "Green"
-            }
-        st.rerun()
+        # Status
+        if risk['level'] == 'OK':
+            status_class, status_text = 'status-ok', '✅ CÓ THỂ TEST'
+        elif risk['level'] == 'MEDIUM':
+            status_class, status_text = 'status-warn', '⚠️ CẨN THẬN'
+        else:
+            status_class, status_text = 'status-stop', '🛑 RỦI RO CAO'
+        
+        st.markdown(f"""
+        <div class="status-card {status_class}">
+            {status_text} | Risk: {risk['score']}/100 | {risk['reason']}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Display patterns, numbers, etc. (same as v5.0)
+        # ... rest of display code ...
+        
+        # Test Verification
+        st.markdown("---")
+        st.markdown("### ✅ Test Độ Chính Xác")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            actual = st.text_input("Kết quả thực tế:", key="actual_result", placeholder="12864")
+        with col2:
+            if st.button("✅ GHI NHẬN", type="primary", use_container_width=True):
+                if actual and len(actual) == 5 and actual.isdigit():
+                    main_3 = res['main_3']
+                    is_win = set(main_3).issubset(set(actual))
+                    
+                    st.session_state.db_manager.record_test(
+                        prediction=main_3,
+                        actual=actual,
+                        won=is_win,
+                        confidence=res['confidence'],
+                        house_risk=st.session_state.ai_engine.pattern_detector.risk_level
+                    )
+                    
+                    if is_win:
+                        st.success(f"🎉 TRÚNG!")
+                    else:
+                        st.warning(f"❌ Trượt!")
+                    st.rerun()
+    
+    # Footer
+    st.markdown("---")
+    st.markdown(f"""
+    <div style="text-align: center; color: #94a3b8; padding: 20px; font-size: 12px;">
+        {Config.APP_TITLE} | {Config.APP_SUBTITLE}<br>
+        🔍 Phát hiện: Bệt cầu | Đảo cầu | Xoay cầu | Bẫy nhịp<br>
+        ⚠️ Khi House Control >= 50%: Nên dừng
+    </div>
+    """, unsafe_allow_html=True)
 
-# ================= PHẦN 2: HIỂN THỊ =================
-if st.session_state.last_prediction:
-    res = st.session_state.last_prediction
-    status_color = "#238636" if res['col'].lower() == "green" else "#da3633"
-    
-    st.markdown(f"<div class='status-bar' style='background: {status_color};'>📢 TRẠNG THÁI: {res['dec']}</div>", unsafe_allow_html=True)
-    st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
-    
-    c1, c2 = st.columns([1.6, 1])
-    with c1:
-        st.markdown("<p style='text-align:center; color:#8b949e;'>🔥 3 SỐ CHỦ LỰC (3 SỐ 5 TINH)</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='num-box'>{res['main']}</div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown("<p style='text-align:center; color:#8b949e;'>🛡️ 4 SỐ LÓT (DÀN 7)</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='lot-box'>{res['supp']}</div>", unsafe_allow_html=True)
-    
-    st.divider()
-    st.write(f"🧠 **LOGIC:** {res['log']}")
-    full_dan = "".join(sorted(set(res['main'] + res['supp'])))
-    st.text_input("📋 DÀN 7 SỐ KUBET (Copy):", full_dan)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# Biểu đồ
-if st.session_state.history:
-    with st.expander("📊 Phân tích nhịp rơi"):
-        st.bar_chart(pd.Series(Counter("".join(st.session_state.history[:25]))).sort_index())
+if __name__ == "__main__":
+    main()
