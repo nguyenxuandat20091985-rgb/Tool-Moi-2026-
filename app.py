@@ -130,9 +130,3 @@ if st.session_state.history:
         all_d = "".join(st.session_state.history[-50:])
         st.bar_chart(pd.Series(Counter(all_d)).sort_index())
 
-
-
-streamlit
-google-generativeai
-pandas
-numpy
