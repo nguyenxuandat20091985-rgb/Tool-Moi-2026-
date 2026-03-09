@@ -1,13 +1,14 @@
 # ==============================================================================
 # TITAN AI v5.0 - Configuration
+# Professional Production Configuration
 # ==============================================================================
 
 class Config:
-    """Application configuration."""
+    """Application configuration - DO NOT MODIFY WITHOUT TESTING."""
     
     # App Settings
     APP_TITLE = "🎯 TITAN AI v5.0"
-    APP_SUBTITLE = "House Pattern Detector"
+    APP_SUBTITLE = "House Pattern Detector - Professional Edition"
     PAGE_ICON = "🔍"
     
     # Data Settings
@@ -15,7 +16,7 @@ class Config:
     MAX_HISTORY_LENGTH = 500
     DEFAULT_SIMULATIONS = 2000
     
-    # Algorithm Weights
+    # Algorithm Weights (must sum to 100)
     ALGORITHM_WEIGHTS = {
         'frequency': 25,
         'gap': 20,
@@ -40,16 +41,16 @@ class Config:
         'high': 70
     }
     
-    # Pattern Detection
+    # Pattern Detection Weights
     PATTERN_CONFIG = {
-        'bet_cau_weight': 0.3,
-        'dao_cau_weight': 0.2,
-        'xoay_cau_weight': 0.2,
+        'bet_cau_weight': 0.30,
+        'dao_cau_weight': 0.20,
+        'xoay_cau_weight': 0.20,
         'nhip_bay_weight': 0.15,
         'tong_control_weight': 0.15
     }
     
-    # UI Settings
+    # UI Theme Colors
     THEME = {
         'primary_color': '#1e3a8a',
         'secondary_color': '#7c3aed',
@@ -57,3 +58,17 @@ class Config:
         'warning_color': '#d97706',
         'danger_color': '#dc2626'
     }
+    
+    # Validation
+    @classmethod
+    def validate(cls):
+        """Validate configuration integrity."""
+        weight_sum = sum(cls.ALGORITHM_WEIGHTS.values())
+        if weight_sum != 100:
+            raise ValueError(f"ALGORITHM_WEIGHTS must sum to 100, got {weight_sum}")
+        
+        pattern_sum = sum(cls.PATTERN_CONFIG.values())
+        if abs(pattern_sum - 1.0) > 0.01:
+            raise ValueError(f"PATTERN_CONFIG must sum to 1.0, got {pattern_sum}")
+        
+        return True
