@@ -7,12 +7,12 @@ import pandas as pd
 from collections import Counter, defaultdict
 import random
 import math
+import re
 from typing import Dict, List, Tuple
 from config import Config
 
 class HousePatternDetector:
-    """Detect house manipulation patterns."""
-    
+    # ... rest of code ...
     def __init__(self):
         self.detected_patterns = {}
         self.risk_level = 0
