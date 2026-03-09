@@ -308,7 +308,7 @@ class TitanAI:
         cleaned = []
         for item in history:
             s = str(item).strip()
-            match = re.search(r'\d{5}', s)  # ← Đây là dòng bị lỗi nếu thiếu import re
+            match = re.search(r'\d{5}', s)  # ← Đây là dòng cần import re
             if match:
                 cleaned.append(match.group())
         return cleaned
