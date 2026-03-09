@@ -7,12 +7,13 @@ import pandas as pd
 from collections import Counter, defaultdict
 import random
 import math
-import re
+import re  # ← QUAN TRỌNG: Phải có dòng này!
 from typing import Dict, List, Tuple
 from config import Config
 
 class HousePatternDetector:
-    # ... rest of code ...
+    """Detect house manipulation patterns."""
+    
     def __init__(self):
         self.detected_patterns = {}
         self.risk_level = 0
@@ -221,7 +222,6 @@ class HousePatternDetector:
     
     def _calculate_house_control_risk(self, patterns: Dict) -> int:
         """Calculate overall house control risk."""
-        from config import Config
         total_risk = 0
         
         if patterns['bet_cau']['detected']:
@@ -239,8 +239,6 @@ class HousePatternDetector:
     
     def get_house_control_level(self) -> Tuple[str, str]:
         """Get house control level description."""
-        from config import Config
-        
         if self.risk_level >= Config.HOUSE_CONTROL['high']:
             return 'RẤT CAO', '🚫 Nhà cái đang điều khiển mạnh - NÊN DỪNG'
         elif self.risk_level >= Config.HOUSE_CONTROL['medium']:
@@ -310,7 +308,7 @@ class TitanAI:
         cleaned = []
         for item in history:
             s = str(item).strip()
-            match = re.search(r'\d{5}', s)
+            match = re.search(r'\d{5}', s)  # ← Đây là dòng bị lỗi nếu thiếu import re
             if match:
                 cleaned.append(match.group())
         return cleaned
