@@ -1,34 +1,59 @@
 # ==============================================================================
-# TITAN v35.0 - Configuration
+# TITAN AI v5.0 - Configuration
 # ==============================================================================
 
 class Config:
-    """System configuration."""
+    """Application configuration."""
     
-    # App settings
-    APP_NAME = "TITAN v35.0 PRO MAX"
-    APP_VERSION = "35.0"
+    # App Settings
+    APP_TITLE = "🎯 TITAN AI v5.0"
+    APP_SUBTITLE = "House Pattern Detector"
+    PAGE_ICON = "🔍"
     
-    # Database
-    MAX_RECORDS = 3000
-    MAX_PREDICTIONS = 200
+    # Data Settings
+    MIN_HISTORY_LENGTH = 15
+    MAX_HISTORY_LENGTH = 500
+    DEFAULT_SIMULATIONS = 2000
     
-    # Prediction
-    MIN_HISTORY = 20
-    RECENT_WINDOW = 50
-    FREQUENCY_WINDOW = 100
+    # Algorithm Weights
+    ALGORITHM_WEIGHTS = {
+        'frequency': 25,
+        'gap': 20,
+        'markov': 20,
+        'monte_carlo': 15,
+        'pattern': 12,
+        'hot_cold': 8
+    }
     
-    # Risk
-    RISK_THRESHOLD = 70
-    MAX_STREAK = 5
+    # Risk Thresholds
+    RISK_THRESHOLDS = {
+        'entropy_min': 2.8,
+        'entropy_max': 3.4,
+        'max_streak': 5,
+        'sum_std_max': 2.5
+    }
     
-    # Bankroll
-    DEFAULT_BANKROLL = 1000000
-    DEFAULT_BET = 10000
-    MAX_BET_PERCENT = 5
+    # House Control Thresholds
+    HOUSE_CONTROL = {
+        'low': 30,
+        'medium': 50,
+        'high': 70
+    }
     
-    # Auto-refresh
-    REFRESH_INTERVAL = 60  # seconds
+    # Pattern Detection
+    PATTERN_CONFIG = {
+        'bet_cau_weight': 0.3,
+        'dao_cau_weight': 0.2,
+        'xoay_cau_weight': 0.2,
+        'nhip_bay_weight': 0.15,
+        'tong_control_weight': 0.15
+    }
     
-    # API (if using Gemini)
-    GEMINI_LIMIT = 15  # requests per day
+    # UI Settings
+    THEME = {
+        'primary_color': '#1e3a8a',
+        'secondary_color': '#7c3aed',
+        'success_color': '#059669',
+        'warning_color': '#d97706',
+        'danger_color': '#dc2626'
+    }
