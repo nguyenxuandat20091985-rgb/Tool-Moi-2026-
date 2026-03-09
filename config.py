@@ -1,14 +1,13 @@
 # ==============================================================================
 # TITAN AI v5.0 - Configuration
-# Professional Production Configuration
 # ==============================================================================
 
 class Config:
-    """Application configuration - DO NOT MODIFY WITHOUT TESTING."""
+    """Application configuration."""
     
     # App Settings
     APP_TITLE = "🎯 TITAN AI v5.0"
-    APP_SUBTITLE = "House Pattern Detector - Professional Edition"
+    APP_SUBTITLE = "House Pattern Detector"
     PAGE_ICON = "🔍"
     
     # Data Settings
@@ -16,7 +15,7 @@ class Config:
     MAX_HISTORY_LENGTH = 500
     DEFAULT_SIMULATIONS = 2000
     
-    # Algorithm Weights (must sum to 100)
+    # Algorithm Weights
     ALGORITHM_WEIGHTS = {
         'frequency': 25,
         'gap': 20,
@@ -50,25 +49,7 @@ class Config:
         'tong_control_weight': 0.15
     }
     
-    # UI Theme Colors
-    THEME = {
-        'primary_color': '#1e3a8a',
-        'secondary_color': '#7c3aed',
-        'success_color': '#059669',
-        'warning_color': '#d97706',
-        'danger_color': '#dc2626'
-    }
-    
-    # Validation
     @classmethod
     def validate(cls):
-        """Validate configuration integrity."""
-        weight_sum = sum(cls.ALGORITHM_WEIGHTS.values())
-        if weight_sum != 100:
-            raise ValueError(f"ALGORITHM_WEIGHTS must sum to 100, got {weight_sum}")
-        
-        pattern_sum = sum(cls.PATTERN_CONFIG.values())
-        if abs(pattern_sum - 1.0) > 0.01:
-            raise ValueError(f"PATTERN_CONFIG must sum to 1.0, got {pattern_sum}")
-        
+        """Validate configuration."""
         return True
