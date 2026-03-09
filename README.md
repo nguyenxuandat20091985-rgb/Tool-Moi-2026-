@@ -1,24 +1,9 @@
-# 🎯 TITAN v35.0 PRO MAX
+# 🎯 TITAN AI v5.0 - House Pattern Detector
 
-## 5D Bet Professional Prediction System
+Hệ thống AI phát hiện pattern nhà cái và dự đoán 3 số 5 tinh.
 
-### ⚡ Features
-
-- **Real-Time Tracking** - Auto-refresh every 60 seconds
-- **5 Algorithms** - Ensemble prediction engine
-- **Risk Management** - Kelly Criterion calculator
-- **Bankroll Tracking** - Win/loss management
-- **Pattern Detection** - AI-based pattern recognition
-- **Export/Import** - Full data backup
-
-### 🚀 Installation
+## 🚀 Cài đặt
 
 ```bash
-# 1. Install dependencies
 pip install -r requirements.txt
-
-# 2. Run application
 streamlit run app.py
-
-# 3. Open browser
-http://localhost:8501
