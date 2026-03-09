@@ -1,84 +1,143 @@
 # ==============================================================================
-# TITAN v35.0 - Database Management
-# Data cleaning and storage
+# TITAN AI v5.0 - Database Management
 # ==============================================================================
 
 import re
+from typing import List, Dict, Tuple
 from datetime import datetime
 
 class DatabaseManager:
-    """Manage lottery database."""
+    """Manage lottery data storage and retrieval."""
     
     def __init__(self):
-        self.max_records = 3000
+        self.data = []
+        self.test_log = []
     
-    def clean_data(self, raw_text):
-        """Clean and extract 5-digit numbers from raw text."""
+    def clean_data(self, raw_text: str) -> List[str]:
+        """
+        Clean and extract 5-digit numbers from raw text.
+        
+        Args:
+            raw_text: Raw input text
+            
+        Returns:
+            List of cleaned 5-digit numbers
+        """
         if not raw_text or not raw_text.strip():
             return []
         
-        # Normalize whitespace
-        normalized = re.sub(r'\s+', ' ', raw_text.strip())
-        lines = normalized.split('\n')
-        
-        numbers = []
-        
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            # Remove all spaces within line (handle "41 720" → "41720")
-            line_no_spaces = re.sub(r'\s', '', line)
-            
-            # Find all 5-digit sequences
-            matches = re.findall(r'\d{5}', line_no_spaces)
-            numbers.extend(matches)
-        
+        # Extract 5-digit numbers
+        numbers = re.findall(r'\d{5}', raw_text)
         return numbers
     
-    def add_numbers(self, new_numbers, existing_db):
-        """Add new numbers to database with deduplication."""
-        if not new_numbers:
-            return 0
+    def add_numbers(self, new_numbers: List[str], existing_data: List[str] = None) -> Tuple[List[str], int]:
+        """
+        Add new numbers to database with deduplication.
         
-        db_set = set(existing_db)
-        added = 0
+        Args:
+            new_numbers: List of new numbers to add
+            existing_data: Existing database (optional)
+            
+        Returns:
+            Tuple of (updated_data, count_added)
+        """
+        if existing_data is None:
+            existing_data = self.data
+        
+        existing_set = set(existing_data)
+        unique_new = []
         
         for num in new_numbers:
-            if len(num) == 5 and num not in db_set:
-                existing_db.insert(0, num)  # Add to front (newest first)
-                db_set.add(num)
-                added += 1
+            if num not in existing_set:
+                unique_new.append(num)
+                existing_set.add(num)
         
-        # Limit database size
-        if len(existing_db) > self.max_records:
-            existing_db[:] = existing_db[:self.max_records]
+        # Add new numbers to front (newest first)
+        updated_data = unique_new + existing_data
         
-        return added
+        # Limit size
+        if len(updated_data) > 500:
+            updated_data = updated_data[:500]
+        
+        return updated_data, len(unique_new)
     
-    def export_data(self, lottery_db, predictions_log, bankroll):
-        """Export all data as dictionary."""
+    def record_test(self, prediction: Dict, actual: str, won: bool, 
+                   confidence: int, house_risk: int = 0) -> None:
+        """Record a test prediction."""
+        self.test_log.append({
+            'timestamp': datetime.now().isoformat(),
+            'prediction': prediction,
+            'actual': actual,
+            'won': won,
+            'confidence': confidence,
+            'house_risk': house_risk
+        })
+        
+        # Keep last 100 tests
+        if len(self.test_log) > 100:
+            self.test_log = self.test_log[-100:]
+    
+    def get_accuracy_stats(self) -> Dict:
+        """Calculate accuracy statistics."""
+        if not self.test_log:
+            return {
+                'total': 0,
+                'wins': 0,
+                'win_rate': 0,
+                'avg_confidence': 0,
+                'by_confidence': {}
+            }
+        
+        total = len(self.test_log)
+        wins = sum(1 for t in self.test_log if t['won'])
+        win_rate = wins / total * 100 if total > 0 else 0
+        avg_conf = sum(t['confidence'] for t in self.test_log) / total
+        
+        # By confidence bracket
+        by_confidence = {}
+        for bracket in ['50-69', '70-84', '85+']:
+            if bracket == '50-69':
+                subset = [t for t in self.test_log if 50 <= t['confidence'] < 70]
+            elif bracket == '70-84':
+                subset = [t for t in self.test_log if 70 <= t['confidence'] < 85]
+            else:
+                subset = [t for t in self.test_log if t['confidence'] >= 85]
+            
+            if subset:
+                w = sum(1 for t in subset if t['won'])
+                by_confidence[bracket] = {
+                    'count': len(subset),
+                    'win_rate': round(w / len(subset) * 100, 1)
+                }
+        
         return {
-            'lottery_db': lottery_db,
-            'predictions_log': predictions_log,
-            'bankroll': bankroll,
-            'exported_at': datetime.now().isoformat(),
-            'version': '35.0'
+            'total': total,
+            'wins': wins,
+            'win_rate': round(win_rate, 1),
+            'avg_confidence': round(avg_conf, 1),
+            'by_confidence': by_confidence
         }
     
-    def import_data(self, data, lottery_db, predictions_log, bankroll):
+    def clear(self) -> None:
+        """Clear all data."""
+        self.data = []
+        self.test_log = []
+    
+    def export_data(self) -> Dict:
+        """Export all data."""
+        return {
+            'data': self.data,
+            'test_log': self.test_log,
+            'exported_at': datetime.now().isoformat()
+        }
+    
+    def import_data(self, data_dict: Dict) -> bool:
         """Import data from dictionary."""
         try:
-            if 'lottery_db' in data:
-                lottery_db[:] = data['lottery_db'][:self.max_records]
-            
-            if 'predictions_log' in data:
-                predictions_log[:] = data['predictions_log'][-200:]
-            
-            if 'bankroll' in data:
-                bankroll.update(data['bankroll'])
-            
+            if 'data' in data_dict:
+                self.data = data_dict['data']
+            if 'test_log' in data_dict:
+                self.test_log = data_dict['test_log']
             return True
-        except Exception as e:
+        except Exception:
             return False
