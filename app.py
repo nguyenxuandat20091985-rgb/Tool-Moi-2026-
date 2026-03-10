@@ -7,7 +7,7 @@ import math
 
 class TitanAI:
     def __init__(self):
-        # Bộ não AI Gemini 1.5 Pro hỗ trợ giải mã nhịp bão
+        # Cấu hình bộ não Gemini 1.5 Pro để giải mã bẫy nhịp
         self.api_key = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
         try:
             genai.configure(api_key=self.api_key)
@@ -15,97 +15,124 @@ class TitanAI:
         except:
             self.model = None
 
-    # --- 1. PIPELINE: CHUẨN HÓA DỮ LIỆU ---
-    def _parse_data(self, raw):
+    # --- 1. DATA CLEANING (Chuẩn hóa dữ liệu) ---
+    def _parse_data(self, raw_input):
         cleaned = []
-        lines = str(raw).split('\n') if isinstance(raw, str) else raw
+        # Xử lý cả dạng list hoặc chuỗi văn bản dán vào
+        lines = str(raw_input).split('\n') if isinstance(raw_input, str) else raw_input
         for item in lines:
             match = re.search(r'\d{5}', str(item))
-            if match: cleaned.append([int(d) for d in match.group()])
+            if match:
+                cleaned.append([int(d) for d in match.group()])
         return cleaned
 
-    # --- 2. PHÂN TÍCH NHỊP THÔNG (BACKTEST REAL-TIME) ---
-    def _check_rhythm_flow(self, data):
-        """Kiểm tra xem 5 kỳ gần nhất thuật toán có đang ăn thông không"""
-        wins = 0
-        if len(data) < 15: return 0
-        for i in range(1, 6):
-            # Lấy 10 kỳ trước đó để dự đoán kỳ hiện tại (giả lập)
-            past_segment = data[i:i+15]
-            actual = data[i-1]
-            temp_res = self._internal_scoring(past_segment)
-            # Nếu 1 trong 3 số top nằm trong kết quả thực tế -> Tính là 1 trận thắng
-            if any(int(d) in actual for d in temp_res[:3]):
-                wins += 1
-        return (wins / 5) * 100 # Trả về % nhịp thông
-
-    # --- 3. LÕI CHẤM ĐIỂM (INTERNAL SCORING ENGINE) ---
-    def _internal_scoring(self, data):
-        # Tần suất vị trí và chu kỳ
-        recent = data[:20]
-        flat = [d for row in recent for d in row]
-        freq = Counter(flat)
+    # --- 2. FREQUENCY & POSITION ANALYSIS (Tần suất & Vị trí) ---
+    def _analyze_core(self, data):
+        # Tần suất tổng hợp 30 kỳ gần nhất
+        recent_30 = data[:30]
+        flat_data = [d for row in recent_30 for d in row]
+        freq = Counter(flat_data)
         
+        # Tần suất theo từng vị trí (Hàng vạn, ngàn, trăm, chục, đơn vị)
         pos_freq = [Counter() for _ in range(5)]
-        for row in recent:
-            for p, v in enumerate(row): pos_freq[p][v] += 1
-            
-        gaps = {i: 30 for i in range(10)}
+        for row in recent_30:
+            for pos, val in enumerate(row):
+                pos_freq[pos][val] += 1
+                
+        # Phân tích Chu kỳ/Khoảng cách (Gaps/Delay)
+        gaps = {i: 50 for i in range(10)}
         for i in range(10):
             for idx, row in enumerate(data):
                 if i in row:
                     gaps[i] = idx
                     break
-        
-        scores = {}
-        for i in range(10):
-            # Công thức tối ưu 80%: Tần suất(2) + Vị trí(3) + Chu kỳ(5)
-            s = (freq.get(i, 0) * 2) + (sum(1 for p in range(5) if pos_freq[p][i]>0) * 3) + ((30-gaps[i]) * 5)
-            scores[str(i)] = s
-        
-        return [n for n, s in sorted(scores.items(), key=lambda x: x[1], reverse=True)]
+        return freq, pos_freq, gaps
 
-    # --- 4. ĐO ĐỘ HỖN LOẠN (ENTROPY & RISK) ---
-    def _calculate_risk(self, data):
+    # --- 3. ENTROPY CHECK (Đo độ ngẫu nhiên & Bẫy nhà cái) ---
+    def _calculate_entropy(self, data):
+        # Lấy 15 kỳ gần nhất để đo độ hỗn loạn
         recent_all = [d for row in data[:15] for d in row]
+        if not recent_all: return 3.32
         counts = Counter(recent_all)
         total = len(recent_all)
+        # Entropy lý tưởng là ~3.32. Nếu thấp hơn 2.5 là nhà cái đang ép số bệt.
         entropy = -sum((c/total) * math.log2(c/total) for c in counts.values() if c > 0)
-        # Risk dựa trên Entropy (Cầu bệt/ép số) và Nhịp gãy
-        risk_score = int(max(0, min(100, (3.32 - entropy) * 180)))
-        return risk_score, round(entropy, 2)
+        return round(entropy, 2)
 
-    # --- 5. HÀM TỔNG LỆNH (MAIN EXECUTION) ---
+    # --- 4. SCORING ENGINE (Bộ máy chấm điểm đa tầng) ---
+    def _scoring_engine(self, freq, pos_freq, gaps, entropy):
+        scores = {}
+        for i in range(10):
+            d_str = str(i)
+            # Điểm tần suất nóng (30%)
+            s_freq = freq.get(i, 0) * 1.5
+            # Điểm bao phủ vị trí (30%) - Số xuất hiện ở nhiều hàng khác nhau
+            s_pos = sum(1 for p in range(5) if pos_freq[p][i] > 0) * 2.0
+            # Điểm chu kỳ chín (40%) - Số sắp nổ theo nhịp gãy
+            s_gap = (50 - gaps[i]) * 1.8
+            
+            total_score = s_freq + s_pos + s_gap
+            
+            # Risk Filter: Giảm điểm nếu số bệt quá sâu ở 1 vị trí (Dễ bị nhà cái treo)
+            for p in range(5):
+                if pos_freq[p][i] >= 4: 
+                    total_score *= 0.6 
+            
+            scores[d_str] = total_score
+        return scores
+
+    # --- 5. MAIN PIPELINE (Luồng thực thi chính) ---
     def analyze(self, raw_history):
         data = self._parse_data(raw_history)
-        if len(data) < 20:
-            return {"m3": "---", "l4": "----", "logic": "Cần >20 kỳ để bắt nhịp 80%", "risk": {"score": 0}}
+        if len(data) < 15:
+            return {
+                "m3": "---", "l4": "----", 
+                "logic": "⚠️ Cần tối thiểu 15 kỳ để phân tích nhịp.", 
+                "risk": {"score": 0, "level": "LOW"}
+            }
 
-        # Chạy thuật toán chính
-        top_digits = self._internal_scoring(data)
-        flow_rate = self._check_rhythm_flow(data)
-        risk_val, entropy = self._calculate_risk(data)
+        # Thực thi Pipeline
+        freq, pos_freq, gaps = self._analyze_core(data)
+        entropy = self._calculate_entropy(data)
+        scores = self._scoring_engine(freq, pos_freq, gaps, entropy)
         
-        m3 = "".join(top_digits[:3])
-        l4 = "".join(top_digits[3:7])
+        # Xếp hạng số mạnh nhất (Ranking)
+        ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+        top_digits = [n for n, s in ranked]
         
-        # LOGIC GIẢI MÃ TỪ GEMINI
-        decision = "🔥 VÀO LỆNH" if (flow_rate >= 60 and risk_val < 50) else "⏳ QUAN SÁT"
-        logic_msg = f"Nhịp thông: {flow_rate}% | Entropy: {entropy}. Đang ở vùng {decision}."
-
+        # Trả về kết quả khớp với giao diện app.py
+        m3 = "".join(top_digits[:3])  # 3 Số tinh chủ lực
+        l4 = "".join(top_digits[3:7]) # 4 Số lót giữ vốn
+        
+        # Tính toán mức độ rủi ro (Risk)
+        # Nếu Entropy thấp (cầu ảo) hoặc nhịp quá đều -> Risk tăng
+        risk_val = int(max(0, min(100, (3.32 - entropy) * 160)))
+        
+        # Quyết định hành động
+        decision = "VÀO LỆNH" if risk_val < 55 else "QUAN SÁT"
+        
+        # GỌI GEMINI GIẢI MÃ NHỊP CẦU
+        logic_msg = f"Phân tích Entropy: {entropy}. Nhịp nổ mạnh nhất: {top_digits[0]}"
         if self.model:
             try:
-                prompt = f"Data: {data[:12]}. Tool chọn: {m3}. Flow: {flow_rate}%. Phân tích bẫy và chốt lệnh."
+                # Gửi 15 kỳ số thực tế cho AI soi bẫy
+                context = str(data[:15])
+                prompt = f"""
+                Dữ liệu 5D Bet: {context}. 
+                Dàn gợi ý: {m3} (lót {l4}). 
+                Entropy: {entropy}.
+                Hãy phân tích bẫy nhà cái (đảo cầu, giấu số) và chốt 1 câu logic ngắn gọn.
+                """
                 response = self.model.generate_content(prompt)
                 logic_msg = response.text.strip()[:150]
-            except: pass
+            except:
+                pass
 
         return {
             "m3": m3,
             "l4": l4,
             "decision": decision,
             "logic": logic_msg,
-            "risk": {"score": risk_val},
-            "flow_rate": flow_rate,
-            "house_warning": "🚨 Cầu đang ảo, né bẫy!" if risk_val > 65 else ""
+            "risk": {"score": risk_val, "level": "HIGH" if risk_val > 60 else "OK"},
+            "house_warning": "🚨 Cầu đang bị ép số (Entropy thấp)!" if entropy < 2.6 else ""
         }
