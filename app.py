@@ -4,73 +4,78 @@ from collections import Counter
 import math
 import json
 import os
+import time
 
-# --- PHẦN 1: BỘ NÃO AI (CẢI TIẾN KHẢ NĂNG ĐỌC DỮ LIỆU) ---
+# --- PHẦN 1: BỘ NÃO AI (TRINITY OMNI) ---
 class TitanTrinityAI:
     def __init__(self):
         self.shadow_map = {0:5, 1:6, 2:7, 3:8, 4:9, 5:0, 6:1, 7:2, 8:3, 9:4}
 
     def parse_data(self, raw):
-        """Hàm này đã được nâng cấp để đọc được mọi kiểu dán số của anh"""
-        cleaned = []
-        if not raw: return cleaned
-        # Tìm tất cả các dãy có ít nhất 5 chữ số trong văn bản anh dán vào
+        """Hàm bóc tách số siêu tốc"""
+        if not raw: return []
+        # Chỉ lấy các dãy 5 số, loại bỏ mọi chữ cái và ký tự lạ
         found = re.findall(r'\d{5}', str(raw))
-        for item in found:
-            cleaned.append([int(d) for d in item])
-        return cleaned
+        return [[int(d) for d in item] for item in found]
 
     def analyze(self, data):
-        if len(data) < 1: return ["-"] * 5, 0
-        recent = data[:20] # Lấy 20 kỳ gần nhất để phân tích sâu hơn
+        if not data: return ["-"] * 5, 18
+        # Phân tích dựa trên 30 kỳ gần nhất để tăng độ nhạy
+        recent = data[:30]
         all_nums = [d for row in recent for d in row]
         freq = Counter(all_nums)
         
-        gaps = {i: 30 for i in range(10)}
+        gaps = {i: 50 for i in range(10)}
         for i in range(10):
             for idx, row in enumerate(data):
                 if i in row: gaps[i] = idx; break
 
         scores = {}
         for i in range(10):
-            f_score = freq.get(i, 0) * 5
-            g_score = 40 if gaps[i] == 1 else 20 if gaps[i] == 0 else 0
-            s_score = 25 if gaps[self.shadow_map[i]] == 0 else 0
+            # Thuật toán trọng số mới v8.5
+            f_score = freq.get(i, 0) * 6
+            g_score = 50 if gaps[i] == 1 else 25 if gaps[i] == 0 else 0
+            s_score = 30 if gaps[self.shadow_map[i]] == 0 else 0
             scores[str(i)] = f_score + g_score + s_score
             
         top_5 = [n for n, s in sorted(scores.items(), key=lambda x: x[1], reverse=True)][:5]
         
+        # Tính toán độ tin cậy thực tế
         try:
             counts = [all_nums.count(i) for i in set(all_nums)]
             total = sum(counts)
             entropy = -sum((c/total)*math.log2(c/total) for c in counts if c > 0)
-            accuracy = int(max(18, min(99, (3.32 - entropy) * 300)))
-        except: accuracy = 18
+            acc = int(max(21, min(98, (3.32 - entropy) * 350)))
+        except: acc = 21
         
-        return top_5, accuracy
+        return top_5, acc
 
-# --- PHẦN 2: GIAO DIỆN SIÊU GỌN ---
-st.set_page_config(page_title="TITAN GOLD v8.4", layout="centered")
+# --- PHẦN 2: GIAO DIỆN PHẢN HỒI TỨC THÌ ---
+st.set_page_config(page_title="TITAN v8.5", layout="centered")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #0e1117; }
-    .gold-container { display: flex; justify-content: space-between; margin: 15px 0; }
+    .stApp { background-color: #0b0e14; }
+    .gold-container { display: flex; justify-content: space-between; margin: 10px 0; }
     .gold-item {
-        background: linear-gradient(145deg, #333, #111);
-        border: 2px solid #ffd700; border-radius: 10px;
-        width: 18%; aspect-ratio: 1/1;
+        background: linear-gradient(145deg, #ffd700, #b8860b);
+        border-radius: 12px; width: 18%; aspect-ratio: 1/1;
         display: flex; align-items: center; justify-content: center;
-        font-size: 24px; font-weight: bold; color: #ffd700;
-        box-shadow: 0 4px 10px rgba(255, 215, 0, 0.4);
+        font-size: 26px; font-weight: bold; color: #000;
+        box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+        animation: pulse 0.5s;
     }
-    .stButton button { background-color: #ffd700; color: black; font-weight: bold; border-radius: 8px; border: none; }
-    .stTextArea textarea { border: 1px solid #ffd700; }
-    .suggest-label { background: #ffd700; color: black; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 18px; }
+    @keyframes pulse { 0% {transform: scale(0.9);} 100% {transform: scale(1);} }
+    .stButton button { 
+        background: #ffd700 !important; color: black !important; 
+        font-weight: bold !important; border: none !important;
+        box-shadow: 0 4px 10px rgba(255,215,0,0.3);
+    }
+    .status-text { text-align: center; color: #00ff00; font-size: 20px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-DB_FILE = "history_v84.json"
+DB_FILE = "titan_v85.json"
 def load_data():
     if os.path.exists(DB_FILE):
         try:
@@ -79,36 +84,45 @@ def load_data():
     return []
 
 def save_data(data):
-    with open(DB_FILE, "w") as f: json.dump(data[:100], f)
+    with open(DB_FILE, "w") as f: json.dump(data[:150], f)
 
-history = load_data()
+if 'history' not in st.session_state:
+    st.session_state.history = load_data()
+
 ai = TitanTrinityAI()
 
-st.markdown("<h2 style='text-align: center; color: #ffd700;'>🏆 TITAN GOLD v8.4</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center; color: #ffd700;'>💎 TITAN OMNI v8.5</h2>", unsafe_allow_html=True)
 
-raw_input = st.text_area("", placeholder="Dán dãy số vào đây (Ví dụ: 24373)...", height=80, label_visibility="collapsed")
+# Input
+raw_input = st.text_area("", placeholder="Dán dãy số tại đây...", height=80, label_visibility="collapsed")
 
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("🚀 GIẢI MÃ NGAY", use_container_width=True):
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("🚀 PHÂN TÍCH NGAY", use_container_width=True):
         new_records = ai.parse_data(raw_input)
         if new_records:
-            history = (new_records + history)[:100]
-            save_data(history)
+            # Cập nhật và ép làm mới
+            st.session_state.history = (new_records + st.session_state.history)[:150]
+            save_data(st.session_state.history)
+            with st.spinner('AI đang quét dữ liệu...'):
+                time.sleep(0.5)
             st.rerun()
         else:
-            st.error("Không tìm thấy dãy 5 số. Anh kiểm tra lại nhé!")
-with c2:
-    if st.button("🗑️ RESET", use_container_width=True):
+            st.warning("⚠️ Vui lòng dán dãy số!")
+
+with col2:
+    if st.button("🗑️ LÀM TRỐNG", use_container_width=True):
+        st.session_state.history = []
         save_data([])
         st.rerun()
 
-if history:
-    top_5, acc = ai.analyze(history)
-    st.markdown(f"<p style='text-align: center; color: #00ff00; font-weight: bold;'>Độ tin cậy: {acc}%</p>", unsafe_allow_html=True)
+# Hiển thị kết quả
+if st.session_state.history:
+    top_5, acc = ai.analyze(st.session_state.history)
+    st.markdown(f"<p class='status-text'>Độ tin cậy: {acc}%</p>", unsafe_allow_html=True)
     
-    # Dàn ngang 5 số
-    gold_html = f"""
+    # Hiển thị 5 số vàng
+    res_html = f"""
     <div class="gold-container">
         <div class="gold-item">{top_5[0]}</div>
         <div class="gold-item">{top_5[1]}</div>
@@ -117,9 +131,12 @@ if history:
         <div class="gold-item">{top_5[4]}</div>
     </div>
     """
-    st.markdown(gold_html, unsafe_allow_html=True)
+    st.markdown(res_html, unsafe_allow_html=True)
     
-    st.markdown(f"<div class='suggest-label'>🔥 CHỐT 3 TINH: {top_5[0]} - {top_5[1]} - {top_5[2]}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='background:#ffd700; color:black; padding:15px; border-radius:10px; text-align:center; font-weight:bold; font-size:20px;'>🔥 CHỐT 3 TINH: {top_5[0]} - {top_5[1]} - {top_5[2]}</div>", unsafe_allow_html=True)
     
-    with st.expander("📜 Lịch sử dữ liệu"):
-        for row in history[:10]: st.write("".join(map(str, row)))
+    with st.expander("📊 Xem 10 kỳ gần nhất"):
+        for row in st.session_state.history[:10]:
+            st.text("".join(map(str, row)))
+else:
+    st.info("💡 Hệ thống sẵn sàng. Hãy dán dữ liệu kỳ quay vào ô trên.")
