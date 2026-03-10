@@ -3,23 +3,22 @@ import pandas as pd
 import re
 import json
 import google.generativeai as genai
-from collections import Counter, defaultdict
+from collections import Counter
 from itertools import combinations
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 class TitanAI:
     def __init__(self):
-        # Kết hợp API Key của anh
+        # API Key anh cung cấp
         self.api_key = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
-        self.risk_level = 0
-        self.house_warning = ""
         try:
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel('gemini-1.5-flash')
-        except:
+        except Exception:
             self.model = None
 
     def _clean_history(self, history: List[str]) -> List[str]:
+        """Lọc dữ liệu rác, chỉ lấy chuỗi 5 số"""
         cleaned = []
         for item in history:
             s = str(item).strip()
@@ -28,77 +27,61 @@ class TitanAI:
                 cleaned.append(match.group())
         return cleaned
 
-    # --- NHÓM THUẬT TOÁN PHÁT HIỆN BẪY (HOUSE TRAPS) ---
+    # --- HỆ THỐNG QUÉT BẪY NHÀ CÁI (ANTI-TRAP) ---
     def _detect_house_traps(self, data: List[str]) -> Dict:
         risk = 0
         warnings = []
-        recent = data[:30]
+        recent = data[:20]
         
-        # 1. Bẫy Bệt Ảo (Vị trí về quá 5 kỳ)
+        # 1. Bẫy Bệt Ảo: Kiểm tra 1 vị trí ra liên tiếp > 4 lần
         for pos in range(5):
-            seq = [n[pos] for n in recent[:10] if len(n) > pos]
+            seq = [n[pos] for n in recent[:6] if len(n) > pos]
             if len(seq) >= 5 and len(set(seq)) == 1:
-                risk += 35
-                warnings.append(f"Cảnh báo Bệt Ảo vị trí {pos}")
+                risk += 40
+                warnings.append(f"Cảnh báo Bệt Ảo vị trí {pos+1}")
 
-        # 2. Bẫy Đảo Nhịp (Số vừa ra lại mất hút)
-        all_digits = "".join(data[:15])
+        # 2. Bẫy Số Treo: Một số nổ quá nhiều trong 10 kỳ
+        all_digits = "".join(data[:10])
         counts = Counter(all_digits)
         for d, c in counts.items():
-            if c > 6: # Số nổ quá dày trong 15 kỳ thường sẽ bị "treo" ở các kỳ sau
-                risk += 15
-                warnings.append(f"Số {d} nổ quá dày - Dễ bị treo")
+            if c > 7:
+                risk += 20
+                warnings.append(f"Số {d} đang bị 'soi' (nổ dày)")
 
-        # 3. Kiểm soát Tổng (Std Dev thấp)
-        sums = [sum(int(d) for d in n) for n in data[:20]]
-        if np.std(sums) < 2.2:
-            risk += 25
-            warnings.append("Nhà cái đang kiểm soát tổng (Số quay ảo)")
+        # 3. Bẫy Nhịp Đều (Cầu lừa): Tổng số không đổi
+        sums = [sum(int(d) for d in n) for n in recent[:10]]
+        if np.std(sums) < 1.5:
+            risk += 30
+            warnings.append("Nhà cái đang ép nhịp (Số quay không tự nhiên)")
 
-        return {"score": min(100, risk), "details": "; ".join(warnings)}
+        return {"score": min(100, risk), "details": " | ".join(warnings)}
 
-    # --- THUẬT TOÁN CHỐT SỐ (3 SỐ 5 TINH) ---
-    def _matrix_evolution_analysis(self, data: List[str]) -> str:
-        """Tìm bộ 3 dựa trên ma trận xác suất nổ chung"""
+    # --- THUẬT TOÁN MATRIX COMBO (3 SỐ 5 TINH) ---
+    def _matrix_analysis(self, data: List[str]) -> str:
         combos = []
-        # Quét sâu 40 kỳ để tìm nhịp nổ chung
-        for line in data[:40]:
+        # Quét sâu 50 kỳ để tìm cặp số hay đi cùng nhau
+        for line in data[:50]:
             digits = sorted(list(set(line)))
             if len(digits) >= 3:
                 combos.extend(combinations(digits, 3))
         
-        if not combos: return "123"
+        if not combos: return "125" # Mặc định nếu thiếu dữ liệu
         top = Counter(combos).most_common(1)
         return "".join(top[0][0])
 
-    def _get_support_numbers(self, data: List[str], main_3: str) -> str:
-        """Lấy 4 số lót dựa trên nhịp rơi lùi"""
-        all_digits = "".join(data[:25])
-        freq = Counter(all_digits).most_common(10)
-        support = []
-        for d, c in freq:
-            if d not in main_3:
-                support.append(d)
-            if len(support) == 4: break
-        return "".join(support)
-
-    # --- PHÂN TÍCH GEMINI AI ---
-    def _ai_insight(self, history: List[str], matrix_suggestion: str) -> Dict:
+    # --- AI INSIGHT (GEMINI PRO) ---
+    def _ai_consultant(self, history: List[str], suggest_3: str) -> Dict:
         if not self.model:
-            return {"l": "Cầu tự nhiên", "d": "VÀO LỆNH"}
+            return None
         
         prompt = f"""
-        Hệ thống TITAN AI v5.5. 
-        Dữ liệu 30 kỳ gần nhất: {history[:30]}
-        Gợi ý từ thuật toán Matrix: {matrix_suggestion}
-        
-        Nhiệm vụ:
-        1. Phân tích bẫy nhà cái.
-        2. Chốt lại 3 số chủ lực mạnh nhất.
-        3. Đưa ra lời khuyên (ĐÁNH/DỪNG).
-        
-        Trả về định dạng JSON:
-        {{"m": "3 số chủ lực", "s": "4 số lót", "d": "ĐÁNH/DỪNG", "l": "lý do logic", "r": "mức rủi ro 0-100"}}
+        Hệ thống TITAN v24.6. Dữ liệu: {history[:20]}
+        Gợi ý hiện tại: {suggest_3}
+        Hãy phân tích bẫy nhà cái và chốt:
+        1. 3 số 5 tinh chủ lực.
+        2. 4 số lót giữ vốn.
+        3. Tỷ lệ thắng (%).
+        Trả về JSON: {{"m3": "...", "l4": "...", "win": ..., "reason": "..."}}
         """
         try:
             response = self.model.generate_content(prompt)
@@ -107,41 +90,25 @@ class TitanAI:
         except:
             return None
 
-    # --- HÀM TỔNG HỢP CHÍNH ---
-    def analyze(self, raw_history: List[str]) -> Dict:
-        data = self._clean_history(raw_history)
-        if len(data) < 10:
-            return {"logic": "Cần thêm dữ liệu", "decision": "CHỜ"}
+    def analyze(self, raw_data: List[str]) -> Dict:
+        data = self._clean_history(raw_data)
+        if len(data) < 5:
+            return {"status": "ERR", "msg": "Cần tối thiểu 5 kỳ"}
 
-        # Bước 1: Quét bẫy nhà cái
-        trap_results = self._detect_house_traps(data)
-        
-        # Bước 2: Chạy thuật toán nội bộ
-        matrix_3 = self._matrix_evolution_analysis(data)
-        support_4 = self._get_support_numbers(data, matrix_3)
+        # Chạy đồng thời 3 lớp
+        traps = self._detect_house_traps(data)
+        m3_logic = self._matrix_analysis(data)
+        ai_res = self._ai_consultant(data, m3_logic)
 
-        # Bước 3: Hỏi ý kiến Gemini AI
-        ai_res = self._ai_insight(data, matrix_3)
-
-        # Hợp nhất kết quả (Ưu tiên AI nếu có, nếu không dùng Matrix)
-        if ai_res:
-            final_main = ai_res.get("m", matrix_3)
-            final_supp = ai_res.get("s", support_4)
-            decision = ai_res.get("d", "VÀO LỆNH")
-            logic = ai_res.get("l", "Phân tích AI")
-            risk_score = ai_res.get("r", trap_results["score"])
-        else:
-            final_main = matrix_3
-            final_supp = support_4
-            decision = "VÀO LỆNH" if trap_results["score"] < 50 else "DỪNG"
-            logic = "Dùng Matrix Combo (AI nghẽn)"
-            risk_score = trap_results["score"]
+        # Hợp nhất kết quả
+        final_m3 = ai_res["m3"] if ai_res else m3_logic
+        final_l4 = ai_res["l4"] if ai_res else "0468"
+        win_rate = ai_res["win"] if ai_res else (100 - traps["score"])
 
         return {
-            "main_3": final_main,
-            "support_4": final_supp,
-            "decision": decision,
-            "logic": logic,
-            "risk": {"score": risk_score, "level": "OK" if risk_score < 45 else "HIGH"},
-            "house_warning": trap_results["details"]
+            "m3": final_m3,
+            "l4": final_l4,
+            "win_rate": win_rate,
+            "trap_msg": traps["details"] if traps["details"] else "Cầu đang ổn định",
+            "decision": "ĐÁNH" if win_rate > 50 else "DỪNG/QUAN SÁT"
         }
