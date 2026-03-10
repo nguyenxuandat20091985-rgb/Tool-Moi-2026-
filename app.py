@@ -43,32 +43,38 @@ class TitanTrinityAI:
         except: accuracy = 50
         return top_5, accuracy
 
-# --- PHẦN 2: GIAO DIỆN HIỆN ĐẠI (UI/UX) ---
-st.set_page_config(page_title="TITAN AI GOLD", layout="centered")
+# --- PHẦN 2: GIAO DIỆN TỐI ƯU DÀN NGANG ---
+st.set_page_config(page_title="TITAN AI COMPACT", layout="centered")
 
-# CSS để làm đẹp giao diện
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
-    .stTextArea textarea { background-color: #1e1e1e; color: #ffd700; border: 1px solid #ffd700; }
-    .gold-box {
-        background: linear-gradient(145deg, #2c2c2c, #1a1a1a);
-        border: 2px solid #ffd700;
-        border-radius: 12px;
-        padding: 10px;
-        text-align: center;
-        font-size: 28px;
+    .stApp { background-color: #0e1117; }
+    .gold-container {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 20px;
+    }
+    .gold-item {
+        background: linear-gradient(145deg, #333, #111);
+        border: 1px solid #ffd700;
+        border-radius: 8px;
+        width: 18%; /* Ép 5 ô nằm ngang */
+        aspect-ratio: 1 / 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
         font-weight: bold;
         color: #ffd700;
-        box-shadow: 0 4px 15px rgba(255, 215, 0, 0.2);
-        margin: 5px;
+        box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
     }
-    .accuracy-text { font-size: 20px; font-weight: bold; color: #00ff00; text-align: center; }
-    .suggest-box { background-color: #ffd700; color: black; padding: 10px; border-radius: 8px; font-weight: bold; text-align: center; margin-top: 15px; }
+    .stButton button { background-color: #333; color: white; border: 1px solid #555; height: 35px; }
+    .accuracy-label { text-align: center; color: #00ff00; font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+    .suggest-label { background: #ffd700; color: black; padding: 8px; border-radius: 5px; text-align: center; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-DB_FILE = "history_v82.json"
+DB_FILE = "history_v83.json"
 def load_data():
     if os.path.exists(DB_FILE):
         try:
@@ -82,12 +88,10 @@ def save_data(data):
 history = load_data()
 ai = TitanTrinityAI()
 
-# Tiêu đề gọn
-st.markdown("<h2 style='text-align: center; color: #ffd700; margin-bottom: 0;'>🏆 TITAN AI GOLD</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: gray; font-size: 14px;'>Premium Trinity System v8.2</p>", unsafe_allow_html=True)
+st.markdown("<h3 style='text-align: center; color: #ffd700; margin-top: -30px;'>🏆 TITAN GOLD v8.3</h3>", unsafe_allow_html=True)
 
-# Ô nhập liệu nhỏ gọn
-raw_input = st.text_area("", placeholder="Dán kỳ quay tại đây...", height=70, label_visibility="collapsed")
+# Nhập liệu thu gọn
+raw_input = st.text_area("", placeholder="Dán kỳ quay...", height=60, label_visibility="collapsed")
 
 c1, c2 = st.columns(2)
 with c1:
@@ -102,22 +106,26 @@ with c2:
         save_data([])
         st.rerun()
 
-# Khu vực hiển thị kết quả
 if history:
     top_5, acc = ai.analyze(history)
     
-    st.markdown(f"<p class='accuracy-text'>Độ tin cậy: {acc}%</p>", unsafe_allow_html=True)
+    st.markdown(f"<div class='accuracy-label'>Độ tin cậy: {acc}%</div>", unsafe_allow_html=True)
     
-    # Hiển thị 5 số vàng trên một hàng ngang
-    st.markdown("<p style='text-align: center; color: white; margin-bottom: 5px;'>💎 5 SỐ VÀNG CHỐT 3 TINH 💎</p>", unsafe_allow_html=True)
-    cols = st.columns(5)
-    for i in range(5):
-        cols[i].markdown(f"<div class='gold-box'>{top_5[i]}</div>", unsafe_allow_html=True)
+    # Hiển thị 5 số vàng dàn ngang
+    gold_html = f"""
+    <div class="gold-container">
+        <div class="gold-item">{top_5[0]}</div>
+        <div class="gold-item">{top_5[1]}</div>
+        <div class="gold-item">{top_5[2]}</div>
+        <div class="gold-item">{top_5[3]}</div>
+        <div class="gold-item">{top_5[4]}</div>
+    </div>
+    """
+    st.markdown(gold_html, unsafe_allow_html=True)
     
-    # Gợi ý bộ 3 tinh nổi bật
-    st.markdown(f"<div class='suggest-box'>🔥 BỘ 3 TINH CHỦ LỰC: {top_5[0]} - {top_5[1]} - {top_5[2]}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='suggest-label'>🔥 CHỐT 3 TINH: {top_5[0]} - {top_5[1]} - {top_5[2]}</div>", unsafe_allow_html=True)
     
-    with st.expander("📜 Xem lịch sử"):
-        for row in history[:5]: st.code("".join(map(str, row)))
+    with st.expander("📜 Lịch sử"):
+        for row in history[:5]: st.write("".join(map(str, row)))
 else:
-    st.info("💡 Hãy dán ít nhất 1 kỳ quay để AI bắt đầu.")
+    st.info("Hãy dán kỳ quay để AI phân tích.")
