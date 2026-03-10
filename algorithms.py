@@ -1,5 +1,5 @@
 # ==============================================================================
-# TITAN AI v5.0 - AI Algorithms
+# TITAN AI v5.0 - AI Algorithms & Pattern Detection
 # ==============================================================================
 
 import numpy as np
@@ -7,42 +7,32 @@ import pandas as pd
 from collections import Counter, defaultdict
 import random
 import math
-import re
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 from config import Config
 
 class HousePatternDetector:
-    """House pattern detector."""
+    """Detect house manipulation patterns."""
     
     def __init__(self):
         self.detected_patterns = {}
         self.risk_level = 0
     
-    def detect_all_patterns(self, data):
-        """Detect all patterns."""
-        try:
-            patterns = {}
-            patterns['bet_cau'] = self._detect_bet_cau(data)
-            patterns['dao_cau'] = self._detect_dao_cau(data)
-            patterns['xoay_cau'] = self._detect_xoay_cau(data)
-            patterns['nhip_bay'] = self._detect_nhip_bay(data)
-            patterns['tong_control'] = self._detect_sum_control(data)
-            
-            self.risk_level = self._calculate_risk(patterns)
-            self.detected_patterns = patterns
-            
-            return patterns
-        except:
-            return {
-                'bet_cau': {'detected': False, 'patterns': [], 'risk': 0, 'max_streak': 0},
-                'dao_cau': {'detected': False, 'patterns': [], 'risk': 0},
-                'xoay_cau': {'detected': False, 'patterns': [], 'risk': 0},
-                'nhip_bay': {'detected': False, 'patterns': [], 'risk': 0},
-                'tong_control': {'detected': False, 'patterns': [], 'risk': 0}
-            }
+    def detect_all_patterns(self, data: List[str]) -> Dict:
+        """Run all pattern detection algorithms."""
+        patterns = {}
+        patterns['bet_cau'] = self._detect_bet_cau(data)
+        patterns['dao_cau'] = self._detect_dao_cau(data)
+        patterns['xoay_cau'] = self._detect_xoay_cau(data)
+        patterns['nhip_bay'] = self._detect_nhip_bay(data)
+        patterns['tong_control'] = self._detect_sum_control(data)
+        
+        self.risk_level = self._calculate_house_control_risk(patterns)
+        self.detected_patterns = patterns
+        
+        return patterns
     
-    def _detect_bet_cau(self, data):
-        """Detect streaks."""
+    def _detect_bet_cau(self, data: List[str]) -> Dict:
+        """Detect streaks (bệt cầu)."""
         if len(data) < 20:
             return {'detected': False, 'patterns': [], 'risk': 0, 'max_streak': 0}
         
@@ -69,7 +59,7 @@ class HousePatternDetector:
                             'position': pos,
                             'digit': d,
                             'streak': streak,
-                            'description': f'Vị {pos}: {d} bệt {streak} kỳ'
+                            'description': f'Vị {pos}: Số {d} bệt {streak} kỳ'
                         })
                         max_streak = max(max_streak, streak)
                         
@@ -83,10 +73,15 @@ class HousePatternDetector:
                 else:
                     i += 1
         
-        return {'detected': len(patterns) > 0, 'patterns': patterns, 'risk': min(100, risk), 'max_streak': max_streak}
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns,
+            'risk': min(100, risk),
+            'max_streak': max_streak
+        }
     
-    def _detect_dao_cau(self, data):
-        """Detect reversals."""
+    def _detect_dao_cau(self, data: List[str]) -> Dict:
+        """Detect reversals (đảo cầu)."""
         if len(data) < 20:
             return {'detected': False, 'patterns': [], 'risk': 0}
         
@@ -96,23 +91,77 @@ class HousePatternDetector:
         
         for i in range(len(recent) - 3):
             a, b = recent[i], recent[i+1]
+            c, d = recent[i+2], recent[i+3]
+            
             if len(a) >= 2 and len(b) >= 2:
                 if a[0:2] == b[1::-1]:
                     patterns.append({
-                        'type': 'Đảo cầu',
+                        'type': 'Đảo cầu 2 số',
+                        'position': i,
                         'pattern': f'{a[0:2]} → {b[0:2]}',
-                        'description': f'{a[0:2]} → {b[0:2]}'
+                        'description': f'Kỳ {i}: {a[0:2]} đảo thành {b[0:2]}'
                     })
                     risk += 10
+                
+                if len(c) >= 2 and len(d) >= 2:
+                    if a[0:2] == b[1::-1] == c[0:2]:
+                        patterns.append({
+                            'type': 'Đảo cầu hoàn chỉnh',
+                            'position': i,
+                            'pattern': f'{a[0:2]} → {b[0:2]} → {c[0:2]}',
+                            'description': f'Chu kỳ đảo: {a[0:2]} → {b[0:2]} → {c[0:2]}'
+                        })
+                        risk += 25
         
-        return {'detected': len(patterns) > 0, 'patterns': patterns[:10], 'risk': min(100, risk)}
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns[:10],
+            'risk': min(100, risk)
+        }
     
-    def _detect_xoay_cau(self, data):
-        """Detect rotations."""
-        return {'detected': False, 'patterns': [], 'risk': 0}
+    def _detect_xoay_cau(self, data: List[str]) -> Dict:
+        """Detect rotations (xoay cầu)."""
+        if len(data) < 30:
+            return {'detected': False, 'patterns': [], 'risk': 0}
+        
+        recent = data[:60] if len(data) >= 60 else data
+        patterns = []
+        risk = 0
+        
+        for pos in range(5):
+            seq = [n[pos] if len(n) > pos else '0' for n in recent]
+            
+            for cycle_len in [3, 4, 5]:
+                if len(seq) >= cycle_len * 3:
+                    cycle_matches = 0
+                    for i in range(len(seq) - cycle_len * 3):
+                        base = seq[i:i+cycle_len]
+                        match = True
+                        for j in range(1, 3):
+                            if seq[i+j*cycle_len:i+(j+1)*cycle_len] != base:
+                                match = False
+                                break
+                        if match:
+                            cycle_matches += 1
+                    
+                    if cycle_matches >= 2:
+                        patterns.append({
+                            'type': 'Xoay cầu chu kỳ',
+                            'position': pos,
+                            'cycle_length': cycle_len,
+                            'matches': cycle_matches,
+                            'description': f'Vị {pos}: Chu kỳ {cycle_len} kỳ lặp {cycle_matches} lần'
+                        })
+                        risk += 20
+        
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns[:10],
+            'risk': min(100, risk)
+        }
     
-    def _detect_nhip_bay(self, data):
-        """Detect rhythm traps."""
+    def _detect_nhip_bay(self, data: List[str]) -> Dict:
+        """Detect rhythm traps (bẫy nhịp)."""
         if len(data) < 20:
             return {'detected': False, 'patterns': [], 'risk': 0}
         
@@ -127,15 +176,20 @@ class HousePatternDetector:
                     d = seq[i]
                     if i+5 < len(seq) and seq[i+5] != d:
                         patterns.append({
-                            'type': 'Bẫy nhịp',
+                            'type': 'Bẫy nhịp 2',
+                            'position': pos,
                             'digit': d,
-                            'description': f'Vị {pos}: {d} gãy nhịp'
+                            'description': f'Vị {pos}: Số {d} nhịp 2 bị gãy ở kỳ {i+5}'
                         })
                         risk += 15
         
-        return {'detected': len(patterns) > 0, 'patterns': patterns[:10], 'risk': min(100, risk)}
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns[:10],
+            'risk': min(100, risk)
+        }
     
-    def _detect_sum_control(self, data):
+    def _detect_sum_control(self, data: List[str]) -> Dict:
         """Detect sum control."""
         if len(data) < 20:
             return {'detected': False, 'patterns': [], 'risk': 0}
@@ -149,73 +203,95 @@ class HousePatternDetector:
         patterns = []
         risk = 0
         
-        sum_std = float(np.std(sums))
+        sum_std = np.std(sums)
         if sum_std < 2.5:
-            patterns.append({'type': 'Kiểm soát tổng', 'std': sum_std})
+            patterns.append({
+                'type': 'Kiểm soát tổng',
+                'std_dev': round(sum_std, 2),
+                'avg_sum': round(np.mean(sums), 1),
+                'description': f'Độ lệch chuẩn tổng: {sum_std:.2f} (quá ổn định)'
+            })
             risk += 30
         
-        return {'detected': len(patterns) > 0, 'patterns': patterns, 'risk': min(100, risk)}
+        return {
+            'detected': len(patterns) > 0,
+            'patterns': patterns,
+            'risk': min(100, risk)
+        }
     
-    def _calculate_risk(self, patterns):
-        """Calculate total risk."""
-        total = 0
-        if patterns.get('bet_cau', {}).get('detected'):
-            total += patterns['bet_cau']['risk'] * 0.30
-        if patterns.get('dao_cau', {}).get('detected'):
-            total += patterns['dao_cau']['risk'] * 0.20
-        if patterns.get('nhip_bay', {}).get('detected'):
-            total += patterns['nhip_bay']['risk'] * 0.15
-        if patterns.get('tong_control', {}).get('detected'):
-            total += patterns['tong_control']['risk'] * 0.15
+    def _calculate_house_control_risk(self, patterns: Dict) -> int:
+        """Calculate overall house control risk."""
+        from config import Config
+        total_risk = 0
         
-        return min(100, int(total))
+        if patterns['bet_cau']['detected']:
+            total_risk += patterns['bet_cau']['risk'] * Config.PATTERN_CONFIG['bet_cau_weight']
+        if patterns['dao_cau']['detected']:
+            total_risk += patterns['dao_cau']['risk'] * Config.PATTERN_CONFIG['dao_cau_weight']
+        if patterns['xoay_cau']['detected']:
+            total_risk += patterns['xoay_cau']['risk'] * Config.PATTERN_CONFIG['xoay_cau_weight']
+        if patterns['nhip_bay']['detected']:
+            total_risk += patterns['nhip_bay']['risk'] * Config.PATTERN_CONFIG['nhip_bay_weight']
+        if patterns['tong_control']['detected']:
+            total_risk += patterns['tong_control']['risk'] * Config.PATTERN_CONFIG['tong_control_weight']
+        
+        return min(100, int(total_risk))
     
-    def get_house_control_level(self):
-        """Get house control level."""
-        if self.risk_level >= 70:
-            return 'RẤT CAO', '🚫 Nhà cái điều khiển mạnh'
-        elif self.risk_level >= 50:
-            return 'CAO', '⚠️ Có dấu hiệu điều khiển'
-        elif self.risk_level >= 30:
-            return 'TRUNG BÌNH', '⚠️ Pattern bất thường'
+    def get_house_control_level(self) -> Tuple[str, str]:
+        """Get house control level description."""
+        from config import Config
+        
+        if self.risk_level >= Config.HOUSE_CONTROL['high']:
+            return 'RẤT CAO', '🚫 Nhà cái đang điều khiển mạnh - NÊN DỪNG'
+        elif self.risk_level >= Config.HOUSE_CONTROL['medium']:
+            return 'CAO', '⚠️ Có dấu hiệu điều khiển - CẨN THẬN'
+        elif self.risk_level >= Config.HOUSE_CONTROL['low']:
+            return 'TRUNG BÌNH', '⚠️ Một số pattern bất thường'
         else:
-            return 'THẤP', '✅ Ổn định'
+            return 'THẤP', '✅ Nhịp số tự nhiên'
 
 
 class TitanAI:
-    """AI prediction engine."""
+    """Main AI prediction engine."""
     
     def __init__(self):
         self.weights = Config.ALGORITHM_WEIGHTS.copy()
         self.accuracy_history = []
         self.pattern_detector = HousePatternDetector()
     
-    def analyze(self, history, max_simulations=None):
-        """Main analysis."""
+    def analyze(self, history: List[str], max_simulations: int = None) -> Dict:
+        """Main analysis method."""
         if max_simulations is None:
             max_simulations = Config.DEFAULT_SIMULATIONS
         
         if not history or len(history) < Config.MIN_HISTORY_LENGTH:
-            return self._fallback(f"Cần {Config.MIN_HISTORY_LENGTH}+ kỳ")
+            return self._fallback()
         
         clean_data = self._clean_history(history)
         if len(clean_data) < Config.MIN_HISTORY_LENGTH:
-            return self._fallback("Data không hợp lệ")
+            return self._fallback("Cần ít nhất 15 kỳ")
         
+        # Detect house patterns
         house_patterns = self.pattern_detector.detect_all_patterns(clean_data)
-        house_level, house_warning = self.pattern_detector.get_house_control_level()
+        house_control_level, house_warning = self.pattern_detector.get_house_control_level()
         
+        # Run analysis
         results = {}
-        results['frequency'] = self._frequency(clean_data)
-        results['gap'] = self._gap(clean_data)
-        results['markov'] = self._markov(clean_data)
-        results['monte_carlo'] = self._monte_carlo(clean_data, max_simulations)
-        results['pattern'] = self._pattern(clean_data)
-        results['hot_cold'] = self._hot_cold(clean_data)
+        results['frequency'] = self._analyze_frequency(clean_data)
+        results['gap'] = self._analyze_gap(clean_data)
+        results['markov'] = self._analyze_markov(clean_data)
+        results['monte_carlo'] = self._analyze_monte_carlo(clean_data, max_simulations)
+        results['pattern'] = self._analyze_pattern_advanced(clean_data)
+        results['hot_cold'] = self._analyze_hot_cold(clean_data)
         
-        ensemble = self._ensemble(results, house_patterns)
-        stats_df = self._stats_df(clean_data, results)
-        risk = self._risk(clean_data, house_patterns)
+        # Adjust weights based on house patterns
+        if house_patterns['bet_cau']['detected'] and house_patterns['bet_cau']['risk'] >= 40:
+            self.weights['frequency'] = 15
+            self.weights['pattern'] = 25
+        
+        ensemble = self._ensemble_vote(results, house_patterns)
+        stats_df = self._build_stats_df(clean_data, results)
+        risk = self._calculate_risk(clean_data, house_patterns)
         
         return {
             'main_3': ensemble['main_3'],
@@ -223,15 +299,14 @@ class TitanAI:
             'stats_df': stats_df,
             'risk': risk,
             'confidence': ensemble['confidence'],
-            'logic': self._logic(results, ensemble, house_patterns),
+            'logic': self._build_logic(results, ensemble, house_patterns),
             'house_patterns': house_patterns,
-            'house_control_level': house_level,
-            'house_warning': house_warning,
-            'success': True
+            'house_control_level': house_control_level,
+            'house_warning': house_warning
         }
     
-    def _clean_history(self, history):
-        """Clean data."""
+    def _clean_history(self, history: List[str]) -> List[str]:
+        """Clean history data."""
         cleaned = []
         for item in history:
             s = str(item).strip()
@@ -240,29 +315,22 @@ class TitanAI:
                 cleaned.append(match.group())
         return cleaned
     
-    def _frequency(self, data):
-        """Frequency analysis."""
+    def _analyze_frequency(self, data: List[str]) -> Dict:
+        """Frequency analysis with recency weighting."""
         weighted = Counter()
         n = len(data)
         
         for idx, num in enumerate(data):
             weight = 3.0 - 2.0 * (idx / max(n, 1))
             for d in num:
-                if d.isdigit():
-                    weighted[d] += weight
+                weighted[d] += weight
         
         scores = {d: weighted.get(d, 0) for d in '0123456789'}
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
         
-        while len(top_3) < 3:
-            for d in '0123456789':
-                if d not in top_3:
-                    top_3.append(d)
-                    break
-        
         return {'scores': scores, 'top_3': top_3}
     
-    def _gap(self, data):
+    def _analyze_gap(self, data: List[str]) -> Dict:
         """Gap analysis."""
         last_seen = {d: -1 for d in '0123456789'}
         
@@ -279,16 +347,15 @@ class TitanAI:
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
         return {'scores': scores, 'top_3': top_3}
     
-    def _markov(self, data):
-        """Markov analysis."""
+    def _analyze_markov(self, data: List[str]) -> Dict:
+        """Markov chain analysis."""
         if len(data) < 20:
-            return {'scores': {d: 10.0 for d in '0123456789'}, 'top_3': ['1', '5', '9']}
+            return {'scores': {d: 10 for d in '0123456789'}, 'top_3': ['1','5','9']}
         
         transitions = defaultdict(Counter)
         
         for i in range(len(data) - 1):
-            curr = data[i]
-            next_num = data[i + 1]
+            curr, next_num = data[i], data[i + 1]
             for pos in range(5):
                 if pos < len(curr) and pos < len(next_num):
                     transitions[curr[pos]][next_num[pos]] += 1
@@ -299,10 +366,9 @@ class TitanAI:
         for pos, last_d in enumerate(last_num[:5]):
             if last_d in transitions and transitions[last_d]:
                 total = sum(transitions[last_d].values())
-                if total > 0:
-                    for next_d, count in transitions[last_d].items():
-                        pos_weight = 1.0 + 0.25 * (2 - abs(pos - 2))
-                        next_prob[next_d] += (count / total) * pos_weight
+                for next_d, count in transitions[last_d].items():
+                    pos_weight = 1.0 + 0.25 * (2 - abs(pos - 2))
+                    next_prob[next_d] += (count / total) * pos_weight
         
         scores = {d: next_prob.get(d, 0) * 10 for d in '0123456789'}
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
@@ -315,10 +381,10 @@ class TitanAI:
         
         return {'scores': scores, 'top_3': top_3}
     
-    def _monte_carlo(self, data, n_sim):
+    def _analyze_monte_carlo(self, data: List[str], n_simulations: int) -> Dict:
         """Monte Carlo simulation."""
         if len(data) < 20:
-            return {'scores': {d: 10.0 for d in '0123456789'}, 'top_3': ['2', '4', '6']}
+            return {'scores': {d: 10 for d in '0123456789'}, 'top_3': ['2','4','6']}
         
         recent = data[:80] if len(data) >= 80 else data
         pool = []
@@ -326,14 +392,13 @@ class TitanAI:
         for idx, num in enumerate(recent):
             weight = max(1, 4 - idx // 20)
             for d in num:
-                if d.isdigit():
-                    pool.extend([d] * weight)
+                pool.extend([d] * weight)
         
         if not pool:
-            return {'scores': {d: 10.0 for d in '0123456789'}, 'top_3': ['0', '1', '2']}
+            return {'scores': {d: 10 for d in '0123456789'}, 'top_3': ['0','1','2']}
         
         sim_count = Counter()
-        for _ in range(min(n_sim, 2000)):
+        for _ in range(n_simulations):
             sample = random.choices(pool, k=3)
             for d in sample:
                 sim_count[d] += 1
@@ -344,37 +409,53 @@ class TitanAI:
         
         return {'scores': scores, 'top_3': top_3}
     
-    def _pattern(self, data):
-        """Pattern detection."""
+    def _analyze_pattern_advanced(self, data: List[str]) -> Dict:
+        """Advanced pattern detection."""
         if len(data) < 25:
-            return {'scores': {d: 10.0 for d in '0123456789'}, 'top_3': ['3', '5', '7'], 'patterns': [], 'avoid': []}
+            return {'scores': {d: 10 for d in '0123456789'}, 'top_3': ['3','5','7'], 'patterns': []}
         
         recent = data[:50] if len(data) >= 50 else data
         candidates = Counter()
         patterns_found = []
         avoid = []
         
+        # Bệt cầu detection
         for pos in range(5):
             seq = [n[pos] if len(n) > pos else '0' for n in recent]
             i = 0
             while i < len(seq) - 2:
                 if seq[i] == seq[i+1] == seq[i+2]:
                     d = seq[i]
-                    streak = 3
+                    streak_len = 3
                     j = i + 3
                     while j < len(seq) and seq[j] == d:
-                        streak += 1
+                        streak_len += 1
                         j += 1
                     
-                    if streak >= 3:
-                        patterns_found.append(f'Bệt {pos}: {d} ({streak})')
-                        if streak >= 5:
-                            avoid.append(d)
-                        else:
-                            candidates[d] += 5
+                    patterns_found.append(f'Bệt vị {pos}: {d} ({streak_len} kỳ)')
+                    
+                    if streak_len >= 5:
+                        avoid.append(d)
+                    elif streak_len >= 3:
+                        candidates[d] += 5
                     i = j
                 else:
                     i += 1
+        
+        # Nhịp 2 detection
+        for pos in range(5):
+            seq = [n[pos] if len(n) > pos else '0' for n in recent]
+            for i in range(len(seq) - 4):
+                if seq[i] == seq[i+2] == seq[i+4] and seq[i] != seq[i+1]:
+                    d = seq[i]
+                    patterns_found.append(f'Nhịp-2 vị {pos}: {d}')
+                    candidates[d] += 4
+        
+        if not candidates:
+            all_digits = ''.join(recent)
+            freq = Counter(all_digits)
+            for d, c in freq.most_common(3):
+                candidates[d] += 3
         
         scores = {d: candidates.get(d, 0) * 2 for d in '0123456789'}
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
@@ -387,10 +468,10 @@ class TitanAI:
         
         return {'scores': scores, 'top_3': top_3, 'patterns': patterns_found[:10], 'avoid': list(set(avoid))}
     
-    def _hot_cold(self, data):
-        """Hot/cold analysis."""
+    def _analyze_hot_cold(self, data: List[str]) -> Dict:
+        """Hot/cold number analysis."""
         recent = data[:15] if len(data) >= 15 else data
-        older = data[15:45] if len(data) >= 45 else []
+        older = data[15:45] if len(data) >= 45 else data
         
         recent_count = Counter(''.join(recent))
         older_count = Counter(''.join(older)) if older else Counter()
@@ -412,18 +493,19 @@ class TitanAI:
         top_3 = [d for d, _ in sorted(scores.items(), key=lambda x: -x[1])[:3]]
         return {'scores': scores, 'top_3': top_3}
     
-    def _ensemble(self, results, house_patterns):
-        """Ensemble voting."""
+    def _ensemble_vote(self, results: Dict, house_patterns: Dict) -> Dict:
+        """Ensemble voting with house pattern awareness."""
         votes = Counter()
         avoid_votes = []
         
+        # Avoid streaking numbers during high house control
         if house_patterns['bet_cau']['detected'] and house_patterns['bet_cau']['risk'] >= 40:
             for p in house_patterns['bet_cau']['patterns']:
-                if p.get('streak', 0) >= 4:
+                if p['streak'] >= 4:
                     avoid_votes.append(p['digit'])
         
-        for algo, result in results.items():
-            weight = self.weights.get(algo, 10)
+        for algo_name, result in results.items():
+            weight = self.weights.get(algo_name, 10)
             for d in result.get('top_3', []):
                 votes[d] += weight
             if result.get('avoid'):
@@ -453,19 +535,24 @@ class TitanAI:
         else:
             confidence = 50
         
-        return {'main_3': main_3, 'support_4': support_4, 'confidence': int(confidence), 'avoid': list(avoid_set)}
+        return {
+            'main_3': main_3,
+            'support_4': support_4,
+            'confidence': int(confidence),
+            'avoid': list(avoid_set)
+        }
     
-    def _stats_df(self, data, results):
-        """Build stats DataFrame."""
+    def _build_stats_df(self, data: List[str], results: Dict) -> pd.DataFrame:
+        """Build statistics DataFrame."""
         rows = []
         for d in '0123456789':
             row = {'Digit': d}
-            row['Frequency'] = float(results['frequency']['scores'].get(d, 0))
-            row['Gap'] = float(results['gap']['scores'].get(d, 0))
-            row['Markov'] = float(results['markov']['scores'].get(d, 0))
-            row['Monte_Carlo'] = float(results['monte_carlo']['scores'].get(d, 0))
-            row['Pattern'] = float(results['pattern']['scores'].get(d, 0))
-            row['Hot_Cold'] = float(results['hot_cold']['scores'].get(d, 0))
+            row['Frequency'] = results['frequency']['scores'].get(d, 0)
+            row['Gap'] = results['gap']['scores'].get(d, 0)
+            row['Markov'] = results['markov']['scores'].get(d, 0)
+            row['Monte_Carlo'] = results['monte_carlo']['scores'].get(d, 0)
+            row['Pattern'] = results['pattern']['scores'].get(d, 0)
+            row['Hot_Cold'] = results['hot_cold']['scores'].get(d, 0)
             
             ai_score = (row['Frequency'] * 0.25 + row['Gap'] * 0.20 + 
                        row['Markov'] * 0.20 + row['Monte_Carlo'] * 0.15 + 
@@ -473,41 +560,43 @@ class TitanAI:
             row['AI_Score'] = round(ai_score, 1)
             rows.append(row)
         
-        return pd.DataFrame(rows).sort_values('AI_Score', ascending=False).reset_index(drop=True)
+        df = pd.DataFrame(rows)
+        return df.sort_values('AI_Score', ascending=False).reset_index(drop=True)
     
-    def _risk(self, data, house_patterns):
-        """Calculate risk."""
+    def _calculate_risk(self, data: List[str], house_patterns: Dict) -> Dict:
+        """Calculate risk level."""
         base_risk = 0
         reasons = []
         
+        # House control risk
         house_risk = self.pattern_detector.risk_level
         if house_risk >= 50:
             base_risk += house_risk * 0.5
-            reasons.append(f'House: {house_risk}%')
+            reasons.append(f'Nhà cái điều khiển: {house_risk}%')
         
+        # Standard risk
         if len(data) < 20:
-            return {'score': 30, 'level': 'MEDIUM', 'reason': 'Ít data'}
+            return {'score': 30, 'level': 'MEDIUM', 'reason': 'Dữ liệu ít'}
         
         all_digits = ''.join(data[:50])
         counts = Counter(all_digits)
         total = len(all_digits)
         
-        if total > 0:
-            entropy = sum(- (c/total) * math.log2(c/total) for c in counts.values() if c > 0)
-            if entropy < 2.8:
-                base_risk += 25
-                reasons.append('Quá đều')
-            elif entropy > 3.4:
-                base_risk += 15
-                reasons.append('Biến động')
+        entropy = sum(- (c/total) * math.log2(c/total) for c in counts.values() if c > 0)
+        if entropy < Config.RISK_THRESHOLDS['entropy_min']:
+            base_risk += 25
+            reasons.append('Kết quả quá đều')
+        elif entropy > Config.RISK_THRESHOLDS['entropy_max']:
+            base_risk += 15
+            reasons.append('Biến động mạnh')
         
         base_risk = min(100, int(base_risk))
         level = 'HIGH' if base_risk >= 50 else 'MEDIUM' if base_risk >= 25 else 'OK'
         
-        return {'score': base_risk, 'level': level, 'reason': '; '.join(reasons) if reasons else 'Ổn'}
+        return {'score': base_risk, 'level': level, 'reason': '; '.join(reasons) if reasons else 'Ổn định'}
     
-    def _logic(self, results, ensemble, house_patterns):
-        """Build logic string."""
+    def _build_logic(self, results: Dict, ensemble: Dict, house_patterns: Dict) -> str:
+        """Build logic explanation."""
         parts = []
         
         freq_top = [d for d, _ in sorted(results['frequency']['scores'].items(), key=lambda x: -x[1])[:2]]
@@ -523,19 +612,18 @@ class TitanAI:
         if ensemble.get('avoid'):
             parts.append(f"Tránh: {','.join(ensemble['avoid'][:2])}")
         
-        return ' | '.join(parts) if parts else 'AI Analysis'
+        return ' | '.join(parts) if parts else 'Phân tích AI'
     
-    def _fallback(self, msg):
-        """Fallback prediction."""
+    def _fallback(self, msg: str = "Chưa đủ dữ liệu") -> Dict:
+        """Return fallback prediction."""
         return {
             'main_3': ['?', '?', '?'],
             'support_4': ['0', '0', '0', '0'],
-            'stats_df': pd.DataFrame({'Digit': list('0123456789'), 'AI_Score': [0.0]*10}),
+            'stats_df': pd.DataFrame({'Digit': list('0123456789'), 'AI_Score': [0]*10}),
             'risk': {'score': 0, 'level': 'LOW', 'reason': msg},
             'confidence': 0,
             'logic': msg,
             'house_patterns': {},
             'house_control_level': 'N/A',
-            'house_warning': '',
-            'success': False
+            'house_warning': ''
         }
