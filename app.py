@@ -2,8 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import google.generativeai as genai
-import plotly.express as px
-import plotly.graph_objects as go
 import requests
 from io import StringIO
 from datetime import datetime
@@ -12,136 +10,104 @@ from datetime import datetime
 GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
 genai.configure(api_key=GEMINI_API_KEY) 
 
-# Link CSV đã tối ưu (Tự động cập nhật để tránh cache cũ)
+# CẤU HÌNH GOOGLE SHEETS
 SHEET_ID = "1McocCyb3PRI6S0bgodyZlJyE_kjET55io1Zv966dZpA"
-SHEET_NAME = "data"
-SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
+SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=data"
+# URL Web App anh vừa tạo ở bước trên (Dùng để nhập số)
+DEPLOY_URL = "https://script.google.com/macros/s/AKfycbz_XXXXXXXXX/exec" 
 
-st.set_page_config(page_title="TITAN MASTER HUB V8", layout="wide") 
+st.set_page_config(page_title="TITAN ULTIMATE V9", layout="wide")
 
-# --- GIAO DIỆN CHUYÊN NGHIỆP ---
+# --- STYLE GIAO DIỆN VIP ---
 st.markdown("""
     <style>
-    .stApp { background-color: #050505; color: #ffffff; }
-    .prediction-card { 
-        background: linear-gradient(135deg, #111 0%, #000 100%); 
-        padding: 25px; border-radius: 15px; 
-        border-left: 10px solid #00ff00; 
-        box-shadow: 0 10px 20px rgba(0,255,0,0.1);
-        margin-bottom: 25px;
-    }
-    .stButton>button { 
-        background: linear-gradient(45deg, #00ff00, #008000) !important; 
-        color: black !important; font-weight: 900 !important; 
-        border-radius: 12px !important; border: none !important;
-        height: 3.5em !important; width: 100%;
-    }
-    [data-testid="stMetricValue"] { color: #00ff00 !important; font-size: 32px !important; }
+    .stApp { background-color: #050505; color: white; }
+    .card { background: #111; padding: 20px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
+    .win-status { color: #00ff00; font-weight: bold; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] { background: #222; border-radius: 5px; padding: 10px 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- THUẬT TOÁN XỬ LÝ DỮ LIỆU ĐA TẦNG ---
-@st.cache_data(ttl=30)
-def load_data_master():
+# --- QUẢN LÝ DỮ LIỆU ---
+@st.cache_data(ttl=10)
+def fetch_data():
     try:
-        # Thêm random param để ép Google Sheets trả về dữ liệu mới nhất ngay lập tức
-        timestamp = datetime.now().timestamp()
-        response = requests.get(f"{SHEET_CSV_URL}&v={timestamp}", timeout=15)
-        
-        # Đọc dữ liệu thô (không header)
-        df_raw = pd.read_csv(StringIO(response.text), header=None).astype(str)
-        
-        all_numbers = []
-        for col in df_raw.columns:
-            # Thuật toán quét mọi ô chứa chuỗi 5 chữ số
-            matches = df_raw[col].str.extractall(r'(\d{5})')[0].tolist()
-            all_numbers.extend(matches)
-        
-        if not all_numbers: return pd.DataFrame()
-        
-        # Chuyển về DataFrame và loại bỏ trùng lặp nếu có (giữ đúng thứ tự thời gian)
-        df = pd.DataFrame(all_numbers, columns=['numbers'])
-        return df
-    except Exception as e:
-        st.error(f"Lỗi kết nối dữ liệu: {e}")
-        return pd.DataFrame()
-
-# --- BỘ NÃO PHÂN TÍCH ---
-class TitanBrain:
-    def __init__(self, df):
-        self.df = df
-        # Chuyển thành ma trận 5 cột (A, B, C, D, E)
-        self.matrix = np.array([[int(d) for d in str(n)] for n in df['numbers'].tail(300)])
-
-    def get_stats(self):
-        # Thống kê tần suất 10 số gần nhất
-        freq = {}
-        for i in range(10):
-            freq[i] = np.sum(self.matrix[-50:] == i)
-        return freq
+        res = requests.get(f"{SHEET_CSV_URL}&v={datetime.now().timestamp()}")
+        df = pd.read_csv(StringIO(res.text), header=None).astype(str)
+        nums = []
+        for col in df.columns:
+            matches = df[col].str.extractall(r'(\d{5})')[0].tolist()
+            nums.extend(matches)
+        return nums
+    except: return []
 
 # --- GIAO DIỆN CHÍNH ---
 def main():
-    st.markdown("<h1 style='text-align: center; color: #00ff00;'>⚡ TITAN MASTER HUB V8 ⚡</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='text-align: center; color: #888;'>Dữ liệu đồng bộ Real-time: {datetime.now().strftime('%H:%M:%S')}</p>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #00ff00;'>⚡ TITAN ULTIMATE V9 ⚡</h1>", unsafe_allow_html=True)
+    
+    # Khởi tạo bộ nhớ tạm cho lịch sử dự đoán
+    if 'predict_history' not in st.session_state:
+        st.session_state.predict_history = []
 
-    if st.button("🔄 CẬP NHẬT NHỊP CẦU MỚI NHẤT"):
-        st.cache_data.clear()
-        st.rerun()
+    tab1, tab2, tab3 = st.tabs(["📊 DASHBOARD", "✍️ NHẬP SỐ MỚI", "📜 LỊCH SỬ & TỶ LỆ"])
 
-    df = load_data_master()
-
-    if not df.empty:
-        brain = TitanBrain(df)
-        freq_stats = brain.get_stats()
-        last_val = df['numbers'].iloc[-1]
-
-        # Dashboard thông số
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Tổng Kỳ Quét", len(df))
-        c2.metric("Số Vừa Ra", last_val)
-        c3.metric("Nhịp Cầu", "ỔN ĐỊNH ✅")
-
-        st.divider()
-
-        # PHẦN QUAN TRỌNG: AI CHỐT SỐ
-        st.subheader("🤖 SIÊU TRÍ TUỆ AI GEMINI CHỐT SỐ")
-        with st.spinner('Đang phân tích ma trận dữ liệu...'):
-            try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                history = df['numbers'].tail(20).tolist()
-                prompt = f"""
-                Bạn là TITAN MASTER AI. Đây là lịch sử 5D: {history}. 
-                Nhiệm vụ:
-                1. Soi nhịp bệt, nhịp nhảy và các con số hay đi kèm nhau.
-                2. Chốt 1 cặp 2D (hai số cuối) duy nhất có khả năng nổ cao nhất kỳ tới.
-                3. Đưa ra lời khuyên vào tiền (Gấp thếp hoặc Đều tay).
-                Yêu cầu: Trả lời ngắn gọn, mạnh mẽ.
-                """
-                res = model.generate_content(prompt)
-                st.markdown(f'<div class="prediction-card">{res.text}</div>', unsafe_allow_html=True)
-            except:
-                st.warning("⚠️ Kết nối AI đang bận. Gợi ý kỹ thuật: 19 - 91")
-
-        # BIỂU ĐỒ TRỰC QUAN
-        st.subheader("📊 Tần Suất Xuất Hiện (50 kỳ)")
-        chart_df = pd.DataFrame([{"Số": k, "Lượt": v} for k, v in freq_stats.items()])
-        fig = px.bar(chart_df, x="Số", y="Lượt", color="Lượt", color_continuous_scale="Greens")
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font=dict(color="white"))
-        st.plotly_chart(fig, use_container_width=True)
-
-        # NHẬT KÝ SỐ
-        with st.expander("📂 Xem toàn bộ nhật ký số"):
-            st.dataframe(df[::-1].reset_index(drop=True), use_container_width=True)
+    # --- TAB 1: DASHBOARD ---
+    with tab1:
+        data = fetch_data()
+        if data:
+            last_num = data[-1]
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Kỳ gần nhất", last_num)
+            c2.metric("Tổng dữ liệu", len(data))
             
-    else:
-        st.error("❌ KHÔNG TÌM THẤY DỮ LIỆU!")
-        st.markdown(f"""
-        **Anh Đạt kiểm tra giúp em:**
-        1. File Sheets tên là **data** (viết thường).
-        2. Trang tính (Tab) tên là **data** (viết thường).
-        3. Anh đã bấm nút **Chia sẻ** (Góc trên bên phải) -> Chọn **Bất kỳ ai có liên kết** chưa?
-        """)
+            # PHẦN DỰ ĐOÁN AI
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.subheader("🤖 DỰ ĐOÁN AI KỲ TIẾP THEO")
+            if st.button("KÍCH HOẠT SOI CẦU"):
+                with st.spinner('AI đang tính toán...'):
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    prompt = f"Dữ liệu 5D: {data[-20:]}. Chốt 1 cặp 2D, 1 số 3D. Trả lời: 2D: XX, 3D: XXX"
+                    res = model.generate_content(prompt).text
+                    # Lưu vào lịch sử
+                    st.session_state.predict_history.append({"time": datetime.now().strftime("%H:%M"), "pred": res, "status": "Waiting..."})
+                    st.write(f"### {res}")
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.warning("Đang chờ dữ liệu từ Sheets...")
+
+    # --- TAB 2: NHẬP SỐ ---
+    with tab2:
+        st.subheader("📝 Cập nhật kết quả kỳ mới")
+        new_val = st.text_input("Nhập dãy 5 số vừa ra:", placeholder="Ví dụ: 10245")
+        if st.button("XÁC NHẬN LƯU"):
+            if len(new_val) == 5 and new_val.isdigit():
+                try:
+                    # Gửi dữ liệu lên Google Sheets thông qua Web App
+                    requests.get(f"{DEPLOY_URL}?number={new_val}")
+                    st.success(f"Đã lưu thành công số {new_val} vào hệ thống!")
+                    st.cache_data.clear()
+                except:
+                    st.error("Lỗi kết nối Web App. Vui lòng kiểm tra lại Deploy URL.")
+            else:
+                st.error("Vui lòng nhập đúng 5 chữ số!")
+
+    # --- TAB 3: TỶ LỆ THẮNG & LỊCH SỬ ---
+    with tab3:
+        st.subheader("📈 Thống kê hiệu quả dự đoán")
+        if st.session_state.predict_history:
+            # Thuật toán tính tỷ lệ thắng đơn giản
+            history_df = pd.DataFrame(st.session_state.predict_history)
+            win_count = sum(1 for x in st.session_state.predict_history if x['status'] == "WIN")
+            total = len(st.session_state.predict_history)
+            
+            c1, c2 = st.columns(2)
+            c1.metric("Tổng dự đoán", total)
+            c2.metric("Tỷ lệ thắng %", f"{(win_count/total)*100:.1f}%" if total > 0 else "0%")
+            
+            st.table(history_df)
+        else:
+            st.info("Chưa có dữ liệu dự đoán để thống kê.")
 
 if __name__ == "__main__":
     main()
