@@ -1,150 +1,162 @@
 import streamlit as st
 import pandas as pd
-import time
-import re
-import json
-import os
-from collections import Counter
-import math
+import numpy as np
+import google.generativeai as genai
+import plotly.express as px
+import requests
+from io import StringIO
 
-# ==============================================================================
-# CONFIGURATION & UI STYLE
-# ==============================================================================
-st.set_page_config(page_title="TITAN OMNI v9.0", layout="wide", initial_sidebar_state="collapsed")
+# ================= CẤU HÌNH HỆ THỐNG =================
+# API Key của anh Đạt
+API_KEY = "AIzaSyBgd0Au6FGhsiqTkADgz1SBECjs2e1MwGE"
+genai.configure(api_key=API_KEY) 
 
-st.markdown("""
-<style>
-    .stApp { background: #010409; color: #e6edf3; }
-    .header-card {
-        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
-        padding: 20px; border-radius: 15px; border-bottom: 4px solid #ffd700;
-        margin-bottom: 20px; text-align: center;
-    }
-    .num-box {
-        font-size: calc(40px + 4vw); font-weight: 900; color: #ffd700;
-        text-align: center; letter-spacing: 10px;
-        text-shadow: 0 0 20px rgba(255, 215, 0, 0.4);
-        line-height: 1.1; margin: 10px 0;
-    }
-    .status-bar {
-        padding: 12px; border-radius: 10px; text-align: center;
-        font-weight: 800; font-size: 1.2rem; margin-bottom: 10px;
-    }
-    .prediction-card {
-        background: #0d1117; border: 2px solid #30363d;
-        border-radius: 20px; padding: 25px; margin-top: 10px;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Link Google Sheets của anh (Đã chuyển sang định dạng xuất CSV để AI đọc nhanh)
+SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1McocCyb3PRI6S0bgodyZlJyE_kjET55io1Zv966dZpA/export?format=csv"
 
-# ==============================================================================
-# CORE LOGIC (Database & AI Engine)
-# ==============================================================================
-class DatabaseManager:
-    def __init__(self):
-        self.file_path = "history_v9.json"
-        self.data = self.load()
+st.set_page_config(page_title="TITAN AI - DỮ LIỆU ĐỒNG BỘ", layout="wide") 
 
-    def load(self):
-        if os.path.exists(self.file_path):
-            with open(self.file_path, "r") as f: return json.load(f)
-        return []
+# Hàm lấy dữ liệu trực tiếp từ Google Sheets
+def load_data_from_sheets():
+    try:
+        response = requests.get(SHEET_CSV_URL)
+        response.encoding = 'utf-8'
+        df = pd.read_csv(StringIO(response.text))
+        # Giả định cột chứa số 5D tên là 'numbers' hoặc cột đầu tiên
+        if 'numbers' not in df.columns:
+            df.columns = ['numbers'] + list(df.columns[1:])
+        return df
+    except Exception as e:
+        st.error(f"Lỗi kết nối dữ liệu Sheets: {e}")
+        return pd.DataFrame(columns=["numbers"])
 
-    def save(self):
-        with open(self.file_path, "w") as f: json.dump(self.data[:200], f)
+# Hàm gọi Gemini nhận định
+def get_gemini_advice(history_str, ai_analysis):
+    try:
+        model = genai.GenerativeModel('gemini-pro')
+        prompt = f"""
+        Bạn là chuyên gia toán xác suất TITAN. 
+        Dữ liệu gần đây: {history_str}
+        Kết quả máy học: {ai_analysis}
+        Yêu cầu: Loại bỏ số chập, ưu tiên nhịp cầu bệt.
+        Hãy đưa ra 1 cặp số duy nhất (2 số khác nhau) hoặc khuyên 'KHÔNG ĐÁNH'.
+        Trả lời cực ngắn: 'Cặp số: XX-YY' hoặc 'KHÔNG ĐÁNH'.
+        """
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "Gemini đang bảo trì nhịp cầu."
 
-    def clean_data(self, raw):
-        found = re.findall(r'\d{5}', str(raw))
-        return [[int(d) for d in item] for item in found]
+# ================= LỚP PHÂN TÍCH AI =================
+class LotobetAI_V2:
+    def clean_data(self, df):
+        matrix = []
+        # Lấy 100 dòng gần nhất để đảm bảo tốc độ
+        valid_data = df['numbers'].astype(str).tail(100).values
+        for val in valid_data:
+            digits = [int(d) for d in val if d.isdigit()]
+            if len(digits) == 5:
+                matrix.append(digits)
+        return np.array(matrix)
 
-    def add_numbers(self, new_nums):
-        # Tránh trùng lặp kỳ quay
-        for num in reversed(new_nums):
-            if num not in self.data:
-                self.data.insert(0, num)
-        self.save()
-
-class TitanAI:
-    def analyze(self, data):
-        if len(data) < 3: return None
-        recent = data[:30]
-        all_nums = [d for row in recent for d in row]
-        freq = Counter(all_nums)
-        
-        gaps = {i: 30 for i in range(10)}
-        for i in range(10):
-            for idx, row in enumerate(data):
-                if i in row: gaps[i] = idx; break
-
-        scores = {}
-        for i in range(10):
-            # Thuật toán nhịp 3 tinh
-            f_score = freq.get(i, 0) * 5
-            g_score = 45 if gaps[i] == 1 else 20 if gaps[i] == 0 else 0
-            scores[str(i)] = f_score + g_score
+    def analyze_numbers(self, matrix):
+        if len(matrix) < 5: return None
+        analysis = {}
+        for num in range(10):
+            appears = np.where(np.any(matrix == num, axis=1))[0]
+            count_10 = sum(1 for row in matrix[-10:] if num in row)
+            count_3 = sum(1 for row in matrix[-3:] if num in row)
             
-        top_nums = [n for n, s in sorted(scores.items(), key=lambda x: x[1], reverse=True)]
-        
-        return {
-            "m3": "".join(top_nums[:3]),
-            "l4": "".join(top_nums[3:7]),
-            "win_rate": int(max(45, min(98, 100 - (len(set(all_nums)) * 2)))),
-            "logic": "Ưu tiên nhịp Gaps 1 và tần suất rơi bệt."
-        }
+            if count_3 >= 2: state = "NÓNG/BỆT"
+            elif 1 <= count_10 <= 3: state = "ỔN ĐỊNH"
+            else: state = "YẾU/GAN"
+            
+            analysis[num] = {
+                "state": state,
+                "freq": count_10,
+                "last_seen": (len(matrix) - 1 - appears[-1]) if len(appears) > 0 else 99
+            }
+        return analysis
 
-# ==============================================================================
-# MAIN APP
-# ==============================================================================
+    def get_predictions(self, analysis):
+        if not analysis: return []
+        sorted_nums = sorted(analysis.items(), key=lambda x: x[1]['freq'], reverse=True)
+        top_7 = [x[0] for x in sorted_nums[:7]]
+        
+        candidates = []
+        for i in range(len(top_7)):
+            for j in range(i + 1, len(top_7)):
+                n1, n2 = top_7[i], top_7[j]
+                s1, s2 = analysis[n1], analysis[n2]
+                score = 50
+                if s1['state'] == "NÓNG/BỆT": score += 20
+                if s2['state'] == "NÓNG/BỆT": score += 20
+                if s1['state'] == "ỔN ĐỊNH": score += 10
+                if s1['last_seen'] == 0 and s2['last_seen'] == 0: score -= 30 
+                if score >= 70:
+                    candidates.append({"pair": (n1, n2), "score": score})
+        
+        candidates.sort(key=lambda x: x['score'], reverse=True)
+        return candidates[:2]
+
+# ================= GIAO DIỆN CHÍNH =================
 def main():
-    db = DatabaseManager()
-    ai = TitanAI()
-
-    st.markdown("""<div class="header-card"><div style="font-size:30px; font-weight:900; color:#ffd700;">🛡️ TITAN OMNI v9.0</div>
-                <div style="color: #8b949e;">CHUYÊN GIA 3 SỐ 5 TINH | PRO EDITION</div></div>""", unsafe_allow_html=True)
-
-    # Stats
-    c1, c2, c3 = st.columns(3)
-    c1.metric("📦 Tổng kỳ", len(db.data))
+    st.markdown("<h1 style='text-align: center; color: #00ff00;'>⚡ TITAN AI REAL-TIME v2</h1>", unsafe_allow_html=True)
     
-    # Input Area
-    raw_input = st.text_area("Dán kết quả tại đây:", height=100, placeholder="Ví dụ: 60577...")
+    # Nút bấm đồng bộ
+    if st.button("🔄 ĐỒNG BỘ DỮ LIỆU TỪ GOOGLE SHEETS"):
+        st.session_state.data = load_data_from_sheets()
+        st.success("Đã cập nhật dữ liệu mới nhất từ Sheets!")
+
+    if 'data' not in st.session_state:
+        st.session_state.data = load_data_from_sheets()
+
+    df = st.session_state.data
     
-    col_b1, col_b2, col_b3 = st.columns([2,1,1])
-    if col_b1.button("🚀 GIẢI MÃ MATRIX AI", type="primary", use_container_width=True):
-        new_nums = db.clean_data(raw_input)
-        if new_nums:
-            db.add_numbers(new_nums)
-            st.rerun()
+    if not df.empty:
+        st.info(f"Dữ liệu hiện có: {len(df)} kỳ quay.")
+        ai = LotobetAI_V2()
+        matrix = ai.clean_data(df)
+        
+        if len(matrix) >= 5:
+            analysis = ai.analyze_numbers(matrix)
+            preds = ai.get_predictions(analysis)
+
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.subheader("🤖 AI Dự Đoán")
+                if not preds:
+                    st.warning("Hệ thống khuyên: KHÔNG ĐÁNH (Nhịp cầu không đẹp)")
+                else:
+                    history_str = ", ".join(df['numbers'].tail(5).astype(str).tolist())
+                    advice = get_gemini_advice(history_str, str(preds))
+                    st.success(f"NHẬN ĐỊNH GEMINI: {advice}")
+                    
+                    for p in preds:
+                        st.markdown(f"""
+                        <div style="background: #111; padding: 20px; border-radius: 10px; border: 1px solid #00ff00; margin-bottom: 10px;">
+                            <span style="font-size: 24px; color: #ffff00;">Cặp số vàng: {p['pair'][0]} - {p['pair'][1]}</span>
+                            <br><span style="color: #00ff00;">Xác suất TITAN: {p['score']}%</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+            with col2:
+                st.subheader("📈 Trạng thái")
+                hot_count = sum(1 for v in analysis.values() if v['state'] == "NÓNG/BỆT")
+                st.metric("Số lượng số NÓNG", hot_count)
+                if hot_count > 6: st.error("Thị trường NHIỄU")
+                else: st.write("Thị trường ỔN ĐỊNH")
+
+            # Biểu đồ
+            st.divider()
+            chart_df = pd.DataFrame([{"Số": k, "Tần suất": v['freq'], "Trạng thái": v['state']} for k, v in analysis.items()])
+            fig = px.bar(chart_df, x='Số', y='Tần suất', color='Trạng thái', title="Thống kê nhịp số 0-9")
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.error("Không tìm thấy dãy 5 số hợp lệ!")
-
-    if col_b2.button("🔄 Làm mới", use_container_width=True): st.rerun()
-    if col_b3.button("🗑️ Reset", use_container_width=True):
-        db.data = []
-        db.save()
-        st.rerun()
-
-    # Phân tích và Hiển thị
-    res = ai.analyze(db.data)
-    if res:
-        st.markdown(f'<div class="status-bar" style="background: #238636;">📢 TRẠNG THÁI: SẴN SÀNG VÀO TIỀN</div>', unsafe_allow_html=True)
-        
-        st.markdown("<div class='prediction-card'>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align:center; color:#8b949e; margin:0;'>💎 3 SỐ 5 TINH CHỦ LỰC</p>", unsafe_allow_html=True)
-        st.markdown(f"<div class='num-box'>{res['m3']}</div>", unsafe_allow_html=True)
-        
-        st.markdown("<p style='text-align:center; color:#8b949e; margin:0;'>🛡️ DÀN LÓT (4 SỐ)</p>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align:center; font-size:35px; color:#58a6ff; font-weight:bold;'>{res['l4']}</p>", unsafe_allow_html=True)
-        
-        st.divider()
-        st.write(f"🧠 **LOGIC AI:** {res['logic']}")
-        st.text_input("📋 DÀN 7 SỐ (Copy):", "".join(sorted(set(res['m3'] + res['l4']))))
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Hiển thị lịch sử để kiểm tra
-    with st.expander("📜 Lịch sử dữ liệu đã nạp"):
-        for row in db.data[:10]:
-            st.write("".join(map(str, row)))
+            st.warning("Dữ liệu trong Sheets không đủ 5 kỳ chuẩn (5 chữ số).")
+    else:
+        st.error("Không thể lấy dữ liệu. Vui lòng kiểm tra quyền chia sẻ link Google Sheets (Bất kỳ ai có liên kết đều có thể xem).")
 
 if __name__ == "__main__":
     main()
