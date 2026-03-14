@@ -7,156 +7,148 @@ import requests
 from io import StringIO
 
 # ================= CẤU HÌNH HỆ THỐNG =================
-# API Key của anh Đạt
-API_KEY = "AIzaSyBgd0Au6FGhsiqTkADgz1SBECjs2e1MwGE"
-genai.configure(api_key=API_KEY) 
+# Cập nhật API Key mới của anh Đạt
+GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
+genai.configure(api_key=GEMINI_API_KEY) 
 
-# Link Google Sheets của anh (Đã chuyển sang định dạng xuất CSV để AI đọc nhanh)
+# Link Google Sheets của anh (Định dạng xuất CSV)
 SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1McocCyb3PRI6S0bgodyZlJyE_kjET55io1Zv966dZpA/export?format=csv"
 
-st.set_page_config(page_title="TITAN AI - DỮ LIỆU ĐỒNG BỘ", layout="wide") 
+st.set_page_config(page_title="TITAN AI PRO - VIP", layout="wide") 
 
-# Hàm lấy dữ liệu trực tiếp từ Google Sheets
-def load_data_from_sheets():
+# Tùy chỉnh giao diện bằng CSS
+st.markdown("""
+    <style>
+    .stApp { background-color: #0e1117; color: #ffffff; }
+    .prediction-card {
+        background: linear-gradient(135deg, #1e1e1e 0%, #000000 100%);
+        padding: 25px;
+        border-radius: 15px;
+        border: 2px solid #00ff00;
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+        margin: 15px 0;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Hàm lấy dữ liệu từ Google Sheets
+def load_data():
     try:
-        response = requests.get(SHEET_CSV_URL)
+        response = requests.get(SHEET_CSV_URL, timeout=10)
         response.encoding = 'utf-8'
         df = pd.read_csv(StringIO(response.text))
-        # Giả định cột chứa số 5D tên là 'numbers' hoặc cột đầu tiên
-        if 'numbers' not in df.columns:
-            df.columns = ['numbers'] + list(df.columns[1:])
-        return df
+        # Tự động tìm cột chứa 5 số
+        for col in df.columns:
+            if df[col].astype(str).str.contains(r'\d{5}').any():
+                df = df.rename(columns={col: 'numbers'})
+                break
+        return df[['numbers']].dropna()
     except Exception as e:
-        st.error(f"Lỗi kết nối dữ liệu Sheets: {e}")
+        st.error(f"⚠️ Lỗi đồng bộ Sheets: {e}")
         return pd.DataFrame(columns=["numbers"])
 
-# Hàm gọi Gemini nhận định
-def get_gemini_advice(history_str, ai_analysis):
+# Hàm gọi Gemini nhận định chuyên sâu
+def get_gemini_analysis(history_data, logic_results):
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-1.5-flash') # Sử dụng model Flash để tốc độ nhanh hơn
         prompt = f"""
-        Bạn là chuyên gia toán xác suất TITAN. 
-        Dữ liệu gần đây: {history_str}
-        Kết quả máy học: {ai_analysis}
-        Yêu cầu: Loại bỏ số chập, ưu tiên nhịp cầu bệt.
-        Hãy đưa ra 1 cặp số duy nhất (2 số khác nhau) hoặc khuyên 'KHÔNG ĐÁNH'.
-        Trả lời cực ngắn: 'Cặp số: XX-YY' hoặc 'KHÔNG ĐÁNH'.
+        Bạn là hệ thống trí tuệ nhân tạo TITAN v6.
+        Dữ liệu lịch sử 10 kỳ: {history_data}
+        Kết quả thuật toán: {logic_results}
+        
+        Nhiệm vụ:
+        1. Phân tích nhịp cầu (Bệt, Nhảy, hay Đảo).
+        2. Loại bỏ các số có dấu hiệu 'Gan' quá lâu.
+        3. Chốt 1 cặp duy nhất có xác suất > 85%.
+        
+        Trả lời theo định dạng:
+        - Nhận định: [Ngắn gọn 1 câu]
+        - Chốt số: XX - YY
         """
         response = model.generate_content(prompt)
         return response.text
     except:
-        return "Gemini đang bảo trì nhịp cầu."
+        return "⚠️ Gemini đang bận phân tích nhịp cầu, hãy thử lại sau."
 
-# ================= LỚP PHÂN TÍCH AI =================
-class LotobetAI_V2:
-    def clean_data(self, df):
+# ================= LOGIC TOÁN HỌC TITAN =================
+class TitanEngine:
+    def process_matrix(self, df):
         matrix = []
-        # Lấy 100 dòng gần nhất để đảm bảo tốc độ
-        valid_data = df['numbers'].astype(str).tail(100).values
-        for val in valid_data:
-            digits = [int(d) for d in val if d.isdigit()]
-            if len(digits) == 5:
-                matrix.append(digits)
+        for val in df['numbers'].astype(str).tail(150):
+            nums = [int(d) for d in val if d.isdigit()]
+            if len(nums) == 5: matrix.append(nums)
         return np.array(matrix)
 
-    def analyze_numbers(self, matrix):
-        if len(matrix) < 5: return None
-        analysis = {}
-        for num in range(10):
-            appears = np.where(np.any(matrix == num, axis=1))[0]
-            count_10 = sum(1 for row in matrix[-10:] if num in row)
-            count_3 = sum(1 for row in matrix[-3:] if num in row)
+    def run_stats(self, matrix):
+        if len(matrix) < 10: return None
+        stats = {}
+        for i in range(10):
+            # Tần suất trong 15 kỳ gần nhất
+            freq = np.sum(matrix[-15:] == i)
+            # Kỳ cuối cùng xuất hiện
+            last_idx = np.where(np.any(matrix == i, axis=1))[0]
+            gap = (len(matrix) - 1 - last_idx[-1]) if len(last_idx) > 0 else 99
             
-            if count_3 >= 2: state = "NÓNG/BỆT"
-            elif 1 <= count_10 <= 3: state = "ỔN ĐỊNH"
-            else: state = "YẾU/GAN"
+            state = "ỔN ĐỊNH"
+            if freq > 10: state = "CẦU NÓNG"
+            elif gap > 8: state = "SỐ GAN"
             
-            analysis[num] = {
-                "state": state,
-                "freq": count_10,
-                "last_seen": (len(matrix) - 1 - appears[-1]) if len(appears) > 0 else 99
-            }
-        return analysis
-
-    def get_predictions(self, analysis):
-        if not analysis: return []
-        sorted_nums = sorted(analysis.items(), key=lambda x: x[1]['freq'], reverse=True)
-        top_7 = [x[0] for x in sorted_nums[:7]]
-        
-        candidates = []
-        for i in range(len(top_7)):
-            for j in range(i + 1, len(top_7)):
-                n1, n2 = top_7[i], top_7[j]
-                s1, s2 = analysis[n1], analysis[n2]
-                score = 50
-                if s1['state'] == "NÓNG/BỆT": score += 20
-                if s2['state'] == "NÓNG/BỆT": score += 20
-                if s1['state'] == "ỔN ĐỊNH": score += 10
-                if s1['last_seen'] == 0 and s2['last_seen'] == 0: score -= 30 
-                if score >= 70:
-                    candidates.append({"pair": (n1, n2), "score": score})
-        
-        candidates.sort(key=lambda x: x['score'], reverse=True)
-        return candidates[:2]
+            stats[i] = {"freq": int(freq), "gap": int(gap), "state": state}
+        return stats
 
 # ================= GIAO DIỆN CHÍNH =================
 def main():
-    st.markdown("<h1 style='text-align: center; color: #00ff00;'>⚡ TITAN AI REAL-TIME v2</h1>", unsafe_allow_html=True)
-    
-    # Nút bấm đồng bộ
-    if st.button("🔄 ĐỒNG BỘ DỮ LIỆU TỪ GOOGLE SHEETS"):
-        st.session_state.data = load_data_from_sheets()
-        st.success("Đã cập nhật dữ liệu mới nhất từ Sheets!")
+    st.markdown("<h1 style='text-align: center; color: #00ff00;'>⚡ TITAN AI MASTER HUB ⚡</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Hệ thống dự đoán 5D Bet - Đồng bộ Real-time</p>", unsafe_allow_html=True)
 
-    if 'data' not in st.session_state:
-        st.session_state.data = load_data_from_sheets()
+    # Sidebar điều khiển
+    st.sidebar.header("CÀI ĐẶT HỆ THỐNG")
+    if st.sidebar.button("🔄 LÀM MỚI DỮ LIỆU"):
+        st.cache_data.clear()
+        st.rerun()
 
-    df = st.session_state.data
+    data = load_data()
     
-    if not df.empty:
-        st.info(f"Dữ liệu hiện có: {len(df)} kỳ quay.")
-        ai = LotobetAI_V2()
-        matrix = ai.clean_data(df)
+    if not data.empty:
+        engine = TitanEngine()
+        matrix = engine.process_matrix(data)
         
-        if len(matrix) >= 5:
-            analysis = ai.analyze_numbers(matrix)
-            preds = ai.get_predictions(analysis)
-
-            col1, col2 = st.columns([2, 1])
+        if len(matrix) >= 10:
+            stats = engine.run_stats(matrix)
             
+            # Khu vực hiển thị kết quả chính
+            st.subheader("🔮 KẾT QUẢ PHÂN TÍCH TỪ AI")
+            
+            history_str = str(data['numbers'].tail(10).tolist())
+            with st.spinner('AI đang quét nhịp cầu...'):
+                ai_advice = get_gemini_analysis(history_str, str(stats))
+            
+            st.markdown(f"""
+                <div class="prediction-card">
+                    <h3 style="color: #00ff00; margin-top: 0;">🎯 LỜI KHUYÊN HỆ THỐNG</h3>
+                    <p style="font-size: 1.2rem; color: #ffffff;">{ai_advice}</p>
+                </div>
+            """, unsafe_allow_html=True)
+
+            # Thống kê chi tiết
+            col1, col2 = st.columns([2, 1])
             with col1:
-                st.subheader("🤖 AI Dự Đoán")
-                if not preds:
-                    st.warning("Hệ thống khuyên: KHÔNG ĐÁNH (Nhịp cầu không đẹp)")
-                else:
-                    history_str = ", ".join(df['numbers'].tail(5).astype(str).tolist())
-                    advice = get_gemini_advice(history_str, str(preds))
-                    st.success(f"NHẬN ĐỊNH GEMINI: {advice}")
-                    
-                    for p in preds:
-                        st.markdown(f"""
-                        <div style="background: #111; padding: 20px; border-radius: 10px; border: 1px solid #00ff00; margin-bottom: 10px;">
-                            <span style="font-size: 24px; color: #ffff00;">Cặp số vàng: {p['pair'][0]} - {p['pair'][1]}</span>
-                            <br><span style="color: #00ff00;">Xác suất TITAN: {p['score']}%</span>
-                        </div>
-                        """, unsafe_allow_html=True)
-
+                st.subheader("📊 Biểu đồ nhịp số (0-9)")
+                chart_df = pd.DataFrame([
+                    {"Số": k, "Tần suất (15 kỳ)": v['freq'], "Trạng thái": v['state']} 
+                    for k, v in stats.items()
+                ])
+                fig = px.bar(chart_df, x='Số', y='Tần suất (15 kỳ)', color='Trạng thái',
+                             color_discrete_map={"CẦU NÓNG": "#ff0000", "ỔN ĐỊNH": "#00ff00", "SỐ GAN": "#555555"})
+                st.plotly_chart(fig, use_container_width=True)
+            
             with col2:
-                st.subheader("📈 Trạng thái")
-                hot_count = sum(1 for v in analysis.values() if v['state'] == "NÓNG/BỆT")
-                st.metric("Số lượng số NÓNG", hot_count)
-                if hot_count > 6: st.error("Thị trường NHIỄU")
-                else: st.write("Thị trường ỔN ĐỊNH")
-
-            # Biểu đồ
-            st.divider()
-            chart_df = pd.DataFrame([{"Số": k, "Tần suất": v['freq'], "Trạng thái": v['state']} for k, v in analysis.items()])
-            fig = px.bar(chart_df, x='Số', y='Tần suất', color='Trạng thái', title="Thống kê nhịp số 0-9")
-            st.plotly_chart(fig, use_container_width=True)
+                st.subheader("📋 Dữ liệu mới nhất")
+                st.dataframe(data.tail(10), use_container_width=True)
         else:
-            st.warning("Dữ liệu trong Sheets không đủ 5 kỳ chuẩn (5 chữ số).")
+            st.warning("Dữ liệu Sheets cần ít nhất 10 kỳ để bắt đầu phân tích.")
     else:
-        st.error("Không thể lấy dữ liệu. Vui lòng kiểm tra quyền chia sẻ link Google Sheets (Bất kỳ ai có liên kết đều có thể xem).")
+        st.error("Không tìm thấy dữ liệu numbers. Hãy kiểm tra lại cột 'numbers' trong file Google Sheets.")
 
 if __name__ == "__main__":
     main()
