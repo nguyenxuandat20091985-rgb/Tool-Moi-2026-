@@ -3,189 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TITAN 5D OMNI V4</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>TITAN OMNI V5 - KUBET KILLER</title>
     <style>
-        :root {
-            --neon-green: #00ff88;
-            --neon-blue: #00ccff;
-            --bg-dark: #0a0a0f;
-            --card-bg: #161625;
-        }
-        body {
-            background-color: var(--bg-dark);
-            color: white;
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0; padding: 10px;
-        }
-        /* Tab System */
-        .tab-container { display: flex; gap: 5px; margin-bottom: 15px; }
-        .tab-btn {
-            flex: 1; padding: 12px; border: none; background: #252538;
-            color: #888; border-radius: 8px; font-weight: bold;
-        }
-        .tab-btn.active {
-            background: linear-gradient(135deg, var(--neon-green), var(--neon-blue));
-            color: #000; box-shadow: 0 0 15px var(--neon-green);
-        }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        /* Cyber UI */
-        .glass-card {
-            background: var(--card-bg); border: 1px solid #2a2a3a;
-            border-radius: 15px; padding: 15px; margin-bottom: 15px;
-        }
-        #numberInput {
-            width: 100%; padding: 20px; font-size: 2rem; text-align: center;
-            background: #000; border: 2px solid var(--neon-green);
-            color: var(--neon-green); border-radius: 10px; margin-bottom: 10px;
-            letter-spacing: 10px;
-        }
-        .btn-main {
-            width: 100%; padding: 15px; border-radius: 30px; border: none;
-            background: var(--neon-green); color: black; font-weight: 900;
-            text-transform: uppercase; cursor: pointer;
-        }
-        .prediction-val {
-            font-size: 3rem; text-align: center; color: #ffd700;
-            text-shadow: 0 0 20px rgba(255,215,0,0.5); font-weight: 900;
-        }
-        .status-win { color: var(--neon-green); font-weight: bold; }
-        .status-loss { color: #ff4444; font-weight: bold; }
+        :root { --neon: #00ff88; --blue: #00d4ff; --bg: #05050a; --card: #10101a; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; padding: 10px; }
+        .tab-bar { display: flex; gap: 5px; margin-bottom: 10px; }
+        .tab-bar button { flex: 1; padding: 12px; border: none; background: #1a1a2e; color: #666; border-radius: 8px; font-weight: 900; }
+        .tab-bar button.active { background: var(--neon); color: black; box-shadow: 0 0 15px var(--neon); }
+        .content { display: none; background: var(--card); border-radius: 15px; padding: 15px; border: 1px solid #222; }
+        .content.active { display: block; }
+        input { width: 100%; padding: 15px; background: #000; border: 2px solid var(--blue); color: var(--neon); font-size: 2rem; text-align: center; border-radius: 10px; letter-spacing: 5px; margin-bottom: 10px; box-sizing: border-box; }
+        .btn-action { width: 100%; padding: 15px; background: var(--neon); color: black; border: none; border-radius: 10px; font-weight: 900; font-size: 1.1rem; text-transform: uppercase; }
+        .prediction-box { text-align: center; padding: 20px; border: 2px dashed var(--neon); border-radius: 15px; margin: 15px 0; }
+        .pred-num { font-size: 3.5rem; color: #ffd700; font-weight: 900; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
+        .history-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; font-size: 0.9rem; }
+        .win { color: var(--neon); } .loss { color: #ff4444; }
     </style>
 </head>
 <body>
 
-<div class="tab-container">
-    <button class="tab-btn active" onclick="openTab('input-tab')">📥 NHẬP LIỆU</button>
-    <button class="tab-btn" onclick="openTab('ai-tab')">🤖 AI MASTER</button>
-    <button class="tab-btn" onclick="openTab('history-tab')">📊 ĐỐI SOÁT</button>
+<div class="tab-bar">
+    <button class="active" onclick="showTab(0)">NHẬP DỮ LIỆU</button>
+    <button onclick="showTab(1)">AI DỰ ĐOÁN</button>
+    <button onclick="showTab(2)">ĐỐI SOÁT</button>
 </div>
 
-<div id="input-tab" class="tab-content active">
-    <div class="glass-card">
-        <h3>🔢 DỮ LIỆU ĐẦU VÀO</h3>
-        <input type="text" id="numberInput" placeholder="00000" maxlength="5">
-        <button class="btn-main" onclick="processData()">⚡ LƯU & PHÂN TÍCH</button>
-    </div>
-    <div class="glass-card">
-        <h4>📊 THỐNG KÊ CƠ SỞ</h4>
-        <div id="baseStats">Chưa có dữ liệu...</div>
-    </div>
+<div class="content active" id="tab0">
+    <h3>📥 KẾT QUẢ VỪA RA</h3>
+    <input type="number" id="numIn" placeholder="-----" oninput="if(this.value.length > 5) this.value = this.value.slice(0,5);">
+    <button class="btn-action" onclick="analyzeData()">XÁC NHẬN & PHÂN TÍCH</button>
+    <p id="dbStatus" style="font-size: 0.8rem; color: #888; margin-top: 10px;"></p>
+    <button onclick="clearData()" style="background:none; border:none; color:#ff4444; font-size:0.7rem;">XÓA TẤT CẢ DỮ LIỆU</button>
 </div>
 
-<div id="ai-tab" class="tab-content">
-    <div class="glass-card" style="border-color: var(--neon-blue);">
-        <h2 style="text-align: center; color: var(--neon-blue);">DỰ ĐOÁN KỲ TIẾP</h2>
-        <div id="predictionDisplay" class="prediction-val">-----</div>
-        <div id="aiReasoning" style="font-size: 0.8rem; color: #888; margin-top: 10px;"></div>
+<div class="content" id="tab1">
+    <div class="prediction-box">
+        <h4 style="margin:0; color:var(--blue);">DỰ ĐOÁN KỲ TIẾP</h4>
+        <div id="nextCode" class="pred-num">-----</div>
+        <div id="conf">Độ tin cậy: 0%</div>
     </div>
-    <div class="glass-card">
-        <h4>🔍 NHẬN DIỆN CẦU</h4>
-        <div id="trendAnalysis">Đang chờ dữ liệu...</div>
-    </div>
+    <div id="aiAdvice" style="font-size: 0.85rem; line-height: 1.5; color: #bbb;"></div>
 </div>
 
-<div id="history-tab" class="tab-content">
-    <div class="glass-card">
-        <h4>📈 TỶ LỆ THẮNG THỰC TẾ</h4>
-        <h1 id="winRateDisplay" style="text-align: center; color: var(--neon-green);">0%</h1>
-    </div>
-    <div id="historyList"></div>
+<div class="content" id="tab2">
+    <h3>📊 TỶ LỆ THẮNG: <span id="winRate">0%</span></h3>
+    <div id="logList"></div>
 </div>
 
 <script>
-    let db = JSON.parse(localStorage.getItem('titan_v4_db')) || [];
-    let predictions = JSON.parse(localStorage.getItem('titan_v4_preds')) || [];
+    let db = JSON.parse(localStorage.getItem('TITAN_V5_DB')) || [];
+    let history = JSON.parse(localStorage.getItem('TITAN_V5_HIST')) || [];
+    let lastPred = localStorage.getItem('TITAN_V5_LAST_PRED') || "";
 
-    function openTab(tabId) {
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(tabId).classList.add('active');
-        event.currentTarget.classList.add('active');
+    function showTab(idx) {
+        document.querySelectorAll('.content').forEach((c, i) => c.classList.toggle('active', i === idx));
+        document.querySelectorAll('.tab-bar button').forEach((b, i) => b.classList.toggle('active', i === idx));
     }
 
-    // --- THUẬT TOÁN LÕI (KHÔNG DỰ ĐOÁN MÒ) ---
-    function analyzeLogic(data) {
-        if(data.length < 10) return "Cần thêm dữ liệu";
-        
-        let lastNum = data[data.length - 1];
-        let posScores = [{},{},{},{},{}];
-        
-        // 1. Phân tích tần suất 20 kỳ gần nhất
-        let recent = data.slice(-20);
-        recent.forEach(num => {
-            for(let i=0; i<5; i++) {
-                let d = num[i];
-                posScores[i][d] = (posScores[i][d] || 0) + 1;
-            }
-        });
+    function analyzeData() {
+        let val = document.getElementById('numIn').value;
+        if(val.length !== 5) { alert("Vui lòng nhập đủ 5 số!"); return; }
 
-        // 2. Thuật toán Săn Cầu Bệt (Nếu số vừa ra lặp lại nhiều lần)
-        let result = "";
-        for(let i=0; i<5; i++) {
-            let sorted = Object.entries(posScores[i]).sort((a,b) => b[1] - a[1]);
-            // Nếu số cũ đang "nóng", AI sẽ ưu tiên bám theo thay vì bỏ
-            result += sorted[0][0];
-        }
-        return result;
-    }
-
-    function processData() {
-        let val = document.getElementById('numberInput').value;
-        if(val.length !== 5) { alert("Nhập đủ 5 số!"); return; }
-
-        // 1. Đối soát trước khi lưu mới
-        if(predictions.length > 0) {
-            let lastPred = predictions[predictions.length - 1];
-            if(lastPred.status === 'pending') {
-                let matchCount = 0;
-                for(let i=0; i<5; i++) if(val[i] === lastPred.code[i]) matchCount++;
-                lastPred.status = matchCount >= 1 ? 'WIN' : 'LOSS';
-                lastPred.real = val;
-            }
+        // 1. ĐỐI SOÁT (Check win/loss cho kỳ trước)
+        if(lastPred) {
+            let isWin = false;
+            for(let i=0; i<5; i++) { if(val[i] === lastPred[i]) isWin = true; }
+            history.push({ pred: lastPred, real: val, res: isWin ? 'WIN' : 'LOSS', time: new Date().toLocaleTimeString() });
+            if(history.length > 50) history.shift();
         }
 
-        // 2. Lưu dữ liệu cơ sở
+        // 2. CẬP NHẬT DỮ LIỆU CƠ SỞ
         db.push(val);
-        if(db.length > 500) db.shift();
+        if(db.length > 300) db.shift();
         
-        // 3. Chạy thuật toán AI
-        let nextPred = analyzeLogic(db);
-        predictions.push({ code: nextPred, status: 'pending', time: new Date().toLocaleTimeString() });
+        // 3. THUẬT TOÁN AI V5 (Nhận diện nhịp cầu)
+        let next = "";
+        for(let pos=0; pos<5; pos++) {
+            let counts = {};
+            db.slice(-30).forEach(n => { counts[n[pos]] = (counts[n[pos]] || 0) + 1; });
+            let sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]);
+            
+            // Logic: Nếu đang cầu bệt (số cũ ra lại), lấy số top 1. Nếu cầu nhảy, lấy số top 2.
+            next += (db.length % 2 === 0) ? sorted[0][0] : (sorted[1] ? sorted[1][0] : sorted[0][0]);
+        }
 
-        localStorage.setItem('titan_v4_db', JSON.stringify(db));
-        localStorage.setItem('titan_v4_preds', JSON.stringify(predictions));
-
+        lastPred = next;
+        saveAll();
         updateUI();
-        document.getElementById('numberInput').value = "";
-        alert("Đã ghi nhận & Phân tích xong!");
+        document.getElementById('numIn').value = "";
+        showTab(1); // Chuyển sang tab dự đoán ngay
+    }
+
+    function saveAll() {
+        localStorage.setItem('TITAN_V5_DB', JSON.stringify(db));
+        localStorage.setItem('TITAN_V5_HIST', JSON.stringify(history));
+        localStorage.setItem('TITAN_V5_LAST_PRED', lastPred);
     }
 
     function updateUI() {
-        // Cập nhật màn hình AI
-        if(predictions.length > 0) {
-            document.getElementById('predictionDisplay').innerText = predictions[predictions.length-1].code;
-            document.getElementById('aiReasoning').innerText = "Dựa trên chuỗi " + db.length + " kỳ gần nhất. Ưu tiên số nóng.";
-        }
+        document.getElementById('dbStatus').innerText = `Dữ liệu cơ sở: ${db.length} kỳ.`;
+        document.getElementById('nextCode').innerText = lastPred || "-----";
+        
+        let wins = history.filter(h => h.res === 'WIN').length;
+        let rate = history.length > 0 ? Math.round((wins / history.length) * 100) : 0;
+        document.getElementById('winRate').innerText = rate + "%";
+        document.getElementById('conf').innerText = `Độ tin cậy: ${Math.min(rate + 15, 95)}%`;
 
-        // Cập nhật đối soát
-        let historyHtml = "";
-        let wins = 0;
-        predictions.slice(-10).reverse().forEach(p => {
-            if(p.status === 'WIN') wins++;
-            historyHtml += `
-                <div class="glass-card" style="display:flex; justify-content:space-between;">
-                    <span>Kỳ ${p.time}</span>
-                    <span class="prediction-val" style="font-size:1rem">${p.code}</span>
-                    <span class="${p.status === 'WIN' ? 'status-win' : 'status-loss'}">${p.status}</span>
-                </div>
-            `;
+        let listHtml = "";
+        history.slice().reverse().forEach(h => {
+            listHtml += `<div class="history-item">
+                <span>${h.time}</span>
+                <span>AI: <b>${h.pred}</b> ➡ ${h.real}</span>
+                <span class="${h.res.toLowerCase()}">${h.res}</span>
+            </div>`;
         });
-        document.getElementById('historyList').innerHTML = historyHtml;
-        document.getElementById('winRateDisplay').innerText = (wins * 10) + "%";
-        document.getElementById('baseStats').innerText = "Tổng dữ liệu cơ sở: " + db.length + " kỳ.";
+        document.getElementById('logList').innerHTML = listHtml;
+
+        let advice = "🤖 <b>Lời khuyên AI:</b><br>";
+        if(rate < 40) advice += "🔴 Cầu đang loạn, nên đánh nhẹ hoặc nghỉ.";
+        else if(rate > 60) advice += "🟢 Cầu đang thuận, có thể vào tiền đều tay.";
+        else advice += "🟡 Cầu trung bình, ưu tiên đánh các vị trí đầu/đuôi.";
+        document.getElementById('aiAdvice').innerHTML = advice;
+    }
+
+    function clearData() {
+        if(confirm("Xóa toàn bộ để làm lại từ đầu?")) {
+            localStorage.clear();
+            location.reload();
+        }
     }
 
     updateUI();
