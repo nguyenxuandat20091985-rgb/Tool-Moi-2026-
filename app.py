@@ -2,126 +2,168 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import google.generativeai as genai
-import requests
-import re
-from io import StringIO
+import plotly.express as px
 from datetime import datetime
+import os
 
-# --- 1. CẤU HÌNH GỐC (FIXED) ---
-GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
-genai.configure(api_key=GEMINI_API_KEY)
+# ================= CẤU HÌNH HỆ THỐNG =================
+API_KEY = "AIzaSyBgd0Au6FGhsiqTkADgz1SBECjs2e1MwGE"
+genai.configure(api_key=API_KEY)
 
-SHEET_ID = "1McocCyb3PRI6S0bgodyZlJyE_kjET55io1Zv966dZpA"
-# Link truy xuất thẳng vào sheet 'data' đã đổi tên
-SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet=data"
+st.set_page_config(page_title="AI LOTOBET v2 - CHUẨN ĐẶC TẢ", layout="wide")
 
-st.set_page_config(page_title="TITAN V10 FINAL", layout="wide")
-
-# --- 2. GIAO DIỆN VIP ONE-PAGE ---
-st.markdown("""
-    <style>
-    .main { background-color: #000; color: #fff; }
-    .stButton>button { width: 100%; border-radius: 10px; height: 3.5em; background: linear-gradient(45deg, #00ff00, #008000); color: black; font-weight: bold; border: none; }
-    .status-card { padding: 20px; border-radius: 15px; background: #111; border: 1px solid #333; margin-bottom: 15px; }
-    .predict-text { color: #00ff00; font-size: 45px; font-weight: bold; text-align: center; text-shadow: 0 0 10px #00ff00; }
-    [data-testid="stMetricValue"] { color: #00ff00 !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-# --- 3. KHỞI TẠO BỘ NHỚ ---
-if 'history' not in st.session_state:
-    st.session_state.history = []
-if 'last_pred' not in st.session_state:
-    st.session_state.last_pred = "ĐANG CHỜ..."
-
-def get_data():
+# Hàm gọi Gemini để nhận định chuyên sâu
+def get_gemini_advice(history_str, ai_analysis):
     try:
-        # Thêm timestamp để tránh lấy dữ liệu cũ trong bộ nhớ đệm
-        res = requests.get(f"{SHEET_URL}&v={datetime.now().timestamp()}", timeout=10)
-        df = pd.read_csv(StringIO(res.text), header=None).astype(str)
-        all_nums = []
-        for col in df.columns:
-            matches = df[col].str.extractall(r'(\d{5})')[0].tolist()
-            all_nums.extend(matches)
-        return all_nums
-    except: return []
+        model = genai.GenerativeModel('gemini-pro')
+        prompt = f"""
+        Bạn là chuyên gia phân tích thuật toán Lotobet. 
+        Dữ liệu lịch sử (5 số gần nhất): {history_str}
+        Kết quả phân tích máy học: {ai_analysis}
+        Dựa trên đặc tả: Loại bỏ số chập, ưu tiên số ổn định và cầu bệt đang chạy.
+        Hãy đưa ra 1 cặp số duy nhất (2 tinh) có xác suất cao nhất hoặc khuyên 'KHÔNG ĐÁNH'.
+        Trả lời ngắn gọn: 'Cặp số: XX-YY' hoặc 'KHÔNG ĐÁNH'.
+        """
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "Gemini đang bận, sử dụng kết quả thuật toán gốc."
 
-# --- 4. GIAO DIỆN CHÍNH ---
-st.markdown("<h1 style='text-align: center; color: #00ff00;'>⚡ TITAN FINAL SUPER ADMIN ⚡</h1>", unsafe_allow_html=True)
+# ================= LOGIC PHÂN TÍCH AI =================
+class LotobetAI_V2:
+    def __init__(self):
+        self.forbidden_numbers = [i*11 for i in range(10)] # 00, 11... 99
 
-data = get_data()
+    def clean_data(self, df):
+        matrix = []
+        for val in df['numbers'].values:
+            digits = [int(d) for d in str(val) if d.isdigit()]
+            if len(digits) == 5:
+                matrix.append(digits)
+        return np.array(matrix)
 
-# CHIA 2 CỘT TỐI ƯU
-col_left, col_right = st.columns([1, 1.5])
-
-with col_left:
-    st.markdown("### 📥 NHẬP KẾT QUẢ MỚI")
-    input_data = st.text_area("Dán danh sách số (nhiều kỳ cũng được):", height=120, placeholder="Ví dụ: 88231, 10024...")
-    
-    if st.button("💾 LƯU & ĐỐI SOÁT WIN/LOSS"):
-        new_nums = re.findall(r'\d{5}', input_data)
-        if new_nums:
-            for n in new_nums:
-                # So sánh 2 số cuối của dự đoán với 2 số cuối của kết quả thực tế
-                pred = str(st.session_state.last_pred)
-                real = str(n)[-2:]
-                status = "🔥 WIN" if pred == real else "❌ LOSS"
-                
-                st.session_state.history.append({
-                    "Kỳ": datetime.now().strftime("%H:%M"),
-                    "Dự đoán 2D": pred,
-                    "Thực tế": n,
-                    "Kết quả": status
-                })
-            st.success(f"Đã đối soát xong {len(new_nums)} kỳ!")
-        else:
-            st.error("Không tìm thấy dãy 5 số hợp lệ!")
-
-    st.divider()
-    st.markdown("### 📊 CHỈ SỐ HỆ THỐNG")
-    if data:
-        wins = sum(1 for x in st.session_state.history if x['Kết quả'] == "🔥 WIN")
-        total = len(st.session_state.history)
-        win_rate = (wins / total * 100) if total > 0 else 0
+    def analyze_numbers(self, matrix):
+        if len(matrix) < 5: return None
         
-        c1, c2 = st.columns(2)
-        c1.metric("Kỳ gần nhất", data[-1])
-        c2.metric("Tỷ lệ thắng %", f"{win_rate:.1f}%")
-        st.metric("Tổng dữ liệu quét", len(data))
-    else:
-        st.warning("Đang kết nối Sheets...")
+        analysis = {}
+        for num in range(10):
+            # Tìm các kỳ có xuất hiện số num
+            appears = np.where(np.any(matrix == num, axis=1))[0]
+            count_10 = sum(1 for row in matrix[-10:] if num in row)
+            count_3 = sum(1 for row in matrix[-3:] if num in row)
+            
+            # Gán trạng thái theo đặc tả
+            if count_3 >= 2: state = "NÓNG/BỆT"
+            elif 1 <= count_10 <= 3: state = "ỔN ĐỊNH"
+            elif count_10 == 0: state = "YẾU"
+            else: state = "NGUY HIỂM"
+            
+            analysis[num] = {
+                "state": state,
+                "freq": count_10,
+                "last_seen": (len(matrix) - 1 - appears[-1]) if len(appears) > 0 else 99
+            }
+        return analysis
 
-with col_right:
-    st.markdown("### 🤖 TRÍ TUỆ AI CHỐT SỐ (2D)")
-    st.markdown('<div class="status-card">', unsafe_allow_html=True)
-    
-    if st.button("🚀 KÍCH HOẠT SOI CẦU TITAN"):
-        if not data:
-            st.error("Chưa có dữ liệu để soi cầu!")
+    def get_predictions(self, matrix, analysis):
+        if not analysis: return [], "Dữ liệu ít"
+        
+        # 1. Loại bỏ 3 số (Giữ lại 7 số tốt nhất)
+        sorted_nums = sorted(analysis.items(), key=lambda x: (x[1]['freq']), reverse=True)
+        top_7 = [x[0] for x in sorted_nums[:7]]
+        
+        # 2. Logic ghép cặp
+        candidates = []
+        for i in range(len(top_7)):
+            for j in range(i + 1, len(top_7)):
+                n1, n2 = top_7[i], top_7[j]
+                
+                # Loại bỏ số chập (Ví dụ: không ghép nếu tạo thành 11, 22...)
+                # Đặc tả: Đánh 1 cặp gồm 2 số đơn khác nhau (Ví dụ 5 và 6)
+                s1, s2 = analysis[n1], analysis[n2]
+                
+                score = 50
+                # Ưu tiên cầu bệt (Quan trọng theo yêu cầu)
+                if s1['state'] == "NÓNG/BỆT": score += 20
+                if s2['state'] == "NÓNG/BỆT": score += 20
+                # Ưu tiên 1 ổn định + 1 hồi
+                if s1['state'] == "ỔN ĐỊNH": score += 10
+                
+                # Hình phạt: Tránh 2 số vừa ra kỳ trước (giảm xác suất theo đặc tả)
+                if s1['last_seen'] == 0 and s2['last_seen'] == 0: score -= 30
+
+                if score >= 70:
+                    candidates.append({"pair": (n1, n2), "score": score})
+
+        candidates.sort(key=lambda x: x['score'], reverse=True)
+        return candidates[:2] # Trả về tối đa 1-2 cặp
+
+# ================= GIAO DIỆN STREAMLIT =================
+def main():
+    st.markdown("<h1 style='text-align: center; color: #ff4b4b;'>🎯 AI LOTOBET 2-TINH PRO V2</h1>", unsafe_allow_html=True)
+    st.caption("Hệ thống phân tích chuẩn đặc tả v2 - Tích hợp Gemini Pro")
+
+    # Quản lý dữ liệu
+    if 'data' not in st.session_state:
+        st.session_state.data = pd.DataFrame(columns=["numbers"])
+
+    col_in, col_out = st.columns([1, 2])
+
+    with col_in:
+        st.subheader("📥 Nhập dữ liệu")
+        raw_input = st.text_area("Nhập kết quả (5 số liền nhau, mỗi dòng 1 kỳ):", height=250)
+        if st.button("🔄 Phân tích mới"):
+            if raw_input:
+                lines = [n.strip() for n in raw_input.split("\n") if len(n.strip()) == 5]
+                st.session_state.data = pd.DataFrame(lines, columns=["numbers"])
+                st.rerun()
+
+    with col_out:
+        st.subheader("📊 Kết quả AI")
+        df = st.session_state.data
+        if df.empty:
+            st.info("Hãy nhập ít nhất 10 kỳ để AI nhận diện cầu.")
+            return
+
+        ai = LotobetAI_V2()
+        matrix = ai.clean_data(df)
+        
+        if len(matrix) < 5:
+            st.error("Dữ liệu không hợp lệ. Mỗi dòng phải có đúng 5 chữ số.")
+            return
+
+        analysis = ai.analyze_numbers(matrix)
+        preds = ai.get_predictions(matrix, analysis)
+
+        # Hiển thị Trạng thái Thị trường
+        hot_count = sum(1 for v in analysis.values() if v['state'] == "NÓNG/BỆT")
+        
+        if hot_count > 6:
+            st.error("🚫 KHÔNG ĐÁNH KỲ NÀY: Thị trường quá nhiễu (Quá nhiều số nóng)")
+        elif not preds:
+            st.warning("🚫 KHÔNG ĐÁNH: Không tìm thấy cặp số an toàn đạt ngưỡng 75%")
         else:
-            with st.spinner('AI đang quét nhịp cầu...'):
-                try:
-                    # Fix model gemini-1.5-flash cực mạnh
-                    model = genai.GenerativeModel('gemini-1.5-flash')
-                    history_context = ", ".join(data[-25:])
-                    prompt = f"Phân tích nhịp số 5D: {history_context}. Dự đoán duy nhất 2 số cuối kỳ tiếp theo. Chỉ trả về 2 chữ số, không giải thích."
-                    response = model.generate_content(prompt)
-                    st.session_state.last_pred = response.text.strip()[:2] # Chỉ lấy 2 ký tự đầu
-                except Exception as e:
-                    st.error("Lỗi AI. Vui lòng thử lại sau 30 giây.")
-    
-    st.markdown(f'<p class="predict-text">{st.session_state.last_pred}</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+            # Lấy nhận định từ Gemini
+            history_str = ", ".join(df['numbers'].tail(5).tolist())
+            with st.spinner('Gemini đang kiểm tra nhịp cầu...'):
+                advice = get_gemini_advice(history_str, str(preds))
+            
+            st.success(f"🤖 NHẬN ĐỊNH GEMINI: {advice}")
+            
+            for p in preds:
+                st.markdown(f"""
+                <div style="background: #ffffff; padding: 20px; border-radius: 10px; border-left: 10px solid #ff4b4b; margin-bottom: 10px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1)">
+                    <span style="font-size: 25px; font-weight: bold; color: #333;">Cặp số: {p['pair'][0]} - {p['pair'][1]}</span>
+                    <br><span style="color: #ff4b4b;">Độ tự tin: {p['score']}%</span>
+                </div>
+                """, unsafe_allow_html=True)
 
-    st.markdown("### 📜 LỊCH SỬ ĐỐI SOÁT")
-    if st.session_state.history:
-        # Hiển thị bảng lịch sử, số mới nhất lên đầu
-        df_hist = pd.DataFrame(st.session_state.history)
-        st.dataframe(df_hist.iloc[::-1], use_container_width=True, height=350)
-    else:
-        st.info("Chưa có lịch sử dự đoán hôm nay.")
+        # Biểu đồ tần suất
+        st.divider()
+        st.subheader("📈 Thống kê nhịp số đơn (0-9)")
+        chart_df = pd.DataFrame([{"Số": k, "Tần suất": v['freq'], "Trạng thái": v['state']} for k, v in analysis.items()])
+        fig = px.bar(chart_df, x='Số', y='Tần suất', color='Trạng thái', barmode='group', height=300)
+        st.plotly_chart(fig, use_container_width=True)
 
-# NÚT LÀM MỚI TOÀN BỘ
-if st.sidebar.button("🗑 Xóa lịch sử phiên"):
-    st.session_state.history = []
-    st.rerun()
+if __name__ == "__main__":
+    main()
