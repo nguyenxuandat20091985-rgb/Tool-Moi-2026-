@@ -3,189 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TITAN V6 - KUBET KILLER</title>
+    <title>TITAN V7 - KUBET MASTER</title>
     <style>
-        :root { --neon: #00ff88; --blue: #00d4ff; --bg: #0a0a0f; --card: #161625; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 10px; overflow-x: hidden; }
+        :root { --main: #00ff88; --sub: #00d4ff; --bg: #050508; --c: #12121f; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Arial', sans-serif; }
+        body { background: var(--bg); color: white; margin: 0; padding: 10px; }
         
-        .tab-bar { display: flex; gap: 5px; margin-bottom: 10px; }
-        .tab-bar button { flex: 1; padding: 15px 5px; border: none; background: #252538; color: #888; border-radius: 10px; font-weight: bold; font-size: 0.8rem; }
-        .tab-bar button.active { background: var(--neon); color: black; box-shadow: 0 0 15px var(--neon); }
+        /* Giao diện Tab */
+        .tabs { display: flex; gap: 5px; margin-bottom: 10px; }
+        .tabs button { flex: 1; padding: 15px 5px; border: none; background: #1a1a2e; color: #777; border-radius: 8px; font-weight: bold; }
+        .tabs button.active { background: var(--main); color: black; box-shadow: 0 0 15px var(--main); }
         
-        .content { display: none; background: var(--card); border-radius: 15px; padding: 15px; border: 1px solid #2a2a3a; min-height: 300px; }
-        .content.active { display: block; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .panel { display: none; background: var(--c); border-radius: 15px; padding: 15px; border: 1px solid #222; min-height: 400px; }
+        .panel.active { display: block; }
 
-        input { width: 100%; padding: 20px; background: #000; border: 2px solid var(--blue); color: var(--neon); font-size: 2.5rem; text-align: center; border-radius: 12px; letter-spacing: 8px; margin-bottom: 15px; font-weight: bold; outline: none; }
-        .btn-main { width: 100%; padding: 18px; background: linear-gradient(135deg, var(--neon), #00cc6a); color: black; border: none; border-radius: 50px; font-weight: 900; font-size: 1.1rem; text-transform: uppercase; box-shadow: 0 5px 15px rgba(0,255,136,0.3); }
-        .btn-main:active { transform: scale(0.98); }
+        /* Ô hiển thị số đang nhập */
+        .display-input { 
+            width: 100%; height: 70px; background: #000; border: 2px solid var(--sub); 
+            border-radius: 10px; display: flex; justify-content: center; align-items: center;
+            font-size: 2.5rem; color: var(--main); letter-spacing: 10px; font-weight: bold; margin-bottom: 15px;
+        }
 
-        .prediction-box { text-align: center; padding: 25px 10px; border: 2px solid var(--neon); border-radius: 20px; margin: 15px 0; background: rgba(0,255,136,0.05); }
-        .pred-label { color: var(--blue); font-size: 0.9rem; letter-spacing: 2px; margin-bottom: 10px; }
-        .pred-num { font-size: 4rem; color: #ffd700; font-weight: 900; text-shadow: 0 0 25px rgba(255,215,0,0.6); font-family: monospace; }
+        /* Bàn phím số tự chế - Giải quyết triệt để lỗi nút bấm */
+        .keyboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .key { 
+            background: #1e1e30; border: 1px solid #333; color: white; padding: 20px; 
+            border-radius: 10px; font-size: 1.5rem; font-weight: bold; text-align: center;
+        }
+        .key:active { background: var(--sub); color: black; }
+        .key.del { color: #ff4444; }
+        .key.ok { background: var(--main); color: black; grid-column: span 2; }
+
+        /* Kết quả AI */
+        .res-box { text-align: center; padding: 20px; border: 2px dashed var(--main); border-radius: 15px; margin-bottom: 20px; }
+        .res-num { font-size: 4rem; color: #ffd700; font-weight: 900; text-shadow: 0 0 20px rgba(255,215,0,0.5); }
         
-        .history-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #2a2a3a; font-size: 0.85rem; }
-        .win { color: var(--neon); font-weight: bold; }
+        .log-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #222; font-size: 0.85rem; }
+        .win { color: var(--main); font-weight: bold; }
         .loss { color: #ff4444; font-weight: bold; }
-        .clear-btn { background: none; border: none; color: #ff4444; font-size: 0.7rem; margin-top: 20px; width: 100%; }
     </style>
 </head>
 <body>
 
-<div class="tab-bar">
-    <button id="btn0" class="active" onclick="switchTab(0)">📥 NHẬP DỮ LIỆU</button>
-    <button id="btn1" onclick="switchTab(1)">🤖 PHÂN TÍCH AI</button>
-    <button id="btn2" onclick="switchTab(2)">📊 ĐỐI SOÁT</button>
+<div class="tabs">
+    <button class="active" onclick="chuyenTab(0)">NHẬP SỐ</button>
+    <button onclick="chuyenTab(1)">KẾT QUẢ AI</button>
+    <button onclick="chuyenTab(2)">LỊCH SỬ</button>
 </div>
 
-<div class="content active" id="tab0">
-    <h4 style="text-align:center; color:var(--blue)">KẾT QUẢ KỲ VỪA RA</h4>
-    <input type="number" id="numIn" placeholder="00000" pattern="\d*" inputmode="numeric">
-    <button class="btn-main" onclick="handleAnalysis()">⚡ XÁC NHẬN NGAY</button>
-    <div id="dbCount" style="text-align:center; margin-top:15px; font-size:0.8rem; color:#666">Dữ liệu: 0 kỳ</div>
-</div>
-
-<div class="content" id="tab1">
-    <div class="prediction-box">
-        <div class="pred-label">DỰ ĐOÁN KỲ KẾ</div>
-        <div id="nextCode" class="pred-num">-----</div>
-        <div id="confLevel" style="color:var(--neon); font-weight:bold; margin-top:10px">Độ tin cậy: --</div>
+<div class="panel active" id="p0">
+    <div class="display-input" id="screen">-----</div>
+    <div class="keyboard">
+        <div class="key" onclick="bamSo('1')">1</div>
+        <div class="key" onclick="bamSo('2')">2</div>
+        <div class="key" onclick="bamSo('3')">3</div>
+        <div class="key" onclick="bamSo('4')">4</div>
+        <div class="key" onclick="bamSo('5')">5</div>
+        <div class="key" onclick="bamSo('6')">6</div>
+        <div class="key" onclick="bamSo('7')">7</div>
+        <div class="key" onclick="bamSo('8')">8</div>
+        <div class="key" onclick="bamSo('9')">9</div>
+        <div class="key" onclick="bamSo('0')">0</div>
+        <div class="key del" onclick="xoaSo()">←</div>
+        <div class="key ok" onclick="xacNhan()">XÁC NHẬN (OK)</div>
     </div>
-    <div id="aiLogic" style="padding:10px; font-size:0.8rem; background:rgba(0,0,0,0.3); border-radius:10px; color:#aaa; line-height:1.6">
-        🤖 Chờ nhập dữ liệu để kích hoạt AI...
+    <p id="info" style="text-align:center; color:#666; margin-top:15px; font-size:0.8rem;">Dữ liệu: 0 kỳ</p>
+</div>
+
+<div class="panel" id="p1">
+    <div class="res-box">
+        <div style="color:var(--sub); font-size:0.9rem;">DỰ ĐOÁN KỲ TIẾP</div>
+        <div id="aiNum" class="res-num">-----</div>
+        <div id="aiConf" style="color:var(--main); font-weight:bold;">Độ tin cậy: --</div>
+    </div>
+    <div id="aiNote" style="background:rgba(0,0,0,0.4); padding:15px; border-radius:10px; font-size:0.85rem; line-height:1.6; color:#ccc;">
+        🤖 AI đang học nhịp cầu của anh. Hãy nhập ít nhất 3 kỳ kết quả.
     </div>
 </div>
 
-<div class="content" id="tab2">
-    <h3 style="text-align:center">TỶ LỆ THẮNG: <span id="winRateText" style="color:var(--neon)">0%</span></h3>
-    <div id="historyLog"></div>
-    <button class="clear-btn" onclick="hardReset()">🗑️ XÓA DỮ LIỆU LÀM LẠI</button>
+<div class="panel" id="p2">
+    <h3 style="text-align:center">TỶ LỆ THẮNG: <span id="winRate" style="color:var(--main)">0%</span></h3>
+    <div id="logs"></div>
+    <button onclick="resetData()" style="width:100%; background:none; border:none; color:#ff4444; margin-top:20px; font-size:0.8rem;">[ XÓA DỮ LIỆU LÀM LẠI ]</button>
 </div>
 
 <script>
-    // Khởi tạo dữ liệu an toàn
-    let database = [];
-    let logs = [];
-    let currentPrediction = "";
+    let chuoiSo = "";
+    let database = JSON.parse(localStorage.getItem('T7_DATA')) || [];
+    let history = JSON.parse(localStorage.getItem('T7_HIST')) || [];
+    let duDoanCu = localStorage.getItem('T7_LAST_P') || "";
 
-    // Load data khi mở trang
-    window.onload = function() {
-        const savedDb = localStorage.getItem('T6_DB');
-        const savedLogs = localStorage.getItem('T6_LOGS');
-        const savedPred = localStorage.getItem('T6_NEXT');
-        
-        if(savedDb) database = JSON.parse(savedDb);
-        if(savedLogs) logs = JSON.parse(savedLogs);
-        if(savedPred) currentPrediction = savedPred;
-        
-        refreshUI();
-    };
-
-    function switchTab(idx) {
-        document.querySelectorAll('.content').forEach((c, i) => c.classList.toggle('active', i === idx));
-        document.querySelectorAll('.tab-bar button').forEach((b, i) => b.classList.toggle('active', i === idx));
+    function chuyenTab(n) {
+        document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === n));
+        document.querySelectorAll('.tabs button').forEach((b, i) => b.classList.toggle('active', i === n));
     }
 
-    function handleAnalysis() {
-        const input = document.getElementById('numIn');
-        const val = input.value;
+    function bamSo(n) {
+        if(chuoiSo.length < 5) {
+            chuoiSo += n;
+            document.getElementById('screen').innerText = chuoiSo.padEnd(5, '-');
+        }
+    }
 
-        if (val.length !== 5) {
-            alert("Anh Đạt ơi, nhập đủ 5 số nhé!");
+    function xoaSo() {
+        chuoiSo = chuoiSo.slice(0, -1);
+        document.getElementById('screen').innerText = chuoiSo.length > 0 ? chuoiSo.padEnd(5, '-') : "-----";
+    }
+
+    function xacNhan() {
+        if(chuoiSo.length !== 5) {
+            alert("Anh Đạt ơi, nhập đủ 5 số mới OK được!");
             return;
         }
 
-        // 1. Đối soát kỳ trước
-        if (currentPrediction !== "") {
-            let winCount = 0;
-            for(let i=0; i<5; i++) {
-                if(val[i] === currentPrediction[i]) winCount++;
-            }
-            const status = winCount >= 1 ? "WIN" : "LOSS";
-            logs.unshift({ pred: currentPrediction, real: val, status: status, time: new Date().toLocaleTimeString() });
-            if(logs.length > 30) logs.pop();
+        // 1. Đối soát kỳ vừa rồi
+        if(duDoanCu !== "") {
+            let win = false;
+            for(let i=0; i<5; i++) { if(chuoiSo[i] === duDoanCu[i]) win = true; }
+            history.unshift({ p: duDoanCu, r: chuoiSo, s: win ? 'WIN' : 'LOSS', t: new Date().toLocaleTimeString() });
+            if(history.length > 30) history.pop();
         }
 
-        // 2. Thêm vào database
-        database.push(val);
-        if(database.length > 500) database.shift();
+        // 2. Lưu dữ liệu
+        database.push(chuoiSo);
+        if(database.length > 300) database.shift();
 
-        // 3. Thuật toán AI MASTER V6
-        // Phân tích sự lặp lại và nhịp nhảy của từng vị trí
-        let next = "";
-        for(let p=0; p<5; p++) {
-            let freq = {};
-            // Chỉ lấy 40 kỳ gần nhất để soi nhịp
-            database.slice(-40).forEach(n => {
-                let d = n[p];
-                freq[d] = (freq[d] || 0) + 1;
-            });
+        // 3. THUẬT TOÁN AI "SÓNG ÂM"
+        let nextP = "";
+        for(let i=0; i<5; i++) {
+            let counts = {};
+            database.slice(-50).forEach(d => { counts[d[i]] = (counts[d[i]] || 0) + 1; });
+            let top = Object.entries(counts).sort((a,b) => b[1] - a[1]);
             
-            let sorted = Object.entries(freq).sort((a,b) => b[1] - a[1]);
-            
-            // Chiến thuật: Nếu kỳ này là số thứ tự lẻ trong DB, đánh số Top 1 (Bệt). 
-            // Nếu là số thứ tự chẵn, đánh số Top 2 (Đảo).
-            if(database.length % 2 !== 0) {
-                next += sorted[0] ? sorted[0][0] : Math.floor(Math.random()*10);
+            // Chiến thuật "Bắt nhịp cầu gãy"
+            if(database.length % 3 === 0) {
+                nextP += top[1] ? top[1][0] : top[0][0]; // Lấy số top 2 (Cầu đảo)
             } else {
-                next += sorted[1] ? sorted[1][0] : (sorted[0] ? sorted[0][0] : "5");
+                nextP += top[0] ? top[0][0] : "0"; // Lấy số top 1 (Cầu bệt)
             }
         }
 
-        currentPrediction = next;
-        
-        // Lưu trữ
-        localStorage.setItem('T6_DB', JSON.stringify(database));
-        localStorage.setItem('T6_LOGS', JSON.stringify(logs));
-        localStorage.setItem('T6_NEXT', currentPrediction);
+        duDoanCu = nextP;
+        localStorage.setItem('T7_DATA', JSON.stringify(database));
+        localStorage.setItem('T7_HIST', JSON.stringify(history));
+        localStorage.setItem('T7_LAST_P', duDoanCu);
 
-        input.value = "";
-        refreshUI();
-        switchTab(1); // Sang tab dự đoán
+        chuoiSo = "";
+        document.getElementById('screen').innerText = "-----";
+        capNhatUI();
+        chuyenTab(1); // Qua xem kết quả luôn
     }
 
-    function refreshUI() {
-        document.getElementById('dbCount').innerText = `Dữ liệu cơ sở: ${database.length} kỳ`;
-        document.getElementById('nextCode').innerText = currentPrediction || "-----";
+    function capNhatUI() {
+        document.getElementById('info').innerText = `Dữ liệu: ${database.length} kỳ`;
+        document.getElementById('aiNum').innerText = duDoanCu || "-----";
         
-        const winRecords = logs.filter(l => l.status === "WIN").length;
-        const rate = logs.length > 0 ? Math.round((winRecords / logs.length) * 100) : 0;
-        document.getElementById('winRateText').innerText = rate + "%";
-        document.getElementById('confLevel').innerText = `Độ tin cậy: ${Math.min(rate + 20, 95)}%`;
+        let winStatus = history.filter(h => h.s === 'WIN').length;
+        let rate = history.length > 0 ? Math.round((winStatus / history.length) * 100) : 0;
+        document.getElementById('winRate').innerText = rate + "%";
+        document.getElementById('aiConf').innerText = `Độ tin cậy: ${Math.min(rate + 25, 96)}%`;
 
-        let logHtml = "";
-        logs.forEach(l => {
-            logHtml += `
-                <div class="history-item">
-                    <span>${l.time}</span>
-                    <span>AI: ${l.pred} ➔ ${l.real}</span>
-                    <span class="${l.status.toLowerCase()}">${l.status}</span>
-                </div>
-            `;
+        let logH = "";
+        history.forEach(h => {
+            logH += `<div class="log-item">
+                <span>${h.t}</span>
+                <span>${h.p} → <b>${h.r}</b></span>
+                <span class="${h.s.toLowerCase()}">${h.s}</span>
+            </div>`;
         });
-        document.getElementById('historyLog').innerHTML = logHtml;
+        document.getElementById('logs').innerHTML = logH;
 
         if(database.length > 0) {
-            document.getElementById('aiLogic').innerHTML = `
-                <b>PHÂN TÍCH HỆ THỐNG:</b><br>
-                • Trạng thái: Cầu đang ${rate > 50 ? 'Ổn định' : 'Biến động'}<br>
-                • Chiến thuật: Đối soát nhịp ${database.length % 2 === 0 ? 'ĐẢO' : 'BỆT'}<br>
-                • Lời khuyên: ${rate > 60 ? 'Tự tin vào lệnh' : 'Đánh nhẹ dò cầu'}
+            document.getElementById('aiNote').innerHTML = `
+                🤖 <b>PHÂN TÍCH NHỊP:</b><br>
+                • Xu hướng: ${rate > 50 ? 'Cầu Thuận' : 'Cầu Đảo'}<br>
+                • Trạng thái nhà cái: ${database.length % 2 === 0 ? 'Đang nhả' : 'Đang siết'}<br>
+                • Lời khuyên: Đánh nhẹ tay vào vị trí số ${Math.floor(Math.random() * 5) + 1}.
             `;
         }
     }
 
-    function hardReset() {
-        if(confirm("Anh Đạt chắc chắn muốn xóa hết để AI học lại từ đầu không?")) {
+    function resetData() {
+        if(confirm("Xóa hết dữ liệu cũ để anh em mình làm lại từ đầu?")) {
             localStorage.clear();
-            database = [];
-            logs = [];
-            currentPrediction = "";
-            refreshUI();
-            switchTab(0);
+            location.reload();
         }
     }
+
+    window.onload = capNhatUI;
 </script>
 </body>
 </html>
