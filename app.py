@@ -1,6 +1,7 @@
 """
 🚀 TITAN V27 - NVIDIA AI EDITION
 Lottery Prediction App with Streamlit + AI Integration
+[FIXED VERSION - No quote escaping issues]
 """
 import streamlit as st
 import pandas as pd
@@ -28,16 +29,25 @@ st.set_page_config(
 )
 
 # ================= 🎨 CUSTOM CSS =================
-st.markdown(f"""
+# 💡 FIX: Dùng single quotes cho f-string, hoặc gán CSS ra biến riêng
+accent_color = THEME["accent"]
+accent_secondary = THEME["accent_secondary"]
+bg_primary = THEME["bg_primary"]
+bg_secondary = THEME["bg_secondary"]
+text_primary = THEME["text_primary"]
+text_secondary = THEME["text_secondary"]
+danger_color = THEME["danger"]
+
+custom_css = f"""
     <style>
     .stApp {{ 
-        background-color: {THEME['bg_primary']}; 
-        color: {THEME['text_primary']}; 
+        background-color: {bg_primary}; 
+        color: {text_primary}; 
         font-family: 'Segoe UI', system-ui, sans-serif;
     }}
     .main-box {{ 
-        background: {THEME['bg_secondary']}; 
-        border: 2px solid {THEME['accent']}; 
+        background: {bg_secondary}; 
+        border: 2px solid {accent_color}; 
         border-radius: 20px; 
         padding: 30px; 
         box-shadow: 0 0 25px rgba(118,185,0,0.3);
@@ -46,16 +56,16 @@ st.markdown(f"""
     .big-num {{ 
         font-size: 90px; 
         font-weight: 900; 
-        color: {THEME['accent']}; 
+        color: {accent_color}; 
         text-align: center; 
         letter-spacing: 15px; 
-        text-shadow: 0 0 20px {THEME['accent']};
+        text-shadow: 0 0 20px {accent_color};
         font-family: 'Courier New', monospace;
     }}
     .lot-num {{ 
         font-size: 45px; 
         font-weight: 700; 
-        color: {THEME['accent_secondary']}; 
+        color: {accent_secondary}; 
         text-align: center; 
         letter-spacing: 10px;
         font-family: 'Courier New', monospace;
@@ -76,7 +86,7 @@ st.markdown(f"""
         100% {{ box-shadow: 0 0 0 0 rgba(118,185,0,0); }}
     }}
     .stButton>button {{
-        background: linear-gradient(135deg, {THEME['accent']}, #5a9e00);
+        background: linear-gradient(135deg, {accent_color}, #5a9e00);
         color: #000;
         font-weight: 700;
         border: none;
@@ -90,13 +100,14 @@ st.markdown(f"""
     }}
     .win-check {{ 
         background: rgba(0,212,255,0.1); 
-        border-left: 4px solid {THEME['accent_secondary']}; 
+        border-left: 4px solid {accent_secondary}; 
         padding: 15px; 
         border-radius: 0 10px 10px 0;
         margin: 10px 0;
     }}
     </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(custom_css, unsafe_allow_html=True)
 
 # ================= 🧠 INIT SESSION & ENGINES =================
 if "db" not in st.session_state:
@@ -129,13 +140,13 @@ with st.sidebar:
     with st.expander("📖 Luật chơi 3 số 5 tinh", expanded=True):
         st.markdown("""
         ✅ **Cách cược**: Chọn 3 số từ `0-9`  
-        ✅ **Điều kiện thắng**: 3 số bạn chọn phải **xuất hiện** trong kết quả 5 chữ số (bất kỳ vị trí nào trong [Chục ngàn, Ngàn, Trăm, Chục, Đơn vị])  
+        ✅ **Điều kiện thắng**: 3 số bạn chọn phải **xuất hiện** trong kết quả 5 chữ số (bất kỳ vị trí nào)  
         ✅ **Thứ tự**: Không quan trọng  
         ✅ **Trùng lặp**: Dù số xuất hiện bao nhiêu lần, vẫn chỉ tính 1 lần  
         
         **Ví dụ**:  
-        • Cược `[1,2,6]` + Kết quả `12864` → 🎉 **THẮNG** (có đủ 1,2,6)  
-        • Cược `[1,3,6]` + Kết quả `12662` → ❌ **THUA** (thiếu số 3)
+        • Cược `[1,2,6]` + Kết quả `12864` → 🎉 **THẮNG**  
+        • Cược `[1,3,6]` + Kết quả `12662` → ❌ **THUA**
         """)
     
     # 🧪 Test nhanh logic trúng thưởng
@@ -155,13 +166,13 @@ with st.sidebar:
                 "win": is_win
             }
         else:
-            st.error("Nhập đúng format: 3 số cược + 5 số kết quả")
+            st.error("Nhập đúng: 3 số cược + 5 số kết quả")
     
     if st.session_state.win_result:
         res = st.session_state.win_result
         icon = "🎉" if res["win"] else "❌"
         status = "THẮNG" if res["win"] else "THUA"
-        color = THEME["accent"] if res["win"] else THEME["danger"]
+        color = accent_color if res["win"] else danger_color
         st.markdown(f"""
         <div class="win-check">
         <strong>{icon} {res['bet']} vs {res['draw']}</strong><br>
@@ -178,8 +189,9 @@ with st.sidebar:
         st.rerun()
 
 # ================= 🖥️ MAIN INTERFACE =================
-st.markdown(f"<h1 style='text-align: center; color: {THEME[\"accent\"]}; text-shadow: 0 0 15px {THEME[\"accent\"]};'>🚀 TITAN V27 - NVIDIA AI EDITION</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: {THEME[\"text_secondary\"]};'>Hệ thống dự đoán lô đề 3 số 5 tinh • Powered by NVIDIA Llama-3.1 & Gemini-1.5</p>", unsafe_allow_html=True)
+# 💡 FIX: Dùng single quotes cho f-string khi cần access dict với double quotes
+st.markdown(f'<h1 style="text-align: center; color: {accent_color}; text-shadow: 0 0 15px {accent_color};">🚀 TITAN V27 - NVIDIA AI EDITION</h1>', unsafe_allow_html=True)
+st.markdown(f'<p style="text-align: center; color: {text_secondary};">Hệ thống dự đoán lô đề 3 số 5 tinh • Powered by NVIDIA Llama-3.1 & Gemini-1.5</p>', unsafe_allow_html=True)
 
 # 📥 Input Section
 col_input, col_info = st.columns([2.5, 1])
@@ -201,7 +213,7 @@ with col_info:
             st.session_state.db.extend(clean_data)
             save_database(st.session_state.db)
             
-            # 🔄 Fallback Algorithm (Loại 7 lấy 3)
+            # 🔄 Fallback Algorithm
             fallback_pred = generate_fallback_prediction(st.session_state.db, PAIR_RULES)
             
             # 🤖 AI Prediction Pipeline
@@ -222,7 +234,6 @@ with col_info:
                 try:
                     # Priority 2: Gemini fallback
                     res = gm_ai.generate_content(prompt)
-                    # Extract JSON from response
                     json_match = re.search(r'\{[\s\S]*\}', res.text)
                     if json_match:
                         st.session_state.pred = json.loads(json_match.group())
@@ -231,38 +242,38 @@ with col_info:
                         
                 except Exception as e2:
                     # Priority 3: Local algorithm
-                    st.warning(f"⚠️ AI error: {e}. Dùng thuật toán dự phòng.")
+                    st.warning(f"⚠️ AI error. Dùng thuật toán dự phòng.")
                     st.session_state.pred = fallback_pred
             
             st.rerun()
         else:
-            st.error("❌ Không tìm thấy số 5 chữ số hợp lệ. Vui lòng kiểm tra lại input!")
+            st.error("❌ Không tìm thấy số 5 chữ số hợp lệ!")
 
 # ================= 📊 DISPLAY PREDICTION =================
 if st.session_state.pred:
     p = st.session_state.pred
     is_recommended = p.get('adv', '').upper() == "ĐÁNH"
-    status_color = THEME["accent"] if is_recommended else THEME["danger"]
+    status_color = accent_color if is_recommended else danger_color
     status_text = "🔥 KHUYÊN ĐÁNH" if is_recommended else "⏸️ NÊN DỪNG"
     
-    st.markdown(f"""
+    st.markdown(f'''
     <div class='status-bar' style='background:{status_color}; color:#000'>
     {status_text} | Độ tin cậy: {p.get('conf', 0)}%
     </div>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
     
     st.markdown("<div class='main-box'>", unsafe_allow_html=True)
     
     c_main, c_sub = st.columns([1.5, 1])
     with c_main:
-        st.markdown(f"<p style='text-align:center; color:{THEME['text_secondary']}'>🎯 3 SỐ CHỦ LỰC</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:{text_secondary}'>🎯 3 SỐ CHỦ LỰC</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='big-num'>{p.get('main', '---')}</div>", unsafe_allow_html=True)
         st.caption("Chọn 3 số này để cược chính")
         
     with c_sub:
-        st.markdown(f"<p style='text-align:center; color:{THEME['text_secondary']}'>🛡️ 4 SỐ LÓT BẢO VỆ</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center; color:{text_secondary}'>🛡️ 4 SỐ LÓT BẢO VỆ</p>", unsafe_allow_html=True)
         st.markdown(f"<div class='lot-num'>{p.get('sub', '---')}</div>", unsafe_allow_html=True)
-        st.caption="Dùng để lót/rải thêm nếu muốn an toàn")
+        st.caption("Dùng để lót/rải thêm nếu muốn an toàn")
     
     st.divider()
     
@@ -273,7 +284,7 @@ if st.session_state.pred:
     dan_7 = "".join(sorted(set(p.get('main', '') + p.get('sub', ''))))[:7]
     st.text_input("📋 DÀN 7 SỐ COPY CHO KUBET/APP:", dan_7, disabled=True)
     
-    # ✅ Kiểm tra nhanh với kết quả mới (nếu có)
+    # ✅ Kiểm tra nhanh với kết quả mới
     with st.expander("🔍 Test với kết quả thực tế"):
         test_result = st.text_input("Nhập kết quả 5 chữ số mới để kiểm tra:", max_chars=5)
         if test_result and len(test_result) == 5 and test_result.isdigit():
@@ -282,7 +293,10 @@ if st.session_state.pred:
                 is_win = check_win_3so5tinh(main_nums, test_result)
                 icon = "🎉" if is_win else "❌"
                 msg = "THẮNG CƯỢC!" if is_win else "Chưa trúng - thử lại kỳ sau"
-                st.success(f"{icon} Với số chính `{p['main']}` + kết quả `{test_result}` → **{msg}**") if is_win else st.warning(f"{icon} Với số chính `{p['main']}` + kết quả `{test_result}` → **{msg}**")
+                if is_win:
+                    st.success(f"{icon} Với số chính `{p['main']}` + kết quả `{test_result}` → **{msg}**")
+                else:
+                    st.warning(f"{icon} Với số chính `{p['main']}` + kết quả `{test_result}` → **{msg}**")
     
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -294,9 +308,8 @@ if st.session_state.db:
             {"Số": str(i), "Tần suất": freq_data.get(str(i), 0)} 
             for i in range(10)
         ])
-        st.bar_chart(df_freq.set_index("Số"), color=THEME["accent_secondary"])
+        st.bar_chart(df_freq.set_index("Số"), color=accent_secondary)
         
-        # 📌 Top 3 số nóng / Top 3 số lạnh
         col_hot, col_cold = st.columns(2)
         with col_hot:
             st.markdown("### 🔥 Top 3 số 'NÓNG'")
@@ -315,7 +328,7 @@ with st.expander("⚙️ Dev Tools / Debug"):
         results = calculate_win_examples()
         for r in results:
             icon = "✅" if r["correct"] else "❌"
-            st.text(f"{icon} Bet:{r['bet']} Draw:{r['draw']} → {'WIN' if r['predicted'] else 'LOSE'} (expected: {'WIN' if r['expected'] else 'LOSE'})")
+            st.text(f"{icon} Bet:{r['bet']} Draw:{r['draw']} → {'WIN' if r['predicted'] else 'LOSE'}")
     
     if st.button("📋 Xem 10 kỳ gần nhất"):
         for i, num in enumerate(reversed(st.session_state.db[-10:]), 1):
@@ -331,10 +344,11 @@ with st.expander("⚙️ Dev Tools / Debug"):
 
 # ================= 🦶 FOOTER =================
 st.markdown("---")
-st.markdown(f"""
-<div style='text-align: center; color: {THEME["text_secondary"]}; font-size: 14px;'>
+footer_html = f'''
+<div style="text-align: center; color: {text_secondary}; font-size: 14px;">
 🔐 TITAN V27 • Build for Micro-SaaS • 
-<a href='https://github.com/yourusername/titan-v27' style='color: {THEME["accent_secondary"]}; text-decoration: none;'>GitHub Repo</a> • 
-<span style='color: {THEME["accent"]};'>v2.7.0</span>
+<a href="https://github.com/yourusername/titan-v27" style="color: {accent_secondary}; text-decoration: none;">GitHub Repo</a> • 
+<span style="color: {accent_color};">v2.7.1-FIXED</span>
 </div>
-""", unsafe_allow_html=True)
+'''
+st.markdown(footer_html, unsafe_allow_html=True)
