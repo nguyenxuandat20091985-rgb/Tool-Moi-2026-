@@ -1,6 +1,6 @@
 """
-🚀 TITAN V27 AI - FIXED FORMAT
-Version: 10.1.0-FIXED
+🚀 TITAN V27 AI - FIXED
+Version: 11.0.0-FIXED
 """
 import streamlit as st
 import re
@@ -21,7 +21,7 @@ st.markdown("""
     .big-num {font-size: 42px; font-weight: bold; color: #28a745; text-align: center; font-family: monospace; letter-spacing: 6px; margin: 5px 0;}
     .box {background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 10px; border-radius: 10px; text-align: center; margin: 5px 0;}
     .grid {display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 10px 0;}
-    .item {background: #ffc107; color: #000; padding: 12px; border-radius: 8px; text-align: center; font-family: monospace; font-size: 24px; font-weight: bold;}
+    .item {background: #ffc107; color: #000; padding: 12px; border-radius: 8px; text-align: center; font-family: monospace; font-size: 28px; font-weight: bold;}
     .item-3 {background: #17a2b8; color: white;}
     button {width: 100%; background: #28a745; color: white; font-size: 18px; font-weight: bold; padding: 12px; border: none; border-radius: 8px;}
     textarea {height: 80px; font-size: 14px;}
@@ -30,7 +30,7 @@ st.markdown("""
     .metric-lbl {font-size: 11px; color: #666;}
     h1 {font-size: 24px; margin: 5px 0;}
     h2 {font-size: 18px; margin: 5px 0;}
-    .ai-logic {background: #f3e5f5; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 12px;}
+    .ai-logic {background: #f3e5f5; padding: 8px; border-radius: 8px; margin: 8px 0; font-size: 11px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -38,7 +38,6 @@ def get_nums(text):
     return re.findall(r"\d{5}", text) if text else []
 
 def statistical_predict(db):
-    """AI 1: Statistical Analysis - ĐẢM BẢO FORMAT ĐÚNG"""
     if len(db) < 10:
         return None
     
@@ -49,20 +48,9 @@ def statistical_predict(db):
         for d in set(num):
             scores[d] += 5
     
-    for d in range(10):
-        ds = str(d)
-        gan = True
-        for num in db[-8:]:
-            if ds in num:
-                gan = False
-                break
-        if gan:
-            scores[ds] -= 10
-    
     sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
     top_8 = [x[0] for x in sorted_scores[:8]]
     
-    # 2 TINH: 6 số đầu → tạo cặp 2 chữ số
     pool_2 = sorted(top_8[:6])
     all_pairs = ["".join(p) for p in combinations(pool_2, 2)]
     
@@ -78,7 +66,6 @@ def statistical_predict(db):
     scored_pairs.sort(key=lambda x: x[1], reverse=True)
     top_3_pairs = [p[0] for p in scored_pairs[:3]]
     
-    # 3 TINH: 6 số sau → tạo tổ hợp 3 chữ số
     pool_3 = sorted(top_8[2:8])
     all_triples = ["".join(t) for t in combinations(pool_3, 3)]
     
@@ -96,13 +83,12 @@ def statistical_predict(db):
     
     return {
         "all_8": "".join(sorted(top_8)),
-        "pairs": top_3_pairs,  # Format: ["09", "69", "79"]
-        "triples": top_3_triples,  # Format: ["017", "047", "147"]
-        "scores": scores
+        "pairs": top_3_pairs,
+        "triples": top_3_triples
     }
 
-def ai_predict(db, stat_result):
-    """AI 2: LLM Analysis - VALIDATE FORMAT CHẶT CHẼ"""
+def ai_enhance(db, stat_result):
+    """AI phân tích và điều chỉnh"""
     try:
         nv_client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=NVIDIA_API_KEY)
         genai.configure(api_key=GEMINI_API_KEY)
@@ -111,28 +97,25 @@ def ai_predict(db, stat_result):
         recent = db[-20:] if len(db) >= 20 else db
         
         prompt = f"""
-Phân tích xổ số 5D. Dữ liệu {len(recent)} kỳ:
-{recent}
+Dữ liệu 20 kỳ gần: {recent}
 
-Thống kê: {stat_result['all_8']}
+Thống kê:
+- 8 số nóng: {stat_result['all_8']}
+- Pairs đề xuất: {stat_result['pairs']}
+- Triples đề xuất: {stat_result['triples']}
 
-NHIỆM VỤ: Chọn 6 số KHÁC NHAU từ 0-9
-- 3 số cho 2 tinh (tạo thành 3 cặp 2 chữ số)
-- 3 số cho 3 tinh (tạo thành 1 tổ hợp 3 chữ số)
+PHÂN TÍCH:
+1. Tìm 3 số mạnh nhất cho 2 tinh (từ 0-9)
+2. Tìm 3 số mạnh nhất cho 3 tinh (từ 0-9, KHÁC với 3 số trên)
+3. Tổng 6 số không trùng nhau
 
-JSON format:
+JSON output:
 {{
-  "two_digit_nums": ["0", "9", "7"],
-  "three_digit_nums": ["1", "4", "6"],
+  "two_digit_3nums": ["1","2","3"],
+  "three_digit_3nums": ["4","5","6"],
   "confidence": 75,
   "reasoning": "Giải thích ngắn"
 }}
-
-LƯU Ý:
-- 6 số PHẢI KHÁC NHAU
-- two_digit_nums: 3 số đơn (0-9)
-- three_digit_nums: 3 số đơn (0-9)
-- Confidence: 60-90
 """
         
         try:
@@ -142,51 +125,37 @@ LƯU Ý:
                 temperature=0.3,
                 response_format={"type": "json_object"}
             )
-            ai_result = json.loads(completion.choices[0].message.content)
+            ai_data = json.loads(completion.choices[0].message.content)
         except:
-            res = gm_model.generate_content(prompt)
-            json_match = re.search(r'\{[\s\S]*\}', res.text)
-            ai_result = json.loads(json_match.group()) if json_match else None
+            gm_result = gm_model.generate_content(prompt)
+            json_match = re.search(r'\{[\s\S]*\}', gm_result.text)
+            ai_data = json.loads(json_match.group()) if json_match else {}
         
-        if not ai_result:
-            return None
+        # ✅ FIX: Tạo pairs đúng từ 3 số
+        two_nums = ai_data.get("two_digit_3nums", [])
+        if len(two_nums) >= 2:
+            two_nums = sorted(two_nums[:3])
+            final_pairs = ["".join(p) for p in combinations(two_nums, 2)][:3]
+        else:
+            final_pairs = stat_result["pairs"]
         
-        # VALIDATE & FIX FORMAT
-        two_nums = ai_result.get("two_digit_nums", [])
-        three_nums = ai_result.get("three_digit_nums", [])
-        
-        # Đảm bảo chỉ lấy chữ số đơn (0-9)
-        two_nums = [str(d)[0] for d in two_nums if str(d).isdigit()][:3]
-        three_nums = [str(d)[0] for d in three_nums if str(d).isdigit()][:3]
-        
-        # Nếu thiếu, lấy từ statistical
-        while len(two_nums) < 3:
-            for num in stat_result["pairs"][0] if stat_result["pairs"] else "01":
-                if num not in two_nums:
-                    two_nums.append(num)
-                    break
-        
-        while len(three_nums) < 3:
-            for num in stat_result["triples"][0] if stat_result["triples"] else "012":
-                if num not in three_nums:
-                    three_nums.append(num)
-                    break
-        
-        # Tạo 3 cặp 2 số từ 3 số
-        from itertools import combinations
-        ai_pairs = ["".join(p) for p in combinations(sorted(two_nums), 2)][:3]
-        
-        # Tạo 1 tổ hợp 3 số
-        ai_triple = "".join(sorted(three_nums[:3])) if len(three_nums) >= 3 else "012"
+        # ✅ FIX: Tạo triples đúng từ 3 số
+        three_nums = ai_data.get("three_digit_3nums", [])
+        if len(three_nums) >= 3:
+            three_nums = sorted(three_nums[:3])
+            final_triples = ["".join(three_nums)]
+        else:
+            final_triples = stat_result["triples"]
         
         return {
-            "pairs": ai_pairs,
-            "triples": [ai_triple],  # Chỉ 1 tổ hợp chính
-            "confidence": ai_result.get("confidence", 75),
-            "reasoning": ai_result.get("reasoning", "AI analysis")
+            "pairs": final_pairs,
+            "triples": final_triples,
+            "confidence": ai_data.get("confidence", 75),
+            "reasoning": ai_data.get("reasoning", "AI analysis")
         }
     
     except Exception as e:
+        st.error(f"AI error: {str(e)[:50]}")
         return None
 
 if "db" not in st.session_state:
@@ -210,53 +179,49 @@ if st.button("⚡ AI PHÂN TÍCH"):
     if numbers:
         st.session_state.db = numbers[-30:]
         
-        with st.spinner("🤖 AI đang phân tích..."):
+        with st.spinner("🤖 AI đang tính..."):
             stat_result = statistical_predict(st.session_state.db)
             
             if stat_result:
-                ai_result = ai_predict(st.session_state.db, stat_result)
+                ai_result = ai_enhance(st.session_state.db, stat_result)
                 
                 if ai_result:
-                    final_result = {
+                    st.session_state.result = {
                         "all_8": stat_result["all_8"],
                         "pairs": ai_result["pairs"],
                         "triples": ai_result["triples"],
                         "conf": ai_result["confidence"],
-                        "ai_reasoning": ai_result["reasoning"]
+                        "reasoning": ai_result["reasoning"]
                     }
-                    st.session_state.result = final_result
-                    st.rerun()
                 else:
                     st.session_state.result = stat_result
                     st.session_state.result["conf"] = 70
+                st.rerun()
             else:
-                st.error("❌ Cần 10 kỳ")
+                st.error("❌ Cần 10+ kỳ")
     else:
         st.error("❌ Không có số!")
 
 if st.session_state.result:
     r = st.session_state.result
     
-    st.markdown(f'<div class="box">🔥 AI {r.get("conf", 70)}%</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="box">🔥 {r.get("conf", 70)}% <span style="background:#6f42c1;padding:2px 6px;border-radius:4px;font-size:10px;">AI</span></div>', unsafe_allow_html=True)
+    
     st.markdown(f'<div style="text-align:center;"><div style="color:#666;font-size:12px;">8 SỐ</div><div class="big-num">{r["all_8"]}</div></div>', unsafe_allow_html=True)
     
-    if "ai_reasoning" in r:
-        st.markdown(f'<div class="ai-logic">🧠 <b>AI:</b> {r["ai_reasoning"]}</div>', unsafe_allow_html=True)
+    if "reasoning" in r:
+        st.markdown(f'<div class="ai-logic">🧠 {r["reasoning"]}</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="box"><h2>🎯 2 TINH</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="box"><h2>🎯 2 TINH (2 chữ số)</h2></div>', unsafe_allow_html=True)
     st.markdown('<div class="grid">', unsafe_allow_html=True)
     for pair in r["pairs"]:
-        # ĐẢM BẢO CHỈ 2 CHỮ SỐ
-        pair_fixed = pair[:2] if len(pair) > 2 else pair
-        st.markdown(f'<div class="item">{pair_fixed}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="item">{pair}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    st.markdown('<div class="box"><h2>🎯 3 TINH</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="box"><h2>🎯 3 TINH (3 chữ số)</h2></div>', unsafe_allow_html=True)
     st.markdown('<div class="grid">', unsafe_allow_html=True)
     for triple in r["triples"]:
-        # ĐẢM BẢO CHỈ 3 CHỮ SỐ
-        triple_fixed = triple[:3] if len(triple) > 3 else triple
-        st.markdown(f'<div class="item item-3">{triple_fixed}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="item item-3">{triple}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 if st.button("🗑️ XÓA"):
@@ -264,4 +229,4 @@ if st.button("🗑️ XÓA"):
     st.session_state.result = None
     st.rerun()
 
-st.markdown('<div style="text-align:center;color:#999;font-size:10px;">🤖 AI-Powered TITAN V27</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center;color:#999;font-size:10px;">AI-Powered</div>', unsafe_allow_html=True)
