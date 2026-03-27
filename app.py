@@ -1,6 +1,6 @@
 """
 🚀 TITAN V27 - COMPACT VERSION
-Version: 4.0.0-COMPACT
+Version: 4.0.1-FIXED
 """
 import streamlit as st
 import pandas as pd
@@ -118,7 +118,9 @@ raw_input = st.text_area("📡 Dán dữ liệu (mỗi dòng 1 số 5 chữ số
 # Button
 if st.button("⚡ CHỐT SỐ AI", type="primary"):
     clean_data = extract_numbers(raw_input)
-    if clean_
+    
+    # ✅ LINE 121 - PHẢI ĐẦY ĐỦ: if clean_data:
+    if clean_data:
         st.session_state.db.extend(clean_data)
         st.session_state.pred = predict(st.session_state.db)
         st.rerun()
@@ -207,4 +209,4 @@ if st.session_state.get("show_stats", False) and st.session_state.db:
                 st.write(f"`{row['Số']}`: {row['Tần suất']}")
 
 # Footer
-st.markdown('<div style="text-align:center;color:#666;font-size:12px;margin-top:20px;">TITAN V27 v4.0.0-COMPACT</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center;color:#666;font-size:12px;margin-top:20px;">TITAN V27 v4.0.1-FIXED</div>', unsafe_allow_html=True)
