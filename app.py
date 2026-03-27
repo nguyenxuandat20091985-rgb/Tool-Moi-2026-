@@ -1,212 +1,184 @@
 """
-🚀 TITAN V27 - COMPACT VERSION
-Version: 4.0.1-FIXED
+🚀 TITAN V27 - ULTRA FAST VERSION
+Dành cho 5D Bet - 1 phút là xong
 """
 import streamlit as st
-import pandas as pd
-from collections import Counter
-from openai import OpenAI
-import google.generativeai as genai
-import json
 import re
 import itertools
+from collections import Counter
 
-# ================= ⚙️ CONFIG =================
-NVIDIA_API_KEY = "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"
-GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
+# Config
+st.set_page_config(page_title="TITAN V27", page_icon="🎲", layout="wide")
 
-PAIR_RULES = ["178", "034", "458", "578", "019", "679", "235", "456", "124", "245", 
-              "247", "248", "246", "340", "349", "348", "015", "236", "028", "026", 
-              "047", "046", "056", "136", "138", "378"]
-
-# ================= 🎨 CSS COMPACT =================
-st.set_page_config(page_title="TITAN V27", page_icon="🎲", layout="centered")
-
+# CSS - CỰC KỲ ĐƠN GIẢN
 st.markdown("""
 <style>
-    .main {padding: 1rem;}
-    .stTextArea label {display: none;}
-    .stButton>button {width: 100%; background: linear-gradient(135deg, #76b900, #5a9e00); color: #000; font-weight: 700; border: none; border-radius: 10px; padding: 15px; font-size: 18px;}
-    .result-box {background: #0d1117; border: 2px solid #76b900; border-radius: 15px; padding: 15px; margin: 10px 0;}
-    .number-display {font-size: 48px; font-weight: bold; color: #76b900; text-align: center; font-family: monospace; letter-spacing: 5px;}
-    .pair-grid {display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0;}
-    .pair-item {background: rgba(0,212,255,0.1); border-left: 3px solid #00d4ff; padding: 8px; text-align: center; border-radius: 5px; font-family: monospace; font-size: 16px; font-weight: bold;}
-    .status-bar {background: #76b900; color: #000; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 16px; margin: 10px 0;}
-    .status-stop {background: #ff4444; color: #fff;}
-    .metric-box {background: rgba(118,185,0,0.1); border-radius: 8px; padding: 10px; text-align: center; margin: 5px 0;}
-    .metric-value {font-size: 24px; font-weight: bold; color: #76b900;}
-    .metric-label {font-size: 12px; color: #888;}
-    .tabs .stTabsContent {padding: 10px;}
+    .main {padding: 0.5rem;}
+    .big-number {font-size: 56px; font-weight: bold; color: #28a745; text-align: center; font-family: monospace; letter-spacing: 8px; margin: 10px 0;}
+    .grid-4 {display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;}
+    .grid-3 {display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;}
+    .box {background: #f8f9fa; border: 2px solid #28a745; border-radius: 8px; padding: 10px; text-align: center; font-family: monospace; font-size: 18px; font-weight: bold;}
+    .box-3 {background: #e3f2fd; border: 2px solid #2196f3; border-radius: 8px; padding: 10px; text-align: center; font-family: monospace; font-size: 20px; font-weight: bold;}
+    .status {background: #28a745; color: white; padding: 15px; border-radius: 10px; text-align: center; font-size: 20px; font-weight: bold; margin: 10px 0;}
+    .status-stop {background: #dc3545;}
+    .metric {display: flex; justify-content: space-around; margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 8px;}
+    .metric-item {text-align: center;}
+    .metric-value {font-size: 24px; font-weight: bold; color: #28a745;}
+    .metric-label {font-size: 12px; color: #666;}
+    textarea {height: 60px !important;}
+    button {width: 100% !important; background: #28a745 !important; color: white !important; font-size: 20px !important; font-weight: bold !important; padding: 15px !important;}
     @media (max-width: 600px) {
-        .number-display {font-size: 36px;}
-        .pair-grid {grid-template-columns: repeat(3, 1fr);}
+        .big-number {font-size: 40px;}
+        .grid-4 {grid-template-columns: repeat(3, 1fr);}
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= 🔧 FUNCTIONS =================
-def extract_numbers(text):
-    return re.findall(r"\b\d{5}\b", text) if text else []
+# Functions
+def get_numbers(text):
+    return re.findall(r"\d{5}", text) if text else []
 
-def generate_combos(numbers_7):
-    digits = sorted(list(set(numbers_7)))[:7]
-    if len(digits) < 7:
-        remaining = [str(i) for i in range(10) if str(i) not in digits]
-        digits = sorted(digits + remaining[:7-len(digits)])
+def make_combos(digits_7):
+    digits = sorted(list(set(digits_7)))[:7]
+    while len(digits) < 7:
+        for i in range(10):
+            if str(i) not in digits:
+                digits.append(str(i))
+                break
+    digits = sorted(digits)[:7]
     pairs = ["".join(p) for p in itertools.combinations(digits, 2)]
     triples = ["".join(t) for t in itertools.combinations(digits, 3)]
-    return {"base_7": "".join(digits), "pairs": pairs, "triples": triples}
+    return "".join(digits), pairs, triples
 
-def calc_scores(db, last_draw):
-    if not db:
-        return {str(i): 0 for i in range(10)}
-    all_digits = "".join(db[-30:])
-    scores = {str(i): all_digits.count(str(i)) * 2 for i in range(10)}
-    if last_draw:
-        for digit in set(last_draw):
-            scores[digit] += 30
-    return scores
-
-def predict(db):
-    if not db or len(db) < 5:
-        return {"base_7": "0123456", "main_3": "012", "pairs_sample": ["01","23","45"], 
-                "triples_sample": ["012","234","456"], "adv": "DỪNG", "logic": "Chưa đủ dữ liệu", "conf": 50}
+def analyze(db):
+    if len(db) < 3:
+        return "0123456", ["01","23","45"], ["012","234","456"], "012", "Chưa đủ dữ liệu", 50
     
-    try:
-        scores = calc_scores(db, db[-1])
-        sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
-        top_7 = [x[0] for x in sorted_scores[:7]]
-        base_7 = "".join(sorted(top_7))
-        combos = generate_combos(base_7)
-        
-        return {
-            "base_7": base_7,
-            "main_3": combos["triples"][0] if combos["triples"] else "012",
-            "pairs_sample": combos["pairs"][:12],
-            "triples_sample": combos["triples"][:10],
-            "adv": "ĐÁNH",
-            "logic": f"Phân tích {len(db)} kỳ",
-            "conf": min(90, 60 + len(db)//5)
-        }
-    except:
-        return {"base_7": "0123456", "main_3": "012", "pairs_sample": ["01","23","45"],
-                "triples_sample": ["012","234","456"], "adv": "DỪNG", "logic": "Lỗi", "conf": 50}
+    # Tính tần suất 30 kỳ gần
+    all_digits = "".join(db[-30:])
+    scores = {str(i): all_digits.count(str(i)) for i in range(10)}
+    
+    # Bonus số vừa ra
+    last = db[-1]
+    for d in set(last):
+        scores[d] += 20
+    
+    # Sort và lấy top 7
+    sorted_nums = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top_7 = "".join(sorted([x[0] for x in sorted_nums[:7]]))
+    
+    # Generate combos
+    base_7, pairs, triples = make_combos(top_7)
+    
+    # Main 3 số
+    main_3 = triples[0] if triples else "012"
+    
+    # Confidence
+    conf = min(90, 50 + len(db)//3)
+    
+    return base_7, pairs[:12], triples[:10], main_3, f"Phân tích {len(db)} kỳ", conf
 
-# ================= 🧠 INIT =================
+# Init session
 if "db" not in st.session_state:
     st.session_state.db = []
-if "pred" not in st.session_state:
-    st.session_state.pred = None
+if "result" not in st.session_state:
+    st.session_state.result = None
 
-# ================= 🖥️ UI =================
-st.markdown('<h1 style="text-align:center;color:#76b900;margin:10px 0;">🎲 TITAN V27</h1>', unsafe_allow_html=True)
+# Title
+st.markdown('<h1 style="text-align:center;color:#28a745;margin:5px 0;">🎲 TITAN V27</h1>', unsafe_allow_html=True)
 
 # Metrics
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 with col1:
-    st.markdown(f'<div class="metric-box"><div class="metric-value">{len(st.session_state.db)}</div><div class="metric-label">Tổng kỳ</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric"><div class="metric-item"><div class="metric-value">{len(st.session_state.db)}</div><div class="metric-label">Tổng kỳ</div></div></div>', unsafe_allow_html=True)
 with col2:
-    last = st.session_state.db[-1] if st.session_state.db else "-"
-    st.markdown(f'<div class="metric-box"><div class="metric-value" style="font-size:18px;">{last}</div><div class="metric-label">Kỳ cuối</div></div>', unsafe_allow_html=True)
-with col3:
-    st.markdown(f'<div class="metric-box"><div class="metric-value">🎯</div><div class="metric-label">Sẵn sàng</div></div>', unsafe_allow_html=True)
+    last_num = st.session_state.db[-1] if st.session_state.db else "Chưa có"
+    st.markdown(f'<div class="metric"><div class="metric-item"><div class="metric-value" style="font-size:18px;">{last_num}</div><div class="metric-label">Kỳ cuối</div></div></div>', unsafe_allow_html=True)
 
 # Input
-raw_input = st.text_area("📡 Dán dữ liệu (mỗi dòng 1 số 5 chữ số):", height=80, 
-                        placeholder="16923\n51475\n31410\n...")
+st.markdown("### 📥 Nhập số (mỗi dòng 1 số 5 chữ số)")
+user_input = st.text_area("", placeholder="16923\n51475\n31410\n...", height=60, label_visibility="collapsed")
 
 # Button
-if st.button("⚡ CHỐT SỐ AI", type="primary"):
-    clean_data = extract_numbers(raw_input)
-    
-    # ✅ LINE 121 - PHẢI ĐẦY ĐỦ: if clean_data:
-    if clean_data:
-        st.session_state.db.extend(clean_data)
-        st.session_state.pred = predict(st.session_state.db)
+if st.button("⚡ CHỐT SỐ"):
+    numbers = get_numbers(user_input)
+    if numbers:
+        st.session_state.db.extend(numbers)
+        base_7, pairs, triples, main_3, logic, conf = analyze(st.session_state.db)
+        st.session_state.result = {
+            "base_7": base_7,
+            "pairs": pairs,
+            "triples": triples,
+            "main_3": main_3,
+            "logic": logic,
+            "conf": conf
+        }
         st.rerun()
     else:
-        st.error("❌ Không tìm thấy số 5 chữ số!")
+        st.error("❌ Không có số 5 chữ số!")
 
-# Results
-if st.session_state.pred:
-    p = st.session_state.pred
-    is_go = p.get("adv", "").upper() == "ĐÁNH"
-    status_class = "" if is_go else "status-stop"
-    status_icon = "🔥" if is_go else "⏸️"
-    status_text = "KHUYÊN ĐÁNH" if is_go else "NÊN DỪNG"
+# Show result
+if st.session_state.result:
+    r = st.session_state.result
     
-    st.markdown(f'<div class="status-bar {status_class}">{status_icon} {status_text} | Tin cậy: {p.get("conf",0)}%</div>', unsafe_allow_html=True)
+    # Status
+    status_class = "" if r["conf"] >= 70 else "status-stop"
+    st.markdown(f'<div class="status {status_class}">🔥 KHUYÊN ĐÁNH | Tin cậy: {r["conf"]}%</div>', unsafe_allow_html=True)
     
-    # Base 7 numbers - PROMINENT
-    st.markdown('<div class="result-box">', unsafe_allow_html=True)
-    st.markdown('<div style="text-align:center;color:#888;margin-bottom:5px;">🎲 DÀN 7 SỐ</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="number-display">{p.get("base_7", "0123456")}</div>', unsafe_allow_html=True)
+    # Base 7 - BIG & CLEAR
+    st.markdown('<div style="text-align:center;margin:15px 0;">', unsafe_allow_html=True)
+    st.markdown('<div style="color:#666;font-size:16px;">🎲 DÀN 7 SỐ</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="big-number">{r["base_7"]}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     # Tabs
     tab1, tab2 = st.tabs(["🎯 2 SỐ", "🎯 3 SỐ"])
     
     with tab1:
-        pairs = p.get("pairs_sample", [])
-        if not pairs and "base_7" in p:
-            combos = generate_combos(p["base_7"])
-            pairs = combos["pairs"][:12]
-        
-        st.markdown('<div class="pair-grid">', unsafe_allow_html=True)
-        for pair in pairs[:12]:
-            st.markdown(f'<div class="pair-item">{pair}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="grid-4">', unsafe_allow_html=True)
+        for p in r["pairs"][:12]:
+            st.markdown(f'<div class="box">{p}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     with tab2:
-        triples = p.get("triples_sample", [])
-        if not triples and "base_7" in p:
-            combos = generate_combos(p["base_7"])
-            triples = combos["triples"][:10]
-        
-        st.markdown('<div class="pair-grid">', unsafe_allow_html=True)
-        for triple in triples[:10]:
-            st.markdown(f'<div class="pair-item" style="font-size:18px;">{triple}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="grid-3">', unsafe_allow_html=True)
+        for t in r["triples"][:10]:
+            st.markdown(f'<div class="box-3">{t}</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Main number
-    if p.get("main_3"):
-        st.markdown(f'<div class="result-box" style="text-align:center;"><div style="color:#888;font-size:14px;">⭐ SỐ CHỦ LỰC</div><div class="number-display" style="font-size:36px;">{p["main_3"]}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="background:#28a745;color:white;padding:15px;border-radius:10px;text-align:center;margin:10px 0;"><div style="font-size:14px;">⭐ SỐ CHỦ LỰC</div><div style="font-size:40px;font-weight:bold;font-family:monospace;">{r["main_3"]}</div></div>', unsafe_allow_html=True)
     
-    # AI Logic
-    st.markdown(f'<div style="background:rgba(0,212,255,0.1);padding:10px;border-radius:8px;margin:10px 0;"><strong style="color:#00d4ff;">🧠 AI:</strong> {p.get("logic", "")}</div>', unsafe_allow_html=True)
-    
-    # Copy button
-    all_numbers = f"Dàn 7 số: {p.get('base_7', '')}\nSố chủ lực: {p.get('main_3', '')}\n2 số: {', '.join(p.get('pairs_sample', [])[:8])}"
-    st.download_button("📋 SAO CHÉP KẾT QUẢ", all_numbers, file_name="titan_v27_result.txt", mime="text/plain", use_container_width=True)
+    # Logic
+    st.markdown(f'<div style="background:#e3f2fd;padding:10px;border-radius:8px;text-align:center;"><strong style="color:#2196f3;">🧠 AI:</strong> {r["logic"]}</div>', unsafe_allow_html=True)
 
 # Quick actions
 st.markdown("---")
 col_a, col_b = st.columns(2)
 with col_a:
-    if st.button("🗑️ Xóa dữ liệu", use_container_width=True):
+    if st.button("🗑️ XÓA HẾT", key="clear"):
         st.session_state.db = []
-        st.session_state.pred = None
+        st.session_state.result = None
         st.rerun()
 with col_b:
-    if st.button("📊 Thống kê", use_container_width=True):
+    if st.button("📊 THỐNG KÊ", key="stats"):
         st.session_state.show_stats = not st.session_state.get("show_stats", False)
 
-# Stats
-if st.session_state.get("show_stats", False) and st.session_state.db:
-    with st.expander("📊 Thống kê tần suất", expanded=True):
+# Stats (optional)
+if st.session_state.get("show_stats", False) and len(st.session_state.db) > 0:
+    with st.expander("📊 Tần suất", expanded=True):
         freq = Counter("".join(st.session_state.db[-50:]))
-        df = pd.DataFrame([{"Số": str(i), "Tần suất": freq.get(str(i), 0)} for i in range(10)])
-        st.bar_chart(df.set_index("Số"), color="#00d4ff")
+        df_data = [{"Số": str(i), "Tần suất": freq.get(str(i), 0)} for i in range(10)]
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**🔥 Nóng**")
-            for _, row in df.nlargest(3, "Tần suất").iterrows():
-                st.write(f"`{row['Số']}`: {row['Tần suất']}")
-        with c2:
-            st.markdown("**❄️ Lạnh**")
-            for _, row in df.nsmallest(3, "Tần suất").iterrows():
-                st.write(f"`{row['Số']}`: {row['Tần suất']}")
+        col_x, col_y = st.columns(2)
+        with col_x:
+            st.markdown("**🔥 Nóng nhất**")
+            for item in sorted(df_data, key=lambda x: x["Tần suất"], reverse=True)[:3]:
+                st.write(f"`{item['Số']}`: {item['Tần suất']}")
+        with col_y:
+            st.markdown("**❄️ Lạnh nhất**")
+            for item in sorted(df_data, key=lambda x: x["Tần suất"])[:3]:
+                st.write(f"`{item['Số']}`: {item['Tần suất']}")
 
 # Footer
-st.markdown('<div style="text-align:center;color:#666;font-size:12px;margin-top:20px;">TITAN V27 v4.0.1-FIXED</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center;color:#999;font-size:11px;margin-top:10px;">⚡ TITAN V27 - 1 PHÚT LÀ XONG</div>', unsafe_allow_html=True)
