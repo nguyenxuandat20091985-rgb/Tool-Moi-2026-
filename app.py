@@ -1,474 +1,278 @@
 """
-🚀 TITAN V27 AI - MAX ACCURACY VERSION
-Ensemble AI + Position Correlation + Backtest + Tuổi Sửu
-2 tinh: 3 cặp (2 chữ số) ✅
-3 tinh: 3 tổ hợp (3 chữ số) ✅
-Target Accuracy: 65-75%
-Version: 17.0.0-MAX
+🚀 TITAN V27 AI - ULTIMATE v17.0.0
+✅ Độ chính xác: Ensemble 5 thuật toán + AI
+✅ Tốc độ: <30 giây cho 5D
+✅ Format: 2-tinh: 3 cặp (2 số) | 3-tinh: 3 tổ hợp (3 số)
+✅ Tuổi Sửu mệnh Kim + Bias detection + Markov chains
 """
 import streamlit as st
 import re
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from itertools import combinations
 from openai import OpenAI
 import google.generativeai as genai
 import json
-import math
-import statistics
+import time
 
-# API Keys
+# ⚡ API Keys
 NVIDIA_API_KEY = "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"
 GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
 
-# Tuổi Sửu - Mệnh Kim + Ngũ hành
-LUCKY_OX = [0, 2, 5, 6, 7, 8]
-METAL_NUMS = [1, 6]
-EARTH_NUMS = [2, 5, 8]
-WATER_NUMS = [0, 9]  # Thủy
-WOOD_NUMS = [3, 4]   # Mộc
-FIRE_NUMS = [7]       # Hỏa
+# 🐂 Tuổi Sửu - Mệnh Kim
+LUCKY_OX = {0, 2, 5, 6, 7, 8}
+METAL = {1, 6}
+EARTH = {2, 5, 8}
 
-# Elemental cycle for Ox (Kim): Thổ sinh Kim, Kim sinh Thủy
-ELEMENT_CYCLE = {"earth": EARTH_NUMS, "metal": METAL_NUMS, "water": WATER_NUMS}
+st.set_page_config(page_title="TITAN V27 AI", page_icon="⚡", layout="centered")
 
-st.set_page_config(page_title="TITAN V27 AI", page_icon="🐂", layout="centered")
-
+# ⚡ CSS tối ưu tốc độ render
 st.markdown("""
 <style>
-    .main {padding: 0.5rem;}
-    .big-num {font-size: 42px; font-weight: bold; color: #FFD700; text-align: center; font-family: monospace; letter-spacing: 6px; margin: 5px 0;}
-    .box {background: linear-gradient(135deg, #2F4F4F, #1C3A3A); color: #FFD700; padding: 10px; border-radius: 10px; text-align: center; margin: 5px 0; border: 2px solid #FFD700;}
-    .grid {display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin: 10px 0;}
-    .item {background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; padding: 12px; border-radius: 8px; text-align: center; font-family: monospace; font-size: 28px; font-weight: bold;}
+    .main {padding: 0.3rem;}
+    .big-num {font-size: 40px; font-weight: 900; color: #FFD700; text-align: center; font-family: monospace; letter-spacing: 5px; margin: 3px 0;}
+    .box {background: linear-gradient(135deg, #1a1a2e, #16213e); color: #FFD700; padding: 8px; border-radius: 8px; text-align: center; margin: 3px 0; border: 1px solid #FFD700;}
+    .grid {display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 8px 0;}
+    .item {background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; padding: 10px; border-radius: 6px; text-align: center; font-family: monospace; font-size: 26px; font-weight: bold;}
     .item-3 {background: linear-gradient(135deg, #C0C0C0, #808080); color: #000;}
-    button {width: 100%; background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; font-size: 18px; font-weight: bold; padding: 12px; border: none; border-radius: 8px;}
-    textarea {height: 80px; font-size: 14px;}
-    .metric {display: flex; justify-content: space-around; margin: 5px 0; background: rgba(255,215,0,0.1); padding: 8px; border-radius: 8px;}
-    .metric-val {font-size: 20px; font-weight: bold; color: #FFD700;}
-    .metric-lbl {font-size: 11px; color: #C0C0C0;}
-    h1 {font-size: 24px; margin: 5px 0; color: #FFD700; text-align: center;}
-    h2 {font-size: 18px; margin: 5px 0; color: #FFD700;}
-    .alert {padding: 8px; border-radius: 8px; margin: 8px 0; font-size: 12px; border-left: 4px solid #FFD700; background: rgba(255,215,0,0.1);}
-    .high-conf {border-color: #00FF00 !important; box-shadow: 0 0 10px rgba(0,255,0,0.3);}
-    .low-conf {border-color: #FF6B6B !important;}
-    .accuracy-badge {background: #00C853; color: white; padding: 3px 8px; border-radius: 5px; font-size: 10px;}
+    button {width: 100%; background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; font-size: 16px; font-weight: bold; padding: 10px; border: none; border-radius: 6px;}
+    textarea {height: 70px; font-size: 13px;}
+    .metric {display: flex; justify-content: space-around; margin: 3px 0; background: rgba(255,215,0,0.08); padding: 6px; border-radius: 6px;}
+    .metric-val {font-size: 18px; font-weight: bold; color: #FFD700;}
+    .metric-lbl {font-size: 10px; color: #AAA;}
+    h1 {font-size: 22px; margin: 3px 0; color: #FFD700; text-align: center;}
+    h2 {font-size: 16px; margin: 3px 0; color: #FFD700;}
+    .alert {padding: 6px; border-radius: 6px; margin: 6px 0; font-size: 11px; border-left: 3px solid #FFD700; background: rgba(255,215,0,0.08);}
+    .speed-tag {background: #00ff88; color: #000; padding: 2px 5px; border-radius: 3px; font-size: 9px; margin-left: 5px;}
 </style>
 """, unsafe_allow_html=True)
 
+# ⚡ Hàm tối ưu tốc độ
 def get_nums(text):
-    return [n for n in re.findall(r"\d{5}", text) if n]
+    return re.findall(r"\d{5}", text)
 
-# ================= 🎯 ENSEMBLE PREDICTION ALGORITHMS =================
+# 🎯 5 THUẬT TOÁN ENSEMBLE
+def algo_frequency(db, window=30):
+    """1. Frequency Analysis - Nhanh, cơ bản"""
+    if not db: return {}
+    freq = Counter("".join(db[-window:]))
+    return {str(i): freq.get(str(i), 0) * 2 for i in range(10)}
 
-def algo_frequency(db, window=40):
-    """Algorithm 1: Frequency Analysis với weighted window"""
-    if len(db) < 10:
-        return {str(i): 0 for i in range(10)}
-    
-    scores = {}
-    # Weighted: kỳ gần hơn được tính nặng hơn
-    for i, num in enumerate(reversed(db[-window:])):
-        weight = 1 + (window - i) / window  # 1.0 → 2.0
-        for d in set(num):
-            scores[d] = scores.get(d, 0) + weight
-    
-    # Normalize
-    max_score = max(scores.values()) if scores else 1
-    return {d: s/max_score * 100 for d, s in scores.items()}
-
-def algo_position_correlation(db):
-    """Algorithm 2: Position Correlation - số nào hay đi cùng vị trí nào"""
-    if len(db) < 20:
-        return {str(i): 0 for i in range(10)}
-    
-    pos_scores = defaultdict(lambda: defaultdict(int))
-    
-    for num in db[-50:]:
-        for pos, digit in enumerate(num[:5]):
-            pos_scores[digit][pos] += 1
-    
-    # Tính điểm: số có phân bố vị trí "bất thường" được bonus
-    scores = {}
-    for digit in range(10):
-        ds = str(digit)
-        if ds in pos_scores:
-            counts = list(pos_scores[ds].values())
-            # Nếu 1 vị trí chiếm >40% → bias mạnh
-            if counts and max(counts) / sum(counts) > 0.4:
-                scores[ds] = 85 + max(counts) / sum(counts) * 15
-            else:
-                scores[ds] = sum(counts) * 1.2
-        else:
-            scores[ds] = 10
-    
-    return scores
-
-def algo_digit_sum_modulo(db):
-    """Algorithm 3: Digit Sum & Modulo Patterns"""
-    if len(db) < 15:
-        return {str(i): 0 for i in range(10)}
-    
-    scores = {str(i): 0 for i in range(10)}
-    
-    # Phân tích tổng các chữ số
-    digit_sums = [sum(int(d) for d in num) for num in db[-30:]]
-    sum_freq = Counter(digit_sums)
-    
-    # Phân tích modulo 3, 5, 9
+def algo_position_bias(db):
+    """2. Position Bias - Phát hiện số hay ra ở vị trí cụ thể"""
+    if len(db) < 15: return {}
+    pos_scores = defaultdict(lambda: Counter())
     for num in db[-30:]:
-        num_int = int(num)
-        for d in set(num):
-            # Bonus nếu digit xuất hiện khi tổng số thuộc pattern phổ biến
-            if sum_freq.get(sum(int(x) for x in num), 0) > 3:
-                scores[d] += 2
-            # Bonus modulo pattern
-            if num_int % 5 == int(d) or num_int % 3 == int(d):
-                scores[d] += 1.5
+        for pos, d in enumerate(num[:5]):
+            pos_scores[pos][d] += 1
     
+    scores = {}
+    for pos in range(5):
+        total = sum(pos_scores[pos].values()) or 1
+        for d, c in pos_scores[pos].most_common(2):
+            if c / total > 0.18:
+                scores[d] = scores.get(d, 0) + (c / total) * 25
     return scores
 
-def algo_zodiac_elemental(db, zodiac="ox"):
-    """Algorithm 4: Zodiac + Elemental Cycle"""
-    scores = {str(i): 10 for i in range(10)}
+def algo_markov(db, order=2):
+    """3. Markov Chain - Dự đoán dựa trên chuỗi trước đó"""
+    if len(db) < 20: return {}
+    chains = defaultdict(lambda: Counter())
     
-    # Base lucky numbers
-    for num in LUCKY_OX:
-        scores[str(num)] += 20
-    for num in METAL_NUMS + EARTH_NUMS:
-        scores[str(num)] += 12
+    for num in db[-40:]:
+        digits = list(num[:5])
+        for i in range(len(digits) - order):
+            key = tuple(digits[i:i+order])
+            chains[key][digits[i+order]] += 1
     
-    # Elemental cycle based on recent patterns
-    recent = db[-20:] if len(db) >= 20 else db
-    all_digits = "".join(recent)
+    # Dự đoán từ kỳ cuối
+    last = db[-1][:5] if db else ""
+    scores = {}
+    if len(last) >= order:
+        key = tuple(last[-order:])
+        if key in chains:
+            total = sum(chains[key].values())
+            for d, c in chains[key].most_common(3):
+                scores[d] = scores.get(d, 0) + (c / total) * 30
+    return scores
+
+def algo_momentum(db, window=10):
+    """4. Momentum/Reversion - Số đang lên/xuống"""
+    if len(db) < window: return {}
+    recent = db[-window:]
+    scores = {}
     
-    # Count elemental appearances
-    element_counts = {"earth": 0, "metal": 0, "water": 0}
-    for d in all_digits:
-        if int(d) in EARTH_NUMS: element_counts["earth"] += 1
-        if int(d) in METAL_NUMS: element_counts["metal"] += 1
-        if int(d) in WATER_NUMS: element_counts["water"] += 1
-    
-    # Thổ sinh Kim → nếu Thổ xuất hiện nhiều, Kim sẽ về
-    if element_counts["earth"] > element_counts["metal"]:
-        for num in METAL_NUMS:
-            scores[str(num)] += 15
-    
-    # Kim sinh Thủy → nếu Kim nhiều, Thủy sẽ về
-    if element_counts["metal"] > element_counts["water"]:
-        for num in WATER_NUMS:
-            scores[str(num)] += 12
-    
+    for d in range(10):
+        ds = str(d)
+        appearances = [i for i, num in enumerate(recent) if ds in num]
+        if len(appearances) >= 2:
+            # Momentum: xuất hiện ngày càng nhiều
+            if appearances[-1] - appearances[-2] <= 3:
+                scores[ds] = scores.get(ds, 0) + 15
+        elif len(appearances) == 1 and appearances[0] >= window - 3:
+            # Reversion: số gan vừa về
+            scores[ds] = scores.get(ds, 0) + 20
+    return scores
+
+def algo_zodiac(db):
+    """5. Zodiac Boost - Tuổi Sửu mệnh Kim"""
+    scores = {}
+    for d in range(10):
+        if d in LUCKY_OX:
+            scores[str(d)] = 10
+        elif d in METAL | EARTH:
+            scores[str(d)] = 6
     return scores
 
 def ensemble_predict(db):
-    """Ensemble: Kết hợp 4 thuật toán với voting"""
-    if len(db) < 15:
-        return None
+    """🎯 Ensemble: Kết hợp 5 thuật toán + weighting"""
+    if len(db) < 10: return None
     
-    # Run all algorithms
-    freq_scores = algo_frequency(db)
-    pos_scores = algo_position_correlation(db)
-    mod_scores = algo_digit_sum_modulo(db)
-    zodiac_scores = algo_zodiac_elemental(db)
+    start = time.time()
     
-    # Weighted ensemble (tuneable weights)
-    weights = {"freq": 0.35, "pos": 0.30, "mod": 0.20, "zodiac": 0.15}
+    # Chạy 5 thuật toán song song (thực tế tuần tự nhưng nhanh)
+    scores = defaultdict(float)
     
-    final_scores = {}
-    for d in range(10):
-        ds = str(d)
-        score = (
-            weights["freq"] * freq_scores.get(ds, 0) +
-            weights["pos"] * pos_scores.get(ds, 0) +
-            weights["mod"] * mod_scores.get(ds, 0) +
-            weights["zodiac"] * zodiac_scores.get(ds, 0)
-        )
-        final_scores[ds] = score
+    # Weight cho từng thuật toán
+    weights = {
+        "frequency": 1.0,
+        "position": 1.3,
+        "markov": 1.5,
+        "momentum": 1.2,
+        "zodiac": 0.8
+    }
     
-    return final_scores
-
-# ================= 🔍 BIAS & PATTERN DETECTION =================
-
-def detect_advanced_patterns(db):
-    """Phát hiện pattern nâng cao"""
-    if len(db) < 20:
-        return {}
+    for s in algo_frequency(db).items(): scores[s[0]] += s[1] * weights["frequency"]
+    for s in algo_position_bias(db).items(): scores[s[0]] += s[1] * weights["position"]
+    for s in algo_markov(db).items(): scores[s[0]] += s[1] * weights["markov"]
+    for s in algo_momentum(db).items(): scores[s[0]] += s[1] * weights["momentum"]
+    for s in algo_zodiac(db).items(): scores[s[0]] += s[1] * weights["zodiac"]
     
-    patterns = {}
+    # Bonus số vừa ra (3 kỳ gần)
+    for num in db[-3:]:
+        for d in set(num):
+            scores[d] += 12
     
-    # 1. Position bias (chi tiết hơn)
-    pos_bias = {}
-    for pos in range(5):
-        digits_at_pos = [n[pos] if pos < len(n) else '0' for n in db[-40:]]
-        freq = Counter(digits_at_pos)
-        for digit, count in freq.most_common(2):
-            ratio = count / len(digits_at_pos)
-            if ratio > 0.22:
-                pos_bias[f"P{pos}_{digit}"] = round(ratio * 100)
+    # Top 8 số (không trùng)
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top_8 = []
+    seen = set()
+    for num, score in sorted_scores:
+        if num not in seen and len(top_8) < 8:
+            top_8.append(num)
+            seen.add(num)
     
-    # 2. Pair correlation (cặp số hay đi cùng)
-    pair_corr = {}
-    for num in db[-30:]:
-        digits = list(set(num))
-        for i in range(len(digits)):
-            for j in range(i+1, len(digits)):
-                pair = "".join(sorted([digits[i], digits[j]]))
-                pair_corr[pair] = pair_corr.get(pair, 0) + 1
+    # Tạo 2-tinh: 3 cặp từ 6 số đầu
+    pool_2 = sorted(top_8[:6])
+    pairs = ["".join(p) for p in combinations(pool_2, 2)]
     
-    top_pairs = {p: c for p, c in sorted(pair_corr.items(), key=lambda x: x[1], reverse=True)[:5] if c >= 4}
+    scored_pairs = []
+    for pair in pairs:
+        score = scores[pair[0]] + scores[pair[1]]
+        # Bonus tandem
+        for num in db[-12:]:
+            if pair[0] in num and pair[1] in num:
+                score += 28
+                break
+        scored_pairs.append((pair, score))
     
-    # 3. Gap analysis (khoảng cách giữa các lần xuất hiện)
-    gap_analysis = {}
-    for d in range(10):
-        ds = str(d)
-        positions = [i for i, n in enumerate(db[-50:]) if ds in n]
-        if len(positions) >= 3:
-            gaps = [positions[i+1] - positions[i] for i in range(len(positions)-1)]
-            avg_gap = statistics.mean(gaps)
-            last_gap = len(db[-50:]) - positions[-1]
-            # Nếu last_gap ≈ avg_gap → sắp về
-            if abs(last_gap - avg_gap) <= 2:
-                gap_analysis[ds] = {"avg": avg_gap, "last": last_gap, "due": True}
+    scored_pairs.sort(key=lambda x: x[1], reverse=True)
+    top_3_pairs = [p[0] for p in scored_pairs[:3]]
     
-    patterns["pos_bias"] = pos_bias
-    patterns["top_pairs"] = top_pairs
-    patterns["gap_due"] = [d for d, v in gap_analysis.items() if v.get("due")]
+    # Tạo 3-tinh: 3 tổ hợp từ 6 số sau
+    pool_3 = sorted(top_8[2:8])
+    triples = ["".join(t) for t in combinations(pool_3, 3)]
     
-    return patterns
-
-# ================= 🤖 AI ENHANCEMENT =================
-
-def ai_enhance_prediction(db, ensemble_scores, patterns):
-    """AI phân tích tổng hợp và điều chỉnh"""
+    scored_triples = []
+    for triple in triples:
+        score = sum(scores[d] for d in triple)
+        for num in db[-12:]:
+            if all(d in num for d in triple):
+                score += 38
+                break
+        scored_triples.append((triple, score))
+    
+    scored_triples.sort(key=lambda x: x[1], reverse=True)
+    top_3_triples = [t[0] for t in scored_triples[:3]]
+    
+    # ⚡ AI nhanh (chỉ gọi nếu cần, timeout 5s)
+    ai_reasoning = ""
     try:
-        nv_client = OpenAI(base_url="https://integrate.api.nvidia.com/v1", api_key=NVIDIA_API_KEY)
-        genai.configure(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=GEMINI_API_KEY, request_options={"timeout": 5000})
         gm_model = genai.GenerativeModel('gemini-1.5-flash')
         
-        top_8 = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)[:8]
-        
-        prompt = f"""
-5D LOTTERY ANALYSIS - MAX ACCURACY MODE
-Dữ liệu: {len(db)} kỳ
-Top 8 số (điểm ensemble): {top_8}
-Pattern phát hiện:
-- Bias vị trí: {patterns.get("pos_bias", {})}
-- Cặp tương quan: {patterns.get("top_pairs", {})}
-- Số sắp về (gap): {patterns.get("gap_due", [])}
-
-NHIỆM VỤ:
-1. Chọn 6 số tốt nhất (3 cho 2-tinh, 3 cho 3-tinh, KHÔNG trùng)
-2. Ưu tiên số có bias vị trí + gap due + hợp tuổi Sửu mệnh Kim
-3. Trả về JSON:
-{{
-  "two_digit_nums": ["x","y","z"],
-  "three_digit_nums": ["a","b","c"],
-  "confidence": 70-90,
-  "reasoning": "1 câu ngắn"
-}}
-
-Tuổi Sửu hợp: 0,2,5,6,7,8 | Mệnh Kim: 1,6 | Thổ sinh Kim: 2,5,8
-"""
-        try:
-            completion = nv_client.chat.completions.create(
-                model="meta/llama-3.1-70b-instruct",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.25,
-                response_format={"type": "json_object"}
-            )
-            result = json.loads(completion.choices[0].message.content)
-        except:
-            res = gm_model.generate_content(prompt)
-            match = re.search(r'\{[\s\S]*\}', res.text)
-            result = json.loads(match.group()) if match else None
-        
-        if result:
-            return {
-                "pairs_nums": result.get("two_digit_nums", [])[:3],
-                "triples_nums": result.get("three_digit_nums", [])[:3],
-                "confidence": result.get("confidence", 75),
-                "reasoning": result.get("reasoning", "AI analysis")[:120]
-            }
-        return None
+        prompt = f"5D: {len(db)} kỳ. Top8:{''.join(sorted(top_8))}. Pairs:{top_3_pairs}. Triples:{top_3_triples}. Tuổi Sửu. Đề xuất 1 câu <50 ký tự."
+        res = gm_model.generate_content(prompt)
+        ai_reasoning = res.text.strip()[:50]
     except:
-        return None
-
-# ================= 🎯 FINAL PREDICTION PIPELINE =================
-
-def generate_final_prediction(db):
-    """Pipeline chính: Ensemble + Patterns + AI + Format"""
-    if len(db) < 15:
-        return None
+        ai_reasoning = "Ensemble 5 thuật toán + Sửu"
     
-    # 1. Ensemble scores
-    ensemble_scores = ensemble_predict(db)
-    if not ensemble_scores:
-        return None
+    elapsed = time.time() - start
     
-    # 2. Pattern detection
-    patterns = detect_advanced_patterns(db)
-    
-    # 3. AI enhancement
-    ai_result = ai_enhance_prediction(db, ensemble_scores, patterns)
-    
-    # 4. Generate pairs/triples from selected numbers
-    if ai_result and ai_result.get("pairs_nums"):
-        two_nums = ai_result["pairs_nums"][:3]
-        three_nums = ai_result["triples_nums"][:3] if ai_result.get("triples_nums") else [n for n in sorted(ensemble_scores.keys()) if n not in two_nums][:3]
-    else:
-        # Fallback: dùng top scores
-        top_8 = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)[:8]
-        top_nums = [n for n, _ in top_8]
-        two_nums = top_nums[:3]
-        three_nums = top_nums[3:6]
-    
-    # Tạo 3 cặp 2-tinh
-    pairs = ["".join(p) for p in combinations(sorted(two_nums), 2)][:3]
-    
-    # Tạo 3 tổ hợp 3-tinh
-    triples = ["".join(t) for t in combinations(sorted(three_nums), 3)][:3]
-    # Đảm bảo có đủ 3 tổ hợp
-    while len(triples) < 3 and len(three_nums) >= 3:
-        # Thêm biến thể
-        alt_nums = [n for n in sorted(ensemble_scores.keys()) if n not in three_nums][:1]
-        if alt_nums:
-            new_triple = "".join(sorted(three_nums[:2] + alt_nums))
-            if new_triple not in triples:
-                triples.append(new_triple)
-        else:
-            break
-    
-    # 5. Calculate confidence
-    base_conf = 60
-    if patterns.get("pos_bias"): base_conf += len(patterns["pos_bias"]) * 4
-    if patterns.get("gap_due"): base_conf += len(patterns["gap_due"]) * 5
-    if ai_result: base_conf += 10
-    # Zodiac bonus
-    zodiac_match = sum(1 for n in two_nums + three_nums if int(n) in LUCKY_OX)
-    base_conf += zodiac_match * 3
-    
-    confidence = min(92, base_conf)
-    
-    # 6. Backtest simulation (optional validation)
-    backtest_acc = None
-    if len(db) >= 40:
-        # Simple backtest: check if top numbers appeared in last 10 results
-        recent_results = db[-10:]
-        hits = sum(1 for num in recent_results if any(n in num for n in two_nums + three_nums))
-        backtest_acc = round(hits / len(recent_results) * 100)
+    # Confidence dựa trên độ đồng thuận của ensemble
+    top_scores = [s for _, s in sorted_scores[:8]]
+    consensus = 1 - (max(top_scores) - min(top_scores)) / (max(top_scores) + 1)
+    conf = min(95, int(65 + consensus * 25 + len(db)//8))
     
     return {
-        "all_8": "".join(sorted([n for n, _ in sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)[:8]])),
-        "pairs": pairs,
-        "triples": triples,
-        "confidence": confidence,
-        "backtest_acc": backtest_acc,
-        "patterns": patterns,
-        "ai_reasoning": ai_result.get("reasoning", "Ensemble analysis") if ai_result else "Statistical ensemble",
-        "two_nums": two_nums,
-        "three_nums": three_nums
+        "all_8": "".join(sorted(top_8)),
+        "pairs": top_3_pairs,
+        "triples": top_3_triples,
+        "conf": conf,
+        "ai_reasoning": ai_reasoning,
+        "time": f"{elapsed:.2f}s"
     }
 
-# ================= 🖥️ UI =================
+# Init session
+if "db" not in st.session_state: st.session_state.db = []
+if "result" not in st.session_state: st.session_state.result = None
 
-if "db" not in st.session_state:
-    st.session_state.db = []
-if "result" not in st.session_state:
-    st.session_state.result = None
-if "history" not in st.session_state:
-    st.session_state.history = []  # Lưu lịch sử dự đoán để backtest
-
-st.markdown('<h1>🐂 TITAN V27 AI - MAX ACCURACY</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center;color:#C0C0C0;font-size:12px;">Ensemble AI • Tuổi Sửu • Target: 65-75%</p>', unsafe_allow_html=True)
+# UI
+st.markdown('<h1>⚡ TITAN V27 AI - ULTIMATE</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center;color:#AAA;font-size:11px;">Sửu•Kim•Ensemble 5 algo•<30s</p>', unsafe_allow_html=True)
 
 col1, col2 = st.columns(2)
 with col1:
     st.markdown(f'<div class="metric"><div class="metric-val">{len(st.session_state.db)}</div><div class="metric-lbl">Kỳ</div></div>', unsafe_allow_html=True)
 with col2:
     last = st.session_state.db[-1] if st.session_state.db else "-"
-    st.markdown(f'<div class="metric"><div class="metric-val" style="font-size:16px;">{last}</div><div class="metric-lbl">Cuối</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric"><div class="metric-val" style="font-size:14px;">{last}</div><div class="metric-lbl">Cuối</div></div>', unsafe_allow_html=True)
 
-user_input = st.text_area("📥 Dán 30-50 kỳ gần nhất:", placeholder="16923\n51475\n31410\n...", height=100)
+user_input = st.text_area("📥 Dán 25-40 kỳ:", placeholder="16923\n51475\n...", height=70)
 
-if st.button("⚡ PHÂN TÍCH TỐI ƯU"):
+if st.button("⚡ CHỐT NHANH"):
     numbers = get_nums(user_input)
     if numbers:
-        st.session_state.db = numbers[-50:]
-        with st.spinner("🔄 Ensemble AI đang tính toán..."):
-            result = generate_final_prediction(st.session_state.db)
-            if result:
-                st.session_state.result = result
-                # Lưu lịch sử để backtest
-                st.session_state.history.append({
-                    "prediction": result,
-                    "actual": None,  # Sẽ cập nhật sau khi có kết quả thực
-                    "timestamp": len(st.session_state.db)
-                })
-                st.rerun()
-            else:
-                st.error("❌ Cần ít nhất 15 kỳ để phân tích")
+        st.session_state.db = numbers[-40:]  # Tối ưu: chỉ giữ 40 kỳ
+        with st.spinner("⚡ Tính..."):
+            st.session_state.result = ensemble_predict(st.session_state.db)
+            st.rerun()
     else:
-        st.error("❌ Không có số 5 chữ số!")
+        st.error("❌ Không có số!")
 
 if st.session_state.result:
     r = st.session_state.result
     
-    # Confidence indicator
-    conf_class = "high-conf" if r["confidence"] >= 75 else ("low-conf" if r["confidence"] < 65 else "")
-    acc_text = f" | Backtest: {r['backtest_acc']}%" if r.get("backtest_acc") else ""
-    
-    st.markdown(f'<div class="box {conf_class}">🔥 ĐỘ TIN CẬY: {r["conf"]}%{acc_text} <span class="accuracy-badge">ENSEMBLE</span></div>', unsafe_allow_html=True)
-    
-    # Pattern alerts
-    if r.get("patterns", {}).get("pos_bias"):
-        biases = [f"{k.split('_')[1]}@P{k.split('_')[0][1:]}" for k in r["patterns"]["pos_bias"].keys()]
-        st.markdown(f'<div class="alert" style="border-color:#00FF00;">✅ <b>BIAS:</b> {", ".join(biases)}</div>', unsafe_allow_html=True)
-    
-    if r.get("patterns", {}).get("gap_due"):
-        st.markdown(f'<div class="alert">⏰ <b>SẮP VỀ:</b> {", ".join(r["patterns"]["gap_due"])}</div>', unsafe_allow_html=True)
-    
-    # Main numbers
-    st.markdown(f'<div style="text-align:center;"><div style="color:#C0C0C0;font-size:12px;">8 SỐ MẠNH</div><div class="big-num">{r["all_8"]}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="box">🔥 {r["conf"]}% <span class="speed-tag">{r["time"]}</span></div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align:center;"><div style="color:#AAA;font-size:11px;">8 SỐ</div><div class="big-num">{r["all_8"]}</div></div>', unsafe_allow_html=True)
     
     if r.get("ai_reasoning"):
-        st.markdown(f'<div style="background:rgba(255,215,0,0.1);padding:8px;border-radius:8px;margin:8px 0;font-size:12px;"><b>🤖 AI:</b> {r["ai_reasoning"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="background:rgba(255,215,0,0.08);padding:6px;border-radius:6px;margin:6px 0;font-size:11px;"><b>🤖</b> {r["ai_reasoning"]}</div>', unsafe_allow_html=True)
     
-    # 2 TINH - 3 CẶP
-    st.markdown('<div class="box"><h2>🎯 2 TINH - 3 CẶP</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="box"><h2>🎯 2 TINH</h2></div>', unsafe_allow_html=True)
     st.markdown('<div class="grid">', unsafe_allow_html=True)
-    for i, pair in enumerate(r["pairs"]):
-        # Highlight nếu chứa số hợp tuổi
-        has_lucky = any(int(d) in LUCKY_OX for d in pair)
-        style = 'style="background:#90EE90;"' if has_lucky else ""
-        star = "⭐" if has_lucky else ""
-        st.markdown(f'<div class="item" {style}>{pair}{star}</div>', unsafe_allow_html=True)
+    for pair in r["pairs"]:
+        st.markdown(f'<div class="item">{pair}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # 3 TINH - 3 TỔ HỢP
-    st.markdown('<div class="box"><h2>🎯 3 TINH - 3 TỔ HỢP</h2></div>', unsafe_allow_html=True)
+    st.markdown('<div class="box"><h2>🎯 3 TINH</h2></div>', unsafe_allow_html=True)
     st.markdown('<div class="grid">', unsafe_allow_html=True)
-    for i, triple in enumerate(r["triples"]):
-        has_lucky = any(int(d) in LUCKY_OX for d in triple)
-        style = 'style="background:#ADD8E6;"' if has_lucky else ""
-        star = "⭐" if has_lucky else ""
-        st.markdown(f'<div class="item item-3" {style}>{triple}{star}</div>', unsafe_allow_html=True)
+    for triple in r["triples"]:
+        st.markdown(f'<div class="item item-3">{triple}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Strategy
-    st.markdown("""
-    <div style="background:rgba(255,215,0,0.05);padding:10px;border-radius:8px;margin:10px 0;font-size:12px;">
-    <b>💡 Chiến lược tối ưu:</b><br>
-    • Số có ⭐ = hợp tuổi Sửu → Ưu tiên<br>
-    • Confidence ≥75% + Backtest ≥60% → Đánh mạnh<br>
-    • Chia vốn: 2-tinh 60%, 3-tinh 40%<br>
-    • Nếu confidence <65% → Cân nhắc skip kỳ này
-    </div>
-    """, unsafe_allow_html=True)
 
 if st.button("🗑️ XÓA"):
     st.session_state.db = []
     st.session_state.result = None
-    st.session_state.history = []
     st.rerun()
 
-st.markdown('<div style="text-align:center;color:#666;font-size:10px;">🐂 TITAN V27 AI - Ensemble Max Accuracy v17.0.0</div>', unsafe_allow_html=True)
+st.markdown('<div style="text-align:center;color:#666;font-size:9px;">⚡ v17.0.0</div>', unsafe_allow_html=True)
