@@ -1,6 +1,5 @@
 """
 TITAN V27 - Configuration Module
-Lưu trữ API keys, constants và rules hệ thống
 """
 import os
 from pathlib import Path
@@ -9,19 +8,19 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 DB_FILE = BASE_DIR / "titan_v27_permanent.json"
 
-# 🔑 API Keys - Ưu tiên lấy từ secrets.toml hoặc env vars
+# 🔑 API Keys - Lấy từ environment variables hoặc hardcoded (chỉ để test)
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "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")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc")
 
-# 🎲 Luật chơi 3 số 5 tinh
+# 🎲 Luật chơi
 LOTTERY_CONFIG = {
-    "digit_range": range(10),  # 0-9
-    "bet_count": 3,            # Chọn 3 số để cược
-    "draw_length": 5,          # Kết quả 5 chữ số
+    "digit_range": range(10),
+    "bet_count": 3,
+    "draw_length": 5,
     "positions": ["Chục ngàn", "Ngàn", "Trăm", "Chục", "Đơn vị"]
 }
 
-# 📊 Bảng bộ số hay đi cùng - Anh Đạt
+# 📊 Bảng bộ số hay đi cùng
 PAIR_RULES = [
     "178", "034", "458", "578", "019", "679", "235", "456", "124", "245", 
     "247", "248", "246", "340", "349", "348", "015", "236", "028", "026", 
