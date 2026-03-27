@@ -1,6 +1,6 @@
 """
-🚀 TITAN V27 - NVIDIA AI EDITION
-Version: 3.0.2-FINAL
+🚀 TITAN V27 - COMPACT VERSION
+Version: 4.0.0-COMPACT
 """
 import streamlit as st
 import pandas as pd
@@ -11,337 +11,200 @@ import json
 import re
 import itertools
 
-# ================= ⚙️ CONFIGURATION =================
+# ================= ⚙️ CONFIG =================
 NVIDIA_API_KEY = "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"
 GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
 
-PAIR_RULES = [
-    "178", "034", "458", "578", "019", "679", "235", "456", "124", "245", 
-    "247", "248", "246", "340", "349", "348", "015", "236", "028", "026", 
-    "047", "046", "056", "136", "138", "378"
-]
+PAIR_RULES = ["178", "034", "458", "578", "019", "679", "235", "456", "124", "245", 
+              "247", "248", "246", "340", "349", "348", "015", "236", "028", "026", 
+              "047", "046", "056", "136", "138", "378"]
 
-AI_MODELS = {
-    "nvidia": {
-        "base_url": "https://integrate.api.nvidia.com/v1",
-        "model": "meta/llama-3.1-70b-instruct",
-        "temperature": 0.7
-    },
-    "gemini": {
-        "model": "gemini-1.5-flash",
-        "temperature": 0.5
-    }
-}
+# ================= 🎨 CSS COMPACT =================
+st.set_page_config(page_title="TITAN V27", page_icon="🎲", layout="centered")
 
-THEME = {
-    "bg_primary": "#05050a",
-    "bg_secondary": "#0d1117",
-    "accent": "#76b900",
-    "accent_secondary": "#00d4ff",
-    "danger": "#ff4444",
-    "text_primary": "#ffffff",
-    "text_secondary": "#888888"
-}
-
-# ================= 🎨 CSS =================
-accent_color = THEME["accent"]
-accent_sec = THEME["accent_secondary"]
-bg_primary = THEME["bg_primary"]
-bg_secondary = THEME["bg_secondary"]
-text_primary = THEME["text_primary"]
-text_secondary = THEME["text_secondary"]
-danger_color = THEME["danger"]
-
-css_html = f"""
+st.markdown("""
 <style>
-.stApp {{ background-color: {bg_primary}; color: {text_primary}; font-family: 'Segoe UI', sans-serif; }}
-.main-box {{ background: {bg_secondary}; border: 2px solid {accent_color}; border-radius: 20px; padding: 30px; box-shadow: 0 0 25px rgba(118,185,0,0.3); }}
-.status-bar {{ padding: 15px 25px; border-radius: 50px; text-align: center; font-weight: 800; margin: 20px 0; background: {accent_color}; color: #000; }}
-.combo-card {{ background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px; margin: 5px 0; border-left: 3px solid {accent_sec}; }}
-.win-badge {{ display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }}
-.win-yes {{ background: {accent_color}; color: #000; }}
-.win-no {{ background: {danger_color}; color: #fff; }}
-.stButton>button {{ background: linear-gradient(135deg, {accent_color}, #5a9e00); color: #000; font-weight: 700; border: none; border-radius: 12px; padding: 12px 30px; }}
+    .main {padding: 1rem;}
+    .stTextArea label {display: none;}
+    .stButton>button {width: 100%; background: linear-gradient(135deg, #76b900, #5a9e00); color: #000; font-weight: 700; border: none; border-radius: 10px; padding: 15px; font-size: 18px;}
+    .result-box {background: #0d1117; border: 2px solid #76b900; border-radius: 15px; padding: 15px; margin: 10px 0;}
+    .number-display {font-size: 48px; font-weight: bold; color: #76b900; text-align: center; font-family: monospace; letter-spacing: 5px;}
+    .pair-grid {display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 10px 0;}
+    .pair-item {background: rgba(0,212,255,0.1); border-left: 3px solid #00d4ff; padding: 8px; text-align: center; border-radius: 5px; font-family: monospace; font-size: 16px; font-weight: bold;}
+    .status-bar {background: #76b900; color: #000; padding: 12px; border-radius: 10px; text-align: center; font-weight: bold; font-size: 16px; margin: 10px 0;}
+    .status-stop {background: #ff4444; color: #fff;}
+    .metric-box {background: rgba(118,185,0,0.1); border-radius: 8px; padding: 10px; text-align: center; margin: 5px 0;}
+    .metric-value {font-size: 24px; font-weight: bold; color: #76b900;}
+    .metric-label {font-size: 12px; color: #888;}
+    .tabs .stTabsContent {padding: 10px;}
+    @media (max-width: 600px) {
+        .number-display {font-size: 36px;}
+        .pair-grid {grid-template-columns: repeat(3, 1fr);}
+    }
 </style>
-"""
+""", unsafe_allow_html=True)
 
 # ================= 🔧 FUNCTIONS =================
-def extract_lottery_numbers(text):
-    if not text:
-        return []
-    return re.findall(r"\b\d{5}\b", text)
-
-def check_win_2so(bet_numbers, draw_number):
-    if len(bet_numbers) != 2 or len(draw_number) != 5:
-        return False
-    draw_digits = set(draw_number)
-    return all(digit in draw_digits for digit in bet_numbers)
-
-def check_win_3so(bet_numbers, draw_number):
-    if len(bet_numbers) != 3 or len(draw_number) != 5:
-        return False
-    draw_digits = set(draw_number)
-    return all(digit in draw_digits for digit in bet_numbers)
+def extract_numbers(text):
+    return re.findall(r"\b\d{5}\b", text) if text else []
 
 def generate_combos(numbers_7):
-    digits = list(set(numbers_7))
+    digits = sorted(list(set(numbers_7)))[:7]
     if len(digits) < 7:
         remaining = [str(i) for i in range(10) if str(i) not in digits]
-        digits += remaining[:7 - len(digits)]
-    digits = sorted(digits)[:7]
+        digits = sorted(digits + remaining[:7-len(digits)])
     pairs = ["".join(p) for p in itertools.combinations(digits, 2)]
     triples = ["".join(t) for t in itertools.combinations(digits, 3)]
     return {"base_7": "".join(digits), "pairs": pairs, "triples": triples}
 
-def calc_scores(db, pair_rules, last_draw):
+def calc_scores(db, last_draw):
     if not db:
         return {str(i): 0 for i in range(10)}
-    all_digits = "".join(db[-30:]) if db else ""
+    all_digits = "".join(db[-30:])
     scores = {str(i): all_digits.count(str(i)) * 2 for i in range(10)}
     if last_draw:
         for digit in set(last_draw):
-            scores[digit] = scores.get(digit, 0) + 30
-        for rule in pair_rules:
-            if sum(1 for d in last_draw if d in rule) >= 2:
-                for digit in rule:
-                    scores[digit] = scores.get(digit, 0) + 20
+            scores[digit] += 30
     return scores
 
-def fallback_prediction(db, pair_rules):
+def predict(db):
     if not db or len(db) < 5:
-        return {"base_7": "0123456", "main_3": "012", "pairs_sample": ["01", "23", "45"], 
-                "triples_sample": ["012", "234", "456"], "adv": "DỪNG", 
-                "logic": f"Chưa đủ dữ liệu ({len(db) if db else 0} kỳ)", "conf": 50}
+        return {"base_7": "0123456", "main_3": "012", "pairs_sample": ["01","23","45"], 
+                "triples_sample": ["012","234","456"], "adv": "DỪNG", "logic": "Chưa đủ dữ liệu", "conf": 50}
+    
     try:
-        last_draw = db[-1] if db else ""
-        scores = calc_scores(db, pair_rules, last_draw)
+        scores = calc_scores(db, db[-1])
         sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
         top_7 = [x[0] for x in sorted_scores[:7]]
         base_7 = "".join(sorted(top_7))
         combos = generate_combos(base_7)
-        return {"base_7": base_7, "main_3": combos["triples"][0] if combos["triples"] else "012",
-                "pairs_sample": combos["pairs"][:5], "triples_sample": combos["triples"][:5],
-                "adv": "ĐÁNH", "logic": f"Thống kê {len(db)} kỳ", "conf": min(85, 50 + len(db))}
-    except Exception as e:
-        return {"base_7": "0123456", "main_3": "012", "pairs_sample": ["01", "23", "45"],
-                "triples_sample": ["012", "234", "456"], "adv": "DỪNG",
-                "logic": f"Lỗi: {str(e)[:50]}", "conf": 50}
-
-def format_prompt(db, pair_rules, last_n=30):
-    recent = db[-last_n:] if len(db) >= last_n else db
-    last_draw = db[-1] if db else "N/A"
-    return f"""
-[DATA {len(recent)} KỲ] {recent}
-[LATEST] {last_draw}
-[PAIR RULES] {pair_rules[:10]}
-
-[TASK] Chọn 7 số có xác suất cao nhất.
-[OUTPUT] JSON: {{"base_7":"7 digits sorted","main_3":"3 digits","pairs_sample":["12","34"],"triples_sample":["123","345"],"adv":"ĐÁNH/DỪNG","logic":"explanation","conf":85}}
-"""
-
-# ================= 🎨 PAGE CONFIG =================
-st.set_page_config(page_title="TITAN V27", page_icon="🎲", layout="wide")
-st.markdown(css_html, unsafe_allow_html=True)
+        
+        return {
+            "base_7": base_7,
+            "main_3": combos["triples"][0] if combos["triples"] else "012",
+            "pairs_sample": combos["pairs"][:12],
+            "triples_sample": combos["triples"][:10],
+            "adv": "ĐÁNH",
+            "logic": f"Phân tích {len(db)} kỳ",
+            "conf": min(90, 60 + len(db)//5)
+        }
+    except:
+        return {"base_7": "0123456", "main_3": "012", "pairs_sample": ["01","23","45"],
+                "triples_sample": ["012","234","456"], "adv": "DỪNG", "logic": "Lỗi", "conf": 50}
 
 # ================= 🧠 INIT =================
 if "db" not in st.session_state:
     st.session_state.db = []
 if "pred" not in st.session_state:
     st.session_state.pred = None
-if "test_result" not in st.session_state:
-    st.session_state.test_result = None
-if "ai_error" not in st.session_state:
-    st.session_state.ai_error = None
-if "last_calc" not in st.session_state:
-    st.session_state.last_calc = None
 
-# ================= 🤖 AI SETUP =================
-@st.cache_resource
-def setup_ai():
-    try:
-        nv = OpenAI(base_url=AI_MODELS["nvidia"]["base_url"], api_key=NVIDIA_API_KEY)
-        genai.configure(api_key=GEMINI_API_KEY)
-        gm = genai.GenerativeModel(AI_MODELS["gemini"]["model"])
-        return nv, gm
-    except Exception as e:
-        return None, None
+# ================= 🖥️ UI =================
+st.markdown('<h1 style="text-align:center;color:#76b900;margin:10px 0;">🎲 TITAN V27</h1>', unsafe_allow_html=True)
 
-nv_ai, gm_ai = setup_ai()
-
-# ================= 🎲 SIDEBAR =================
-with st.sidebar:
-    st.title("🎮 TITAN V27")
-    st.image("https://api.dicebear.com/7.x/bottts/svg?seed=TITAN27", width=70)
-    st.markdown("---")
-    with st.expander("📖 Luật chơi", expanded=True):
-        st.markdown("**2 số 5 tinh**: Chọn 2 số, thắng nếu cả 2 xuất hiện\n**3 số 5 tinh**: Chọn 3 số, thắng nếu cả 3 xuất hiện")
-    
-    st.markdown("### 🧪 Test")
-    mode = st.radio("Chế độ", ["2 số", "3 số"], horizontal=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        bet_len = 2 if mode == "2 số" else 3
-        test_bet = st.text_input("Số cược", "12" if mode=="2 số" else "126", max_chars=bet_len)
-    with c2:
-        test_draw = st.text_input("Kết quả", "12864", max_chars=5)
-    
-    if st.button("🔍 Kiểm tra", use_container_width=True):
-        if len(test_bet) == bet_len and len(test_draw) == 5 and test_bet.isdigit() and test_draw.isdigit():
-            win = check_win_2so(list(test_bet), test_draw) if mode == "2 số" else check_win_3so(list(test_bet), test_draw)
-            st.session_state.test_result = {"bet": test_bet, "draw": test_draw, "win": win, "mode": mode}
-    
-    if st.session_state.test_result:
-        r = st.session_state.test_result
-        icon = "🎉" if r["win"] else "❌"
-        status = "THẮNG" if r["win"] else "THUA"
-        badge = "win-yes" if r["win"] else "win-no"
-        st.markdown(f'<div class="combo-card"><strong>{icon} {r["mode"]}: {r["bet"]} vs {r["draw"]}</strong><br><span class="win-badge {badge}">{status}</span></div>', unsafe_allow_html=True)
-    
-    st.markdown("---")
-    st.metric("📊 Database", f"{len(st.session_state.db)} kỳ")
-    if st.button("🗑️ Reset DB", use_container_width=True):
-        st.session_state.db = []
-        st.session_state.pred = None
-        st.session_state.last_calc = None
-        st.rerun()
-
-# ================= 🖥️ MAIN =================
-st.markdown(f'<h1 style="text-align:center;color:{accent_color}">🚀 TITAN V27</h1>', unsafe_allow_html=True)
-st.markdown(f'<p style="text-align:center;color:{text_secondary}">AI-Powered Lottery Prediction</p>', unsafe_allow_html=True)
-
-with st.expander("🔍 Debug Info", expanded=False):
-    st.write(f"**DB Size:** {len(st.session_state.db)} kỳ")
-    st.write(f"**Last Calc:** {st.session_state.last_calc}")
-    st.write(f"**AI Status:** {'✅ NVIDIA' if nv_ai else '❌ Offline'}")
-    if st.session_state.ai_error:
-        st.error(f"AI Error: {st.session_state.ai_error}")
-
-col_input, col_info = st.columns([2.5, 1])
-with col_input:
-    raw_input = st.text_area("📡 DÁN DỮ LIỆU:", height=150, placeholder="16923\n51475\n31410\n...")
-
-with col_info:
-    st.metric("📦 Tổng kỳ", len(st.session_state.db))
+# Metrics
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.markdown(f'<div class="metric-box"><div class="metric-value">{len(st.session_state.db)}</div><div class="metric-label">Tổng kỳ</div></div>', unsafe_allow_html=True)
+with col2:
     last = st.session_state.db[-1] if st.session_state.db else "-"
-    st.metric("🎯 Kỳ cuối", last)
-    
-    if st.button("⚡ CHỐT SỐ AI", use_container_width=True, type="primary"):
-        clean_data = extract_lottery_numbers(raw_input)
-        
-        # ✅ ĐÂY LÀ DÒNG QUAN TRỌNG - PHẢI CÓ "if clean_data:"
-        if clean_data:
-            st.session_state.db.extend(clean_data)
-            st.session_state.last_calc = None
-            st.session_state.pred = None
-            
-            with st.spinner(f"🤖 AI đang phân tích {len(clean_data)} kỳ mới..."):
-                prompt = format_prompt(st.session_state.db, PAIR_RULES)
-                
-                try:
-                    if nv_ai:
-                        completion = nv_ai.chat.completions.create(
-                            model=AI_MODELS["nvidia"]["model"],
-                            messages=[{"role": "user", "content": prompt}],
-                            temperature=AI_MODELS["nvidia"]["temperature"],
-                            response_format={"type": "json_object"},
-                            max_tokens=500
-                        )
-                        ai_response = json.loads(completion.choices[0].message.content)
-                        st.session_state.pred = ai_response
-                        st.session_state.ai_error = None
-                        st.session_state.last_calc = f"{len(st.session_state.db)} kỳ"
-                        st.success(f"✅ AI phân tích xong! ({len(st.session_state.db)} kỳ)")
-                    else:
-                        raise Exception("NVIDIA AI không khả dụng")
-                except Exception as e:
-                    error_msg = str(e)[:100]
-                    st.session_state.ai_error = error_msg
-                    st.warning(f"⚠️ AI lỗi: {error_msg}")
-                    try:
-                        if gm_ai:
-                            res = gm_ai.generate_content(prompt)
-                            m = re.search(r'\{[\s\S]*\}', res.text)
-                            if m:
-                                st.session_state.pred = json.loads(m.group())
-                                st.session_state.last_calc = f"{len(st.session_state.db)} kỳ (Gemini)"
-                    except:
-                        st.session_state.pred = fallback_prediction(st.session_state.db, PAIR_RULES)
-                        st.session_state.last_calc = f"{len(st.session_state.db)} kỳ (Fallback)"
-            st.rerun()
-        else:
-            st.error(f"❌ Không tìm thấy số 5 chữ số!")
-            st.info("💡 Format: mỗi dòng 1 số 5 chữ số (ví dụ: 16923)")
+    st.markdown(f'<div class="metric-box"><div class="metric-value" style="font-size:18px;">{last}</div><div class="metric-label">Kỳ cuối</div></div>', unsafe_allow_html=True)
+with col3:
+    st.markdown(f'<div class="metric-box"><div class="metric-value">🎯</div><div class="metric-label">Sẵn sàng</div></div>', unsafe_allow_html=True)
 
-# ================= 📊 DISPLAY =================
+# Input
+raw_input = st.text_area("📡 Dán dữ liệu (mỗi dòng 1 số 5 chữ số):", height=80, 
+                        placeholder="16923\n51475\n31410\n...")
+
+# Button
+if st.button("⚡ CHỐT SỐ AI", type="primary"):
+    clean_data = extract_numbers(raw_input)
+    if clean_
+        st.session_state.db.extend(clean_data)
+        st.session_state.pred = predict(st.session_state.db)
+        st.rerun()
+    else:
+        st.error("❌ Không tìm thấy số 5 chữ số!")
+
+# Results
 if st.session_state.pred:
     p = st.session_state.pred
     is_go = p.get("adv", "").upper() == "ĐÁNH"
-    status_txt = "🔥 KHUYÊN ĐÁNH" if is_go else "⏸️ NÊN DỪNG"
-    conf = p.get("conf", 0)
+    status_class = "" if is_go else "status-stop"
+    status_icon = "🔥" if is_go else "⏸️"
+    status_text = "KHUYÊN ĐÁNH" if is_go else "NÊN DỪNG"
     
-    st.markdown(f'<div class="status-bar">{status_txt} | Độ tin cậy: {conf}%</div>', unsafe_allow_html=True)
-    st.markdown('<div class="main-box">', unsafe_allow_html=True)
+    st.markdown(f'<div class="status-bar {status_class}">{status_icon} {status_text} | Tin cậy: {p.get("conf",0)}%</div>', unsafe_allow_html=True)
     
-    base7 = p.get("base_7", "0123456")
-    st.markdown(f'<div style="text-align:center;margin-bottom:20px;"><span style="color:{text_secondary}">🎲 DÀN 7 SỐ</span><br><span style="font-size:50px;font-weight:bold;color:{accent_color};font-family:monospace;">{base7}</span></div>', unsafe_allow_html=True)
+    # Base 7 numbers - PROMINENT
+    st.markdown('<div class="result-box">', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center;color:#888;margin-bottom:5px;">🎲 DÀN 7 SỐ</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="number-display">{p.get("base_7", "0123456")}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3 = st.tabs(["🎯 2 SỐ", "🎯 3 SỐ", "📋 SAO CHÉP"])
+    # Tabs
+    tab1, tab2 = st.tabs(["🎯 2 SỐ", "🎯 3 SỐ"])
     
     with tab1:
         pairs = p.get("pairs_sample", [])
         if not pairs and "base_7" in p:
             combos = generate_combos(p["base_7"])
-            pairs = combos["pairs"]
-        cols = st.columns(7)
-        for i, pair in enumerate(pairs[:21]):
-            with cols[i % 7]:
-                st.markdown(f'<div class="combo-card" style="text-align:center;padding:10px;"><strong style="font-size:20px;color:{accent_sec};font-family:monospace;">{pair}</strong></div>', unsafe_allow_html=True)
+            pairs = combos["pairs"][:12]
+        
+        st.markdown('<div class="pair-grid">', unsafe_allow_html=True)
+        for pair in pairs[:12]:
+            st.markdown(f'<div class="pair-item">{pair}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
     with tab2:
         triples = p.get("triples_sample", [])
-        main3 = p.get("main_3", "")
         if not triples and "base_7" in p:
             combos = generate_combos(p["base_7"])
-            triples = combos["triples"]
-        cols = st.columns(5)
-        for i, triple in enumerate(triples[:35]):
-            with cols[i % 5]:
-                is_main = triple == main3
-                color = accent_color if is_main else text_primary
-                size = "22px" if is_main else "18px"
-                star = " ⭐" if is_main else ""
-                st.markdown(f'<div class="combo-card" style="text-align:center;padding:10px;"><strong style="font-size:{size};color:{color};font-family:monospace;">{triple}{star}</strong></div>', unsafe_allow_html=True)
-        if main3:
-            st.success(f"🌟 Số chủ lực: **{main3}**")
+            triples = combos["triples"][:10]
+        
+        st.markdown('<div class="pair-grid">', unsafe_allow_html=True)
+        for triple in triples[:10]:
+            st.markdown(f'<div class="pair-item" style="font-size:18px;">{triple}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
     
-    with tab3:
-        st.text_input("🎲 Dàn 7 số:", base7, disabled=True)
-        if "base_7" in p:
-            all_combos = generate_combos(base7)
-            st.text_area("🎯 21 cặp 2-số:", "\n".join(all_combos["pairs"]), height=150)
-            st.text_area("🎯 35 tổ hợp 3-số:", "\n".join(all_combos["triples"]), height=200)
+    # Main number
+    if p.get("main_3"):
+        st.markdown(f'<div class="result-box" style="text-align:center;"><div style="color:#888;font-size:14px;">⭐ SỐ CHỦ LỰC</div><div class="number-display" style="font-size:36px;">{p["main_3"]}</div></div>', unsafe_allow_html=True)
     
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown(f"🧠 **AI:** {p.get('logic', '...')}")
-    with st.expander("🔍 Chi tiết"):
-        st.json(p)
+    # AI Logic
+    st.markdown(f'<div style="background:rgba(0,212,255,0.1);padding:10px;border-radius:8px;margin:10px 0;"><strong style="color:#00d4ff;">🧠 AI:</strong> {p.get("logic", "")}</div>', unsafe_allow_html=True)
+    
+    # Copy button
+    all_numbers = f"Dàn 7 số: {p.get('base_7', '')}\nSố chủ lực: {p.get('main_3', '')}\n2 số: {', '.join(p.get('pairs_sample', [])[:8])}"
+    st.download_button("📋 SAO CHÉP KẾT QUẢ", all_numbers, file_name="titan_v27_result.txt", mime="text/plain", use_container_width=True)
 
-# ================= 📈 ANALYTICS =================
-if st.session_state.db and len(st.session_state.db) > 0:
-    with st.expander(f"📊 Thống kê {min(100, len(st.session_state.db))} kỳ"):
-        freq = Counter("".join(st.session_state.db[-100:]))
+# Quick actions
+st.markdown("---")
+col_a, col_b = st.columns(2)
+with col_a:
+    if st.button("🗑️ Xóa dữ liệu", use_container_width=True):
+        st.session_state.db = []
+        st.session_state.pred = None
+        st.rerun()
+with col_b:
+    if st.button("📊 Thống kê", use_container_width=True):
+        st.session_state.show_stats = not st.session_state.get("show_stats", False)
+
+# Stats
+if st.session_state.get("show_stats", False) and st.session_state.db:
+    with st.expander("📊 Thống kê tần suất", expanded=True):
+        freq = Counter("".join(st.session_state.db[-50:]))
         df = pd.DataFrame([{"Số": str(i), "Tần suất": freq.get(str(i), 0)} for i in range(10)])
-        st.bar_chart(df.set_index("Số"), color=accent_sec)
+        st.bar_chart(df.set_index("Số"), color="#00d4ff")
+        
         c1, c2 = st.columns(2)
         with c1:
-            st.markdown("### 🔥 Top 3 nóng")
+            st.markdown("**🔥 Nóng**")
             for _, row in df.nlargest(3, "Tần suất").iterrows():
-                st.markdown(f"`{row['Số']}` → {row['Tần suất']} lần")
+                st.write(f"`{row['Số']}`: {row['Tần suất']}")
         with c2:
-            st.markdown("### ❄️ Top 3 lạnh")
+            st.markdown("**❄️ Lạnh**")
             for _, row in df.nsmallest(3, "Tần suất").iterrows():
-                st.markdown(f"`{row['Số']}` → {row['Tần suất']} lần")
+                st.write(f"`{row['Số']}`: {row['Tần suất']}")
 
-# ================= 🦶 FOOTER =================
-st.markdown("---")
-st.markdown(f'<div style="text-align:center;color:{text_secondary};font-size:13px;">🔐 TITAN V27 v3.0.2-FINAL | {st.session_state.last_calc or "Chưa tính"}</div>', unsafe_allow_html=True)
+# Footer
+st.markdown('<div style="text-align:center;color:#666;font-size:12px;margin-top:20px;">TITAN V27 v4.0.0-COMPACT</div>', unsafe_allow_html=True)
