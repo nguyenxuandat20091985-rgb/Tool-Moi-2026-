@@ -1,7 +1,7 @@
 """
 🚀 TITAN V27 - NVIDIA AI EDITION
-Version: 3.0.0-FIXED
-Fix: Data persistence, AI recalculation, Debug logging
+Version: 3.0.1-FIXED
+Fix: Syntax error - if clean_data:
 """
 import streamlit as st
 import pandas as pd
@@ -437,4 +437,4 @@ if st.session_state.db and len(st.session_state.db) > 0:
 
 # ================= 🦶 FOOTER =================
 st.markdown("---")
-st.markdown(f'<div style="text-align:center;color:{text_secondary};font-size:13px;">🔐 TITAN V27 v3.0.0-FIXED | {st.session_state.last_calc or "Chưa tính"}</div>', unsafe_allow_html=True)
+st.markdown(f'<div style="text-align:center;color:{text_secondary};font-size:13px;">🔐 TITAN V27 v3.0.1-FIXED | {st.session_state.last_calc or "Chưa tính"}</div>', unsafe_allow_html=True)
