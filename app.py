@@ -4,182 +4,291 @@ import numpy as np
 from collections import Counter
 from itertools import combinations
 
-# --- CẤU HÌNH ---
+# --- CẤU HÌNH HỆ THỐNG ---
 LUCKY_OX = [0, 2, 5, 6, 7, 8]
-SHADOW_PAIRS = {'0':'5', '1':'6', '2':'7', '3':'8', '4':'9', '5':'0', '6':'1', '7':'2', '8':'3', '9':'4'}
 
-st.set_page_config(page_title="TITAN V48 - MASTER", page_icon="🔮", layout="centered")
+st.set_page_config(page_title="TITAN V48 - QUANTUM GOD MODE", page_icon="⚡", layout="centered")
 
 # --- GIAO DIỆN ---
 st.markdown("""
 <style>
-    .stApp {background-color: #030303; color: #FFD700;}
-    .big-num {font-size: 38px; font-weight: bold; color: #00FFCC; text-align: center; font-family: 'Courier New', monospace; letter-spacing: 4px; text-shadow: 0 0 10px #00FFCC;}
-    .box {background: linear-gradient(135deg, #0d1b1b, #030303); color: #FFD700; padding: 18px; border-radius: 15px; text-align: center; border: 1px solid #FFD700; margin-bottom: 12px; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.1);}
-    .item {background: linear-gradient(135deg, #00FFCC, #008B8B); color: #000; padding: 12px; border-radius: 10px; text-align: center; font-size: 24px; font-weight: bold;}
-    .item-3 {background: linear-gradient(135deg, #FFD700, #FFA500); color: #000;}
-    .vip-pick {background: linear-gradient(135deg, #FF0080, #FF00FF); color: white; animation: pulse 1.5s infinite;}
-    .stat-box {background: #1a1a1a; padding: 10px; border-radius: 8px; margin: 5px 0;}
-    .confidence-high {color: #00FF00; font-weight: bold; font-size: 22px;}
-    .confidence-med {color: #FFD700; font-weight: bold; font-size: 22px;}
-    .confidence-low {color: #FF3131; font-weight: bold; font-size: 22px;}
-    h1 {text-align: center; color: #FFD700; text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);}
-    @keyframes pulse {0% {transform: scale(1);} 50% {transform: scale(1.05);} 100% {transform: scale(1);}}
+    .stApp {background-color: #000000; color: #FFD700;}
+    .big-num {font-size: 42px; font-weight: bold; color: #00FFCC; text-align: center; font-family: 'Courier New', monospace; letter-spacing: 6px; text-shadow: 0 0 20px #00FFCC;}
+    .box {background: linear-gradient(135deg, #0d1b1b, #000000); color: #FFD700; padding: 20px; border-radius: 15px; text-align: center; border: 2px solid #FFD700; margin-bottom: 15px; box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);}
+    .item {background: linear-gradient(135deg, #00FFCC, #008B8B); color: #000; padding: 15px; border-radius: 10px; text-align: center; font-size: 28px; font-weight: bold; box-shadow: 0 0 15px rgba(0, 255, 204, 0.5);}
+    .item-3 {background: linear-gradient(135deg, #FFD700, #FFA500); color: #000; box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);}
+    .quantum-tag {background: linear-gradient(90deg, #FF00FF, #00FFFF); color: white; padding: 3px 8px; border-radius: 5px; font-size: 10px; font-weight: bold;}
+    .shadow-tag {background: linear-gradient(90deg, #8B00FF, #FF0080); color: white; padding: 3px 8px; border-radius: 5px; font-size: 10px; font-weight: bold;}
+    .trap-warning {background-color: #FF0000; color: white; padding: 3px 8px; border-radius: 5px; font-size: 10px; font-weight: bold; animation: pulse 0.5s infinite;}
+    .confidence-critical {color: #00FF00; font-weight: bold; font-size: 24px; text-shadow: 0 0 10px #00FF00;}
+    .confidence-warning {color: #FFD700; font-weight: bold; font-size: 24px;}
+    .confidence-danger {color: #FF0000; font-weight: bold; font-size: 24px;}
+    .quantum-box {background: linear-gradient(135deg, #1a0a2e, #000000); border: 2px solid #FF00FF; color: #FF00FF; padding: 15px; border-radius: 10px; margin-bottom: 10px;}
+    h1 {text-align: center; color: #FFD700; text-shadow: 0 0 30px rgba(255, 215, 0, 0.8); font-size: 36px;}
+    @keyframes pulse {0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;}}
+    .matrix-rain {color: #00FF00; font-family: 'Courier New', monospace; font-size: 12px;}
 </style>
 """, unsafe_allow_html=True)
 
-# --- THUẬT TOÁN ĐA CHIỀU ---
+# --- THUẬT TOÁN QUANTUM ---
 
 def get_nums(text):
     clean_text = re.sub(r'\s+', '', text)
     nums = [n for n in re.findall(r"\d{5}", clean_text) if n]
-    # LOẠI BỎ TRÙNG LẶP LIÊN TIẾP - QUAN TRỌNG
+    # LỌC TRÙNG LẶP - Chỉ giữ kỳ duy nhất
+    seen = set()
     unique_nums = []
-    for i, n in enumerate(nums):
-        if i == 0 or n != nums[i-1]:
+    for n in nums:
+        if n not in seen:
+            seen.add(n)
             unique_nums.append(n)
     return unique_nums
 
-def analyze_position(db, pos):
-    """Phân tích tần suất theo từng vị trí (0-4)"""
-    digits = [n[pos] for n in db]
-    return Counter(digits)
+def digital_root(num_str):
+    """Tính digital root - tổng các số đến khi còn 1 chữ số"""
+    total = sum(int(d) for d in num_str)
+    while total > 9:
+        total = sum(int(d) for d in str(total))
+    return total
 
-def calculate_sum_stats(db):
-    """Tính thống kê tổng điểm của các kỳ"""
-    sums = [sum(int(d) for d in n) for n in db]
-    return {
-        'mean': np.mean(sums),
-        'std': np.std(sums),
-        'recent': sums[-5:]
-    }
+def position_analysis(db):
+    """Phân tích trọng số từng vị trí"""
+    positions = {i: Counter() for i in range(5)}
+    for num in db:
+        for i, d in enumerate(num):
+            positions[i][d] += 1
+    return positions
 
-def get_shadow_number(d):
-    """Lấy số bóng âm dương"""
-    return SHADOW_PAIRS.get(d, d)
+def get_shadow_numbers(db, window=20):
+    """
+    Shadow Number Theory:
+    Số nào thường xuất hiện NGAY SAU khi số X xuất hiện?
+    """
+    if len(db) < 10: return {}
+    shadow_map = {str(i): Counter() for i in range(10)}
+    
+    for idx in range(len(db) - 1):
+        current = db[idx]
+        next_num = db[idx + 1]
+        for d in current:
+            for nd in next_num:
+                shadow_map[d][nd] += 1
+    
+    # Lấy top 2 shadow cho mỗi số
+    result = {}
+    for d in shadow_map:
+        top_shadows = shadow_map[d].most_common(2)
+        result[d] = [s[0] for s in top_shadows] if top_shadows else []
+    return result
 
-def predict_v48_master(db):
+def get_complement_pairs(db):
+    """
+    Complement Theory:
+    Số X và số (9-X) thường có mối quan hệ bù trừ
+    """
+    complements = {}
+    for i in range(10):
+        complements[str(i)] = str(9 - i)
+    return complements
+
+def calculate_entropy(db, window=10):
+    """Tính entropy - độ hỗn loạn của dữ liệu"""
+    if len(db) < window: return 0
+    recent = db[-window:]
+    all_digits = "".join(recent)
+    counter = Counter(all_digits)
+    total = len(all_digits)
+    entropy = 0
+    for count in counter.values():
+        if count > 0:
+            p = count / total
+            entropy -= p * math.log2(p)
+    return entropy
+
+def detect_cycle(db):
+    """Phát hiện chu kỳ lặp trong dữ liệu"""
     if len(db) < 20: return None
+    # Tìm xem có kỳ nào lặp lại không
+    for i in range(len(db) - 1):
+        for j in range(i + 1, len(db)):
+            if db[i] == db[j]:
+                cycle_length = j - i
+                return cycle_length
+    return None
+
+def quantum_predict(db):
+    if len(db) < 15: return None
     
-    # 1. PHÂN TÍCH TẦN SUẤT TỔNG
-    all_digits = "".join(db)
-    global_freq = Counter(all_digits)
+    # === LỚP 1: DIGITAL ROOT ANALYSIS ===
+    dr_counts = Counter(digital_root(n) for n in db[-30:])
+    dr_mode = dr_counts.most_common(1)[0][0] if dr_counts else 5
     
-    # 2. PHÂN TÍCH TỪNG VỊ TRÍ
-    pos_freq = [analyze_position(db, i) for i in range(5)]
+    # === LỚP 2: POSITION WEIGHT ===
+    positions = position_analysis(db[-30:])
+    hot_positions = {}
+    for pos in range(5):
+        if positions[pos]:
+            hot_positions[pos] = positions[pos].most_common(2)
     
-    # 3. THỐNG KÊ TỔNG ĐIỂM
-    sum_stats = calculate_sum_stats(db)
-    expected_sum_range = (int(sum_stats['mean'] - sum_stats['std']), 
-                          int(sum_stats['mean'] + sum_stats['std']))
+    # === LỚP 3: SHADOW NUMBERS ===
+    shadows = get_shadow_numbers(db)
     
-    # 4. TÌM SỐ "HOT" VÀ "LẠNH"
-    hot_nums = [d for d, c in global_freq.most_common(5)]
-    cold_nums = [d for d, c in global_freq.most_common()[:-6]]
+    # === LỚP 4: COMPLEMENT ===
+    complements = get_complement_pairs(db)
     
-    # 5. TÍNH ĐIỂM CHO TỪNG CẶP 2 SỐ
+    # === LỚP 5: ENTROPY & CYCLE ===
+    entropy = calculate_entropy(db)
+    cycle = detect_cycle(db)
+    
+    # === TỔNG HỢP DỰ ĐOÁN ===
+    pair_pool = Counter()
+    triple_pool = Counter()
+    single_pool = Counter("".join(db[-50:]))
+    
+    for num in db[-50:]:
+        u = sorted(list(set(num)))
+        if len(u) >= 2:
+            for p in combinations(u, 2): pair_pool[p] += 1
+        if len(u) >= 3:
+            for t in combinations(u, 3): triple_pool[t] += 1
+    
+    # Tìm số hot nhất 20 kỳ gần
+    recent_str = "".join(db[-20:])
+    anchors = [item[0] for item in Counter(recent_str).most_common(3)]
+    
     scored_pairs = []
-    for p in combinations("0123456789", 2):
-        score = 0
-        p_set = set(p)
+    for p, freq in pair_pool.items():
+        gan = 0
+        for num in reversed(db):
+            if not set(p).issubset(set(num)): gan += 1
+            else: break
         
-        # Điểm tần suất toàn cục
-        score += (global_freq[p[0]] + global_freq[p[1]]) * 2
+        streak = 0
+        for num in reversed(db):
+            if set(p).issubset(set(num)): streak += 1
+            else: break
         
-        # Điểm vị trí (nếu 2 số này hay xuất hiện cùng vị trí)
-        for i in range(5):
-            if p[0] in pos_freq[i] and p[1] in pos_freq[i]:
-                score += 10
+        score = freq * 5.0
         
-        # Điểm bóng âm dương (nếu là cặp bóng)
-        if get_shadow_number(p[0]) == p[1]:
-            score += 30
+        # Quantum Boost Factors
+        # 1. Digital Root Match
+        dr_pair = (int(p[0]) + int(p[1])) % 9
+        if dr_pair == dr_mode or dr_pair == 0: score += 40
         
-        # Điểm tuổi Sửu
-        if any(int(d) in LUCKY_OX for d in p):
-            score += 15
+        # 2. Shadow Connection
+        if p[1] in shadows.get(p[0], []) or p[0] in shadows.get(p[1], []):
+            score += 50  # Cặp số có quan hệ shadow
         
-        # Ưu tiên cặp có 1 HOT + 1 COLD (cân bằng)
-        if (p[0] in hot_nums and p[1] in cold_nums) or (p[1] in hot_nums and p[0] in cold_nums):
-            score += 25
+        # 3. Complement Pair
+        if complements[p[0]] == p[1] or complements[p[1]] == p[0]:
+            score += 35  # Cặp bù
         
-        # Kiểm tra tổng điểm dự kiến
-        # (giả lập tổng của cặp này trong 5 số)
-        score += 10  # Base score
+        # 4. Anchor Boost
+        if p[0] in anchors or p[1] in anchors: score += 25
         
-        scored_pairs.append(("".join(p), score))
+        # 5. Gan Zone (Vùng vàng 4-10 kỳ)
+        if 4 <= gan <= 10: score += 60
+        elif 1 <= gan <= 3: score += 30
+        elif gan > 18: score -= 50
+        
+        # 6. Anti-Bet (Tránh bệt quá 3)
+        if streak >= 3: score -= 80
+        
+        # 7. Tuổi Sửu
+        if any(int(d) in LUCKY_OX for d in p): score += 15
+        
+        # 8. Entropy Adjustment
+        if entropy < 2.5:  # Dữ liệu đang ổn định -> Sắp biến động
+            score += 20  # Ưu tiên số ít xuất hiện
+        
+        scored_pairs.append(("".join(p), score, gan, streak))
     
-    # 6. TÍNH ĐIỂM CHO TỪNG BỘ 3 SỐ
     scored_triples = []
-    for t in combinations("0123456789", 3):
-        score = 0
-        t_set = set(t)
+    for t, freq in triple_pool.items():
+        gan = 0
+        for num in reversed(db):
+            if not set(t).issubset(set(num)): gan += 1
+            else: break
         
-        score += (global_freq[t[0]] + global_freq[t[1]] + global_freq[t[2]]) * 2
+        streak = 0
+        for num in reversed(db):
+            if set(t).issubset(set(num)): streak += 1
+            else: break
         
-        # Điểm bóng
-        shadow_count = sum(1 for i in range(3) for j in range(i+1, 3) if get_shadow_number(t[i]) == t[j])
-        score += shadow_count * 20
+        score = freq * 6.0
         
-        # Điểm tuổi
-        if any(int(d) in LUCKY_OX for d in t):
-            score += 20
+        # Quantum Boost cho 3 số
+        dr_triple = (int(t[0]) + int(t[1]) + int(t[2])) % 9
+        if dr_triple == dr_mode: score += 45
         
-        # Ưu tiên 1 HOT + 2 COLD hoặc 2 HOT + 1 COLD
-        hot_count = sum(1 for d in t if d in hot_nums)
-        if hot_count in [1, 2]:
-            score += 30
+        # Shadow connection cho 3 số
+        shadow_match = 0
+        for d in t:
+            for other in t:
+                if other != d and other in shadows.get(d, []):
+                    shadow_match += 1
+        if shadow_match >= 2: score += 55
         
-        scored_triples.append(("".join(t), score))
+        if 4 <= gan <= 10: score += 65
+        elif gan > 18: score -= 60
+        if streak >= 3: score -= 90
+        if any(d in anchors for d in t): score += 30
+        
+        scored_triples.append(("".join(t), score, gan, streak))
     
-    res_p = sorted(scored_pairs, key=lambda x: x[1], reverse=True)[:5]
-    res_t = sorted(scored_triples, key=lambda x: x[1], reverse=True)[:5]
+    res_p = sorted(scored_pairs, key=lambda x: x[1], reverse=True)[:3]
+    res_t = sorted(scored_triples, key=lambda x: x[1], reverse=True)[:3]
     
-    # 7. TÍNH TOÁN PHỦ SẢNH THÔNG MINH
-    # Kết hợp HOT + COLD + Bóng
-    coverage_nums = hot_nums[:3] + cold_nums[:2]
-    # Thêm số bóng của HOT
-    for h in hot_nums[:2]:
-        coverage_nums.append(get_shadow_number(h))
-    coverage_nums = list(dict.fromkeys(coverage_nums))[:8]  # Remove duplicates, keep 8
-    top_8 = "".join(sorted(coverage_nums))
+    # Top 8 thông minh
+    single_scores = {}
+    for d in "0123456789":
+        base = single_pool[d]
+        # Boost nếu là shadow của số hot
+        for anchor in anchors:
+            if d in shadows.get(anchor, []): base += 15
+        # Boost nếu là complement của số hot
+        for anchor in anchors:
+            if complements[anchor] == d: base += 10
+        single_scores[d] = base
     
-    # 8. TÍNH ĐỘ TIN CẬY
-    # Dựa vào độ hội tụ của các yếu tố
-    convergence = 0
-    if len(set(hot_nums) & set(LUCKY_OX)) >= 2: convergence += 30
-    if sum_stats['std'] < 5: convergence += 20  # Ổn định
-    if len(db) >= 50: convergence += 20  # Đủ dữ liệu
+    top_8_list = sorted(single_scores.items(), key=lambda x: x[1], reverse=True)[:8]
+    top_8 = "".join([d for d, c in top_8_list])
     
-    confidence = min(95, 50 + convergence)
+    # === TÍNH ĐỘ TIN CẬY QUANTUM ===
+    confidence = 50
+    if cycle: confidence += 20  # Phát hiện được chu kỳ
+    if entropy < 2.8: confidence += 15  # Sắp có biến động lớn
+    if res_p and res_p[0][1] > 200: confidence += 25
+    if len(anchors) >= 2: confidence += 10
+    
+    confidence = min(confidence, 98)
     
     return {
         "pairs": res_p,
         "triples": res_t,
         "top8": top_8,
-        "hot_nums": hot_nums,
-        "cold_nums": cold_nums,
+        "anchors": anchors,
         "confidence": confidence,
-        "sum_range": expected_sum_range,
-        "pos_analysis": pos_freq
+        "entropy": entropy,
+        "cycle": cycle,
+        "digital_root": dr_mode,
+        "shadows": shadows
     }
 
-# --- GIAO DIỆN ---
-st.markdown('<h1>🔮 TITAN V48 - MASTER PREDICTION</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#888;">Phân tích đa chiều - Loại bỏ trùng lặp - Bóng âm dương</p>', unsafe_allow_html=True)
+# --- GIAO DIỆN CHÍNH ---
+st.markdown('<h1>⚡ TITAN V48 - QUANTUM GOD MODE</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#FF00FF;">5 Lớp Thuật Toán Lượng Tử | Phát Hiện Chu Kỳ Ẩn | Shadow Number Theory</p>', unsafe_allow_html=True)
 
 if "history" not in st.session_state: st.session_state.history = []
 
-user_input = st.text_area("📥 Dán bảng kết quả (Kỳ mới nhất ở dưới cùng):", 
+user_input = st.text_area("📥 Dán bảng kết quả thực tế (Kỳ mới nhất ở dưới cùng):", 
                           height=200, 
-                          placeholder="Dán toàn bộ kết quả vào đây...\n87558\n34979\n...")
+                          placeholder="Ví dụ:\n87558\n34979\n16695")
 
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("🚀 PHÂN TÍCH ĐA CHIỀU"):
+    if st.button("⚡ KÍCH HOẠT QUANTUM"):
         nums = get_nums(user_input)
-        st.info(f"✅ Đã xử lý {len(nums)} kỳ duy nhất (đã loại bỏ trùng lặp)")
-        
         if len(nums) >= 15:
             if "last_pred" in st.session_state:
                 lp = st.session_state.last_pred
@@ -188,67 +297,93 @@ with col1:
                 win_check = all(d in last_actual for d in best_pair)
                 st.session_state.history.insert(0, {
                     "Kỳ": last_actual, 
-                    "Cặp VIP": best_pair, 
+                    "Cặp": best_pair, 
+                    "Nhịp": f"G:{lp['pairs'][0][2]} B:{lp['pairs'][0][3]}",
                     "KQ": "🔥 WIN" if win_check else "❌"
                 })
-            st.session_state.last_pred = predict_v48_master(nums)
+            st.session_state.last_pred = quantum_predict(nums)
             st.rerun()
         else:
-            st.warning("Cần ít nhất 15 kỳ duy nhất!")
+            st.warning("Anh Đạt ơi, dán ít nhất 15 kỳ để Quantum hoạt động!")
 
 with col2:
-    if st.button("🗑️ LÀM MỚI"):
+    if st.button("🗑️ RESET HỆ THỐNG"):
         st.session_state.clear()
         st.rerun()
 
-# --- HIỂN THỊ ---
+# --- HIỂN THỊ KẾT QUẢ ---
 if "last_pred" in st.session_state:
     res = st.session_state.last_pred
     
-    # Độ tin cậy
-    conf_class = "confidence-high" if res['confidence'] >= 80 else ("confidence-med" if res['confidence'] >= 65 else "confidence-low")
-    st.markdown(f"<div class='box'>🎯 ĐỘ TIN CẬY: <span class='{conf_class}'>{res['confidence']}%</span></div>", unsafe_allow_html=True)
+    # === HIỂN THỊ THÔNG TIN QUANTUM ===
+    st.markdown(f"""
+    <div class='quantum-box'>
+        <div style='display:flex; justify-content:space-around;'>
+            <div>🌀 <b>Entropy:</b> {res['entropy']:.2f}</div>
+            <div>🔁 <b>Chu Kỳ:</b> {res['cycle'] if res['cycle'] else 'Không phát hiện'}</div>
+            <div>🔢 <b>Digital Root:</b> {res['digital_root']}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Thống kê
+    # === ĐỘ TIN CẬY ===
+    conf_class = "confidence-critical" if res['confidence'] >= 80 else ("confidence-warning" if res['confidence'] >= 60 else "confidence-danger")
+    conf_text = "🟢 CAO - VÀO TIỀN" if res['confidence'] >= 80 else ("🟡 TB - THĂM DÒ" if res['confidence'] >= 60 else "🔴 THẤP - XEM THÊM")
+    st.markdown(f"<div class='box'>🛡 ĐỘ TIN CẬY QUANTUM: <span class='{conf_class}'>{conf_text} ({res['confidence']}%)</span></div>", unsafe_allow_html=True)
+    
+    # === SỐ NEO ===
+    if res['anchors']:
+        anchor_html = " | ".join([f"<span class='big-num' style='color:#FFD700'>{a}</span>" for a in res['anchors']])
+        st.markdown(f"<div class='box'>🔥 SỐ NEO (HOT NUMBERS): {anchor_html}</div>", unsafe_allow_html=True)
+    
+    # === ĐỘ PHỦ SẢNH ===
+    st.markdown(f"<div class='box'>🎯 ĐỘ PHỦ SẢNH (8 SỐ): <span class='big-num'>{res['top8']}</span></div>", unsafe_allow_html=True)
+    
+    # === 2 TINH ===
+    st.markdown("<div class='box'>🎯 2 TINH QUANTUM MATRIX</div>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown(f"<div class='stat-box'>🔥 SỐ HOT<br><span class='big-num' style='font-size:24px;'>{','.join(res['hot_nums'][:3])}</span></div>", unsafe_allow_html=True)
-    with c2:
-        st.markdown(f"<div class='stat-box'>❄️ SỐ LẠNH<br><span class='big-num' style='font-size:24px;'>{','.join(res['cold_nums'][:3])}</span></div>", unsafe_allow_html=True)
-    with c3:
-        st.markdown(f"<div class='stat-box'>📊 TỔNG KB<br><span class='big-num' style='font-size:24px;'>{res['sum_range'][0]}-{res['sum_range'][1]}</span></div>", unsafe_allow_html=True)
+    for i, (p, score, gan, streak) in enumerate(res['pairs']):
+        with [c1, c2, c3][i]:
+            # Check shadow connection
+            is_shadow = p[1] in res['shadows'].get(p[0], []) or p[0] in res['shadows'].get(p[1], [])
+            st.markdown(f"<div class='item'>{p[0]} , {p[1]}</div>", unsafe_allow_html=True)
+            tags = ""
+            if is_shadow: tags += f"<span class='shadow-tag'>👤 SHADOW</span> "
+            if streak >= 3: tags += f"<span class='trap-warning'>⚠️ BẪY</span> "
+            if 4 <= gan <= 10: tags += f"<span class='quantum-tag'>GAN VÀNG {gan}</span>"
+            st.markdown(f"<div style='font-size:12px; margin-top:5px;'>Score: {score:.0f} {tags}</div>", unsafe_allow_html=True)
     
-    # Phủ sảnh
-    st.markdown(f"<div class='box'>🔥 PHỦ SẢNH 8 SỐ: <span class='big-num'>{res['top8']}</span></div>", unsafe_allow_html=True)
+    # === 3 TINH ===
+    st.markdown("<div class='box' style='border-color:#FF00FF;'>💎 3 TINH QUANTUM MATRIX</div>", unsafe_allow_html=True)
+    d1, d2, d3 = st.columns(3)
+    for i, (t, score, gan, streak) in enumerate(res['triples']):
+        with [d1, d2, d3][i]:
+            st.markdown(f"<div class='item item-3'>{t[0]},{t[1]},{t[2]}</div>", unsafe_allow_html=True)
+            tags = ""
+            if streak >= 3: tags += f"<span class='trap-warning'>⚠️ BẪY</span> "
+            if 4 <= gan <= 10: tags += f"<span class='quantum-tag'>GAN VÀNG {gan}</span>"
+            st.markdown(f"<div style='font-size:12px; margin-top:5px;'>Score: {score:.0f} {tags}</div>", unsafe_allow_html=True)
     
-    # CẶP VIP
-    st.markdown("<div class='box'>⭐ CẶP 2 TINH VIP (ƯU TIÊN SỐ 1)</div>", unsafe_allow_html=True)
-    p1, p2, p3 = st.columns(3)
-    for i, (p, score) in enumerate(res['pairs'][:3]):
-        with [p1, p2, p3][i]:
-            style = "vip-pick" if i == 0 else "item"
-            st.markdown(f"<div class='{style}'>{p[0]} - {p[1]}</div>", unsafe_allow_html=True)
-            st.caption(f"Score: {score}")
+    # === SHADOW NUMBER TABLE ===
+    st.divider()
+    st.markdown("<div class='box'>👤 BẢNG SHADOW NUMBER (Số thường về sau số X)</div>", unsafe_allow_html=True)
+    shadow_cols = st.columns(5)
+    for i, d in enumerate(["0", "1", "2", "3", "4"]):
+        with shadow_cols[i]:
+            shadows = res['shadows'].get(d, [])
+            shadow_str = ", ".join(shadows) if shadows else "-"
+            st.markdown(f"<div style='text-align:center; padding:10px; background:#1a1a1a; border-radius:8px;'>Số <b>{d}</b><br>👤 <span style='color:#FF00FF'>{shadow_str}</span></div>", unsafe_allow_html=True)
     
-    # BỘ 3 VIP
-    st.markdown("<div class='box'>💎 BỘ 3 TINH VIP</div>", unsafe_allow_html=True)
-    t1, t2, t3 = st.columns(3)
-    for i, (t, score) in enumerate(res['triples'][:3]):
-        with [t1, t2, t3][i]:
-            style = "vip-pick" if i == 0 else "item-3"
-            st.markdown(f"<div class='{style}'>{t[0]}-{t[1]}-{t[2]}</div>", unsafe_allow_html=True)
-            st.caption(f"Score: {score}")
-    
-    # Phân tích vị trí
-    with st.expander("📍 Phân tích chi tiết từng vị trí"):
-        for i in range(5):
-            pos_name = ["Chục Ngàn", "Ngàn", "Trăm", "Chục", "Đơn Vị"][i]
-            top_3 = res['pos_analysis'][i].most_common(3)
-            st.write(f"**{pos_name}:** {', '.join([f'{d}({c})' for d,c in top_3])}")
+    shadow_cols2 = st.columns(5)
+    for i, d in enumerate(["5", "6", "7", "8", "9"]):
+        with shadow_cols2[i]:
+            shadows = res['shadows'].get(d, [])
+            shadow_str = ", ".join(shadows) if shadows else "-"
+            st.markdown(f"<div style='text-align:center; padding:10px; background:#1a1a1a; border-radius:8px;'>Số <b>{d}</b><br>👤 <span style='color:#FF00FF'>{shadow_str}</span></div>", unsafe_allow_html=True)
 
-# --- LỊCH SỬ ---
+# === NHẬT KÝ ===
 if st.session_state.history:
     st.divider()
-    st.subheader("📋 Lịch sử đối soát")
-    df = pd.DataFrame(st.session_state.history).head(10)
-    st.table(df)
+    st.subheader("📋 Nhật ký đối soát thực chiến")
+    df_history = pd.DataFrame(st.session_state.history).head(15)
+    st.table(df_history)
