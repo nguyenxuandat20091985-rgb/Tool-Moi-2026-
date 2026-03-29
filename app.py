@@ -1,730 +1,556 @@
 import streamlit as st
 import json
 import os
-import re
-import pandas as pd
-import numpy as np
 from collections import Counter, defaultdict
-from itertools import combinations
 from datetime import datetime
-import random
+import numpy as np
+import pandas as pd
+from itertools import combinations
+import re
 
-# === CẤU HÌNH ===
+# ==================== CẤU HÌNH ====================
+DB_FILE = "titan_v32_data.json"
 NVIDIA_API_KEY = "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"
 GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
-DB_FILE = "titan_v52_master_data.json"
-LUCKY_OX = [0, 2, 5, 6, 7, 8]
 
-# === CSS CAO CẤP ===
-st.set_page_config(page_title="TITAN V52 - MASTER ANALYST", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="TITAN V32 - AI PREDICTION", page_icon="🔮", layout="wide")
 
+# ==================== CSS ====================
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-    
-    .stApp {
-        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
-        color: #FFD700;
-        font-family: 'Orbitron', monospace;
-    }
-    
     .main-header {
-        font-size: 42px;
-        font-weight: 900;
+        font-size: 32px;
+        font-weight: bold;
         text-align: center;
-        background: linear-gradient(90deg, #FFD700, #FF00FF, #00FFFF, #FFD700);
-        background-size: 300% 100%;
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        animation: gradient-shift 3s ease infinite;
+        color: #FFD700;
+        text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
     }
-    
-    @keyframes gradient-shift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-    
     .metric-box {
-        background: linear-gradient(135deg, #16213e, #0f3460);
-        border: 2px solid #00fff5;
-        border-radius: 15px;
-        padding: 20px;
-        text-align: center;
-        box-shadow: 0 0 20px rgba(0, 255, 245, 0.3);
-        margin: 10px 0;
-    }
-    
-    .prediction-card {
-        background: linear-gradient(135deg, #1a1a2e, #16213e);
-        border-radius: 15px;
-        padding: 20px;
-        margin: 10px 0;
-        border: 2px solid;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.5);
-    }
-    
-    .big-number {
-        font-size: 48px;
-        font-weight: 900;
-        letter-spacing: 10px;
-        text-align: center;
-    }
-    
-    .tag {
-        display: inline-block;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 10px;
-        font-weight: bold;
-        margin: 3px;
-    }
-    
-    .tag-hot { background: #ff0040; color: white; }
-    .tag-cold { background: #0066ff; color: white; }
-    .tag-gan { background: #9900ff; color: white; }
-    .tag-gold { background: #FFD700; color: black; }
-    .tag-safe { background: #00ff40; color: black; }
-    
-    .history-win { color: #00ff40; font-weight: 900; }
-    .history-lose { color: #ff0040; font-weight: 900; }
-    
-    .progress-bar {
-        height: 20px;
-        background: #1a1a1a;
+        background: linear-gradient(135deg, #1e3c72, #2a5298);
         border-radius: 10px;
-        overflow: hidden;
+        padding: 15px;
+        text-align: center;
         margin: 10px 0;
+        border: 2px solid #FFD700;
     }
-    
-    .progress-fill {
-        height: 100%;
-        background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
-        transition: width 0.5s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: bold;
-        color: #000;
-    }
-    
-    .method-box {
-        background: #0f0f1a;
-        border-left: 4px solid #FFD700;
+    .prediction-card {
+        background: linear-gradient(135deg, #2c3e50, #34495e);
+        border-radius: 10px;
         padding: 15px;
         margin: 10px 0;
-        border-radius: 0 10px 10px 0;
+        border-left: 5px solid #FFD700;
     }
-    
-    .final-pick {
+    .top-pick {
         background: linear-gradient(135deg, #FFD700, #FFA500);
-        color: #000;
-        padding: 30px;
-        border-radius: 20px;
+        color: black;
+        border-radius: 10px;
+        padding: 20px;
         text-align: center;
-        font-size: 56px;
-        font-weight: 900;
-        letter-spacing: 15px;
-        margin: 20px 0;
-        box-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
-        animation: pulse-gold 2s infinite;
+        font-size: 24px;
+        font-weight: bold;
+        margin: 10px 0;
     }
-    
-    @keyframes pulse-gold {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.02); }
-    }
+    .hot-number { color: #ff4444; font-weight: bold; }
+    .cold-number { color: #4444ff; font-weight: bold; }
+    .streak-number { color: #ffaa00; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# === DATABASE MANAGER ===
+# ==================== QUẢN LÝ DỮ LIỆU ====================
+def load_data():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {"history": [], "predictions": [], "stats": {}}
 
-class DatabaseManager:
-    def __init__(self, filename):
-        self.filename = filename
-        self.data = self.load()
-    
-    def load(self):
-        if os.path.exists(self.filename):
-            with open(self.filename, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return {"history": [], "predictions": [], "stats": {}}
-    
-    def save(self):
-        with open(self.filename, 'w', encoding='utf-8') as f:
-            json.dump(self.data, f, ensure_ascii=False, indent=2)
-    
-    def add_prediction(self, prediction):
-        self.data["predictions"].append({
-            "timestamp": datetime.now().isoformat(),
-            "prediction": prediction
-        })
-        self.save()
-    
-    def add_result(self, actual_number, predicted_pair, won):
-        self.data["history"].append({
-            "timestamp": datetime.now().isoformat(),
-            "actual": actual_number,
-            "predicted": predicted_pair,
-            "won": won
-        })
-        self.save()
+def save_data(data):
+    with open(DB_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
-# === MULTI-ALGORITHM ENGINE ===
-
-class MultiAlgorithmEngine:
-    def __init__(self, db_manager):
-        self.db = db_manager
+# ==================== PHÂN TÍCH THỐNG KÊ ====================
+def analyze_frequency(numbers_list):
+    """Phân tích tần suất xuất hiện"""
+    all_digits = "".join(numbers_list)
+    counter = Counter(all_digits)
+    total = len(all_digits)
     
-    def analyze_frequency(self, nums, window=30):
-        """Phân tích tần suất"""
-        recent = "".join(nums[-window:])
-        counter = Counter(recent)
-        return {d: counter.get(d, 0) for d in "0123456789"}
-    
-    def analyze_gaps(self, nums):
-        """Phân tích số gan (khoảng cách)"""
-        gaps = {}
-        for d in "0123456789":
-            gap = 0
-            for num in reversed(nums):
-                if d in num:
-                    break
-                gap += 1
-            gaps[d] = gap
-        return gaps
-    
-    def analyze_positions(self, nums):
-        """Phân tích vị trí"""
-        positions = {i: Counter() for i in range(5)}
-        for num in nums[-30:]:
-            for i, d in enumerate(num):
-                positions[i][d] += 1
-        return positions
-    
-    def markov_chain(self, nums, order=2):
-        """Markov Chain prediction"""
-        if len(nums) < 20:
-            return {}
-        
-        transitions = defaultdict(lambda: defaultdict(int))
-        
-        for i in range(len(nums) - order):
-            state = "".join(nums[i:i+order])
-            next_num = nums[i+order]
-            for d in next_num:
-                transitions[state][d] += 1
-        
-        # Predict from last state
-        if len(nums) >= order:
-            last_state = "".join(nums[-order:])
-            if last_state in transitions:
-                total = sum(transitions[last_state].values())
-                return {d: c/total for d, c in transitions[last_state].items()}
-        
-        return {}
-    
-    def detect_patterns(self, nums):
-        """Phát hiện pattern"""
-        patterns = {
-            'consecutive': [],
-            'symmetry': [],
-            'fibonacci': []
+    stats = {}
+    for digit in "0123456789":
+        count = counter.get(digit, 0)
+        stats[digit] = {
+            "count": count,
+            "frequency": count / total * 100 if total > 0 else 0,
+            "percentage": f"{count/total*100:.1f}%" if total > 0 else "0%"
         }
-        
-        # Check consecutive patterns
-        for i in range(len(nums) - 2):
-            if nums[i][0:2] == nums[i+1][0:2]:
-                patterns['consecutive'].append(nums[i+1])
-        
-        # Check symmetry (abccba pattern)
-        for num in nums[-10:]:
-            if num == num[::-1]:
-                patterns['symmetry'].append(num)
-        
-        # Fibonacci digits
-        fib_digits = {'0', '1', '2', '3', '5', '8'}
-        for num in nums[-10:]:
-            if all(d in fib_digits for d in num):
-                patterns['fibonacci'].append(num)
-        
-        return patterns
+    return stats
+
+def detect_streaks(numbers_list):
+    """Phát hiện số bệt (lặp liên tiếp)"""
+    streaks = defaultdict(int)
+    current_streak = {}
     
-    def analyze_hot_cold(self, nums, window=20):
-        """Phân tích số nóng/lạnh"""
-        freq = self.analyze_frequency(nums, window)
-        sorted_freq = sorted(freq.items(), key=lambda x: x[1], reverse=True)
-        
-        hot = [d for d, _ in sorted_freq[:3]]
-        cold = [d for d, _ in sorted_freq[-3:]]
-        
-        return hot, cold
+    for num in numbers_list:
+        digits = set(num)
+        for digit in digits:
+            if digit in current_streak:
+                current_streak[digit] += 1
+                streaks[digit] = max(streaks[digit], current_streak[digit])
+            else:
+                current_streak[digit] = 1
     
-    def calculate_pair_scores(self, nums):
-        """Tính điểm cho tất cả cặp số"""
-        pairs = {}
-        
-        freq = self.analyze_frequency(nums)
-        gaps = self.analyze_gaps(nums)
-        positions = self.analyze_positions(nums)
-        markov = self.markov_chain(nums)
-        hot, cold = self.analyze_hot_cold(nums)
-        patterns = self.detect_patterns(nums)
-        
-        for p in combinations("0123456789", 2):
-            pair = "".join(p)
-            score = 0
-            reasons = []
-            
-            # 1. Frequency score
-            pair_freq = freq.get(p[0], 0) + freq.get(p[1], 0)
-            if 15 <= pair_freq <= 35:
-                score += 30
-                reasons.append("FREQ_OPTIMAL")
-            elif pair_freq > 40:
-                score -= 20
-                reasons.append("FREQ_HIGH")
-            
-            # 2. Gap score (số gan)
-            pair_gap = gaps.get(p[0], 0) + gaps.get(p[1], 0)
-            if 5 <= pair_gap <= 15:
-                score += 40
-                reasons.append("GAP_GOLDEN")
-            elif pair_gap > 20:
-                score += 20
-                reasons.append("GAP_LONG")
-            
-            # 3. Position score
-            pos_score = 0
-            for pos in positions:
-                if positions[pos].get(p[0], 0) > 0 or positions[pos].get(p[1], 0) > 0:
-                    pos_score += 5
-            score += pos_score
-            if pos_score > 15:
-                reasons.append("POS_STRONG")
-            
-            # 4. Markov score
-            markov_score = 0
-            for d in p:
-                if d in markov:
-                    markov_score += markov[d] * 50
-            score += markov_score
-            if markov_score > 20:
-                reasons.append("MARKOV_STRONG")
-            
-            # 5. Hot/Cold balance
-            hot_count = sum(1 for d in p if d in hot)
-            cold_count = sum(1 for d in p if d in cold)
-            if hot_count == 1 and cold_count == 1:
-                score += 25
-                reasons.append("BALANCED")
-            elif cold_count == 2:
-                score += 15
-                reasons.append("COLD_DUE")
-            
-            # 6. Lucky ox
-            if any(int(d) in LUCKY_OX for d in p):
-                score += 10
-                reasons.append("LUCKY_OX")
-            
-            # 7. Avoid obvious (anti-crowd)
-            if p in ['01', '12', '23', '34', '45', '56', '67', '78', '89']:
-                score -= 15
-                reasons.append("AVOID_OBVIOUS")
-            
-            pairs[pair] = {
-                'score': score,
-                'reasons': reasons,
-                'freq': pair_freq,
-                'gap': pair_gap,
-                'markov': markov_score
+    return dict(streaks)
+
+def analyze_cycles(numbers_list):
+    """Phân tích chu kỳ xuất hiện"""
+    cycles = defaultdict(list)
+    last_position = {}
+    
+    for idx, num in enumerate(numbers_list):
+        for digit in set(num):
+            if digit in last_position:
+                gap = idx - last_position[digit]
+                cycles[digit].append(gap)
+            last_position[digit] = idx
+    
+    cycle_stats = {}
+    for digit in "0123456789":
+        if cycles[digit]:
+            avg_gap = np.mean(cycles[digit])
+            min_gap = min(cycles[digit])
+            max_gap = max(cycles[digit])
+            cycle_stats[digit] = {
+                "avg": avg_gap,
+                "min": min_gap,
+                "max": max_gap,
+                "predict_next": avg_gap
             }
-        
-        return pairs
     
-    def generate_methods(self, nums):
-        """Tạo 10+ phương pháp dự đoán"""
-        methods = []
-        pairs = self.calculate_pair_scores(nums)
-        freq = self.analyze_frequency(nums)
-        gaps = self.analyze_gaps(nums)
-        hot, cold = self.analyze_hot_cold(nums)
-        
-        # Method 1: Highest frequency
-        m1 = sorted(freq.items(), key=lambda x: x[1], reverse=True)[:2]
-        methods.append({
-            'name': 'TẦN SUẤT CAO',
-            'pair': "".join([d for d, _ in m1]),
-            'score': sum([d[1] for d in m1]),
-            'logic': '2 số xuất hiện nhiều nhất'
-        })
-        
-        # Method 2: Longest gap
-        m2 = sorted(gaps.items(), key=lambda x: x[1], reverse=True)[:2]
-        methods.append({
-            'name': 'SỐ GAN LÂU',
-            'pair': "".join([d for d, _ in m2]),
-            'score': sum([d[1] for d in m2]),
-            'logic': '2 số lâu chưa về nhất'
-        })
-        
-        # Method 3: Hot + Cold
-        if hot and cold:
-            methods.append({
-                'name': 'NÓNG + LẠNH',
-                'pair': hot[0] + cold[0],
-                'score': 50,
-                'logic': 'Cân bằng số nóng và lạnh'
-            })
-        
-        # Method 4: Best composite score
-        best_pair = max(pairs.items(), key=lambda x: x[1]['score'])
-        methods.append({
-            'name': 'TỔNG HỢP TỐT NHẤT',
-            'pair': best_pair[0],
-            'score': best_pair[1]['score'],
-            'logic': f"Điểm tổng hợp: {best_pair[1]['reasons']}"
-        })
-        
-        # Method 5: Position based
-        positions = self.analyze_positions(nums)
-        pos_hot = []
-        for pos in positions:
-            if positions[pos]:
-                pos_hot.append(positions[pos].most_common(1)[0][0])
-        if len(pos_hot) >= 2:
-            methods.append({
-                'name': 'VỊ TRÍ MẠNH',
-                'pair': pos_hot[0] + pos_hot[1],
-                'score': 45,
-                'logic': 'Số mạnh theo vị trí'
-            })
-        
-        # Method 6: Markov prediction
-        markov = self.markov_chain(nums)
-        if markov:
-            m6 = sorted(markov.items(), key=lambda x: x[1], reverse=True)[:2]
-            methods.append({
-                'name': 'MARKOV CHAIN',
-                'pair': "".join([d for d, _ in m6]),
-                'score': sum([d[1] for d in m6]) * 100,
-                'logic': 'Xác suất chuyển tiếp'
-            })
-        
-        # Method 7: Fibonacci pattern
-        fib_nums = ['0', '1', '2', '3', '5', '8']
-        fib_freq = {d: freq.get(d, 0) for d in fib_nums}
-        m7 = sorted(fib_freq.items(), key=lambda x: x[1], reverse=True)[:2]
-        methods.append({
-            'name': 'FIBONACCI',
-            'pair': "".join([d for d, _ in m7]),
-            'score': sum([d[1] for d in m7]),
-            'logic': 'Số Fibonacci'
-        })
-        
-        # Method 8: Lucky Ox special
-        ox_freq = {d: freq.get(d, 0) for d in [str(d) for d in LUCKY_OX]}
-        m8 = sorted(ox_freq.items(), key=lambda x: x[1], reverse=True)[:2]
-        methods.append({
-            'name': 'TUỔI SỬU 1985',
-            'pair': "".join([d for d, _ in m8]),
-            'score': sum([d[1] for d in m8]) + 20,
-            'logic': 'Số may mắn tuổi Sửu'
-        })
-        
-        # Method 9: Anti-pattern (avoid crowd)
-        sorted_pairs = sorted(pairs.items(), key=lambda x: x[1]['score'], reverse=True)
-        for pair, data in sorted_pairs:
-            if 'AVOID_OBVIOUS' not in data['reasons']:
-                methods.append({
-                    'name': 'TRÁNH ĐÁM ĐÔNG',
-                    'pair': pair,
-                    'score': data['score'] + 15,
-                    'logic': 'Số không obvious'
-                })
-                break
-        
-        # Method 10: Gap golden zone
-        golden_pairs = []
-        for pair, data in pairs.items():
-            if 'GAP_GOLDEN' in data['reasons']:
-                golden_pairs.append((pair, data['score']))
-        if golden_pairs:
-            golden_pairs.sort(key=lambda x: x[1], reverse=True)
-            methods.append({
-                'name': 'VÙNG GAN VÀNG',
-                'pair': golden_pairs[0][0],
-                'score': golden_pairs[0][1],
-                'logic': 'Gan 5-15 kỳ (vàng)'
-            })
-        
-        return methods
+    return cycle_stats
+
+def analyze_patterns(numbers_list):
+    """Phân tích pattern Đông-Tây"""
+    patterns = {
+        "even_odd": {"even": 0, "odd": 0},
+        "high_low": {"high": 0, "low": 0},
+        "sum_total": 0,
+        "mirror_pairs": [],
+        "shadow_numbers": defaultdict(int)
+    }
     
-    def three_round_analysis(self, nums):
-        """Phân tích 3 vòng"""
-        results = {
-            'round1': {},
-            'round2': {},
-            'round3': {}
-        }
+    for num in numbers_list:
+        digits = [int(d) for d in num]
         
-        # Round 1: Initial analysis
-        methods = self.generate_methods(nums)
-        results['round1']['methods'] = methods
-        results['round1']['top3'] = sorted(methods, key=lambda x: x['score'], reverse=True)[:3]
+        # Chẵn lẻ
+        for d in digits:
+            if d % 2 == 0:
+                patterns["even_odd"]["even"] += 1
+            else:
+                patterns["even_odd"]["odd"] += 1
         
-        # Round 2: Find weaknesses
-        weaknesses = []
-        for method in methods:
-            # Check if this pair lost recently
-            recent_losses = 0
-            for hist in self.db.data['history'][-10:]:
-                if hist['predicted'] == method['pair'] and not hist['won']:
-                    recent_losses += 1
-            if recent_losses >= 2:
-                weaknesses.append({
-                    'method': method['name'],
-                    'pair': method['pair'],
-                    'reason': f'Thua {recent_losses} kỳ gần'
-                })
-                method['score'] -= 30  # Penalty
+        # Cao thấp (0-4: thấp, 5-9: cao)
+        for d in digits:
+            if d >= 5:
+                patterns["high_low"]["high"] += 1
+            else:
+                patterns["high_low"]["low"] += 1
         
-        results['round2']['weaknesses'] = weaknesses
-        results['round2']['adjusted_methods'] = methods
+        # Tổng
+        patterns["sum_total"] += sum(digits)
         
-        # Round 3: Final optimization
-        final_methods = [m for m in methods if m['score'] > 0]
-        final_methods.sort(key=lambda x: x['score'], reverse=True)
+        # Bóng số (mirror: 0-5, 1-6, 2-7, 3-8, 4-9)
+        for d in digits:
+            mirror = (d + 5) % 10
+            patterns["shadow_numbers"][str(mirror)] += 1
+    
+    return patterns
+
+# ==================== MÁY HỌC ĐƠN GIẢN ====================
+def simple_ml_predict(numbers_list, freq_stats, cycle_stats):
+    """Dự đoán dựa trên machine learning đơn giản"""
+    scores = {}
+    
+    for digit in "0123456789":
+        score = 0
         
-        # Add diversity check
-        top_numbers = Counter()
-        for m in final_methods[:5]:
-            for d in m['pair']:
-                top_numbers[d] += 1
+        # Điểm từ tần suất
+        freq = freq_stats[digit]["frequency"]
+        score += freq * 2
         
-        results['round3']['final_methods'] = final_methods
-        results['round3']['top3'] = final_methods[:3]
-        results['round3']['final_pick'] = final_methods[0] if final_methods else None
-        results['round3']['number_distribution'] = dict(top_numbers)
-        
-        return results
-
-# === XỬ LÝ DỮ LIỆU ===
-
-def get_nums(text):
-    clean_text = re.sub(r'\s+', '', text)
-    nums = [n for n in re.findall(r"\d{5}", clean_text) if n]
-    seen = set()
-    return [n for n in nums if not (n in seen or seen.add(n))]
-
-# === GIAO DIỆN ===
-
-st.markdown('<h1 class="main-header">🎯 TITAN V52 - MASTER ANALYST</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#888;">10+ Thuật Toán | 3 Vòng Phân Tích | Tự Học & Cải Tiến</p>', unsafe_allow_html=True)
-
-# Initialize
-db_manager = DatabaseManager(DB_FILE)
-engine = MultiAlgorithmEngine(db_manager)
-
-if "history" not in st.session_state:
-    st.session_state.history = []
-
-user_input = st.text_area("📥 Dữ liệu (kỳ mới nhất ở dưới):", height=150, 
-                          placeholder="46602\n32476\n14606\n...")
-
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("🔍 PHÂN TÍCH ĐA THUẬT TOÁN", type="primary", use_container_width=True):
-        nums = get_nums(user_input)
-        if len(nums) >= 15:
-            # Check previous prediction
-            if "last_analysis" in st.session_state and nums:
-                last = nums[-1]
-                last_pred = st.session_state.last_analysis
-                if last_pred and 'final_pick' in last_pred and last_pred['final_pick']:
-                    pred_pair = last_pred['final_pick']['pair']
-                    won = all(d in last for d in pred_pair)
-                    st.session_state.history.insert(0, {
-                        'Kỳ': last,
-                        'Dự đoán': pred_pair,
-                        'KQ': '🔥' if won else '❌'
-                    })
-                    db_manager.add_result(last, pred_pair, won)
+        # Điểm từ chu kỳ
+        if digit in cycle_stats:
+            expected_gap = cycle_stats[digit]["avg"]
+            last_gaps = []
+            last_pos = -1
+            for idx, num in enumerate(numbers_list):
+                if digit in num:
+                    if last_pos != -1:
+                        last_gaps.append(idx - last_pos)
+                    last_pos = idx
             
-            # Run 3-round analysis
-            analysis = engine.three_round_analysis(nums)
-            st.session_state.last_analysis = analysis['round3']
-            st.session_state.current_nums = nums
-            st.rerun()
-        else:
-            st.warning(f"Cần 15+ kỳ (có {len(nums)})")
+            if last_gaps:
+                current_gap = len(numbers_list) - last_pos - 1
+                if abs(current_gap - expected_gap) < 2:
+                    score += 30  # Sắp đến chu kỳ
+        
+        # Điểm từ xu hướng gần
+        recent = numbers_list[-10:] if len(numbers_list) >= 10 else numbers_list
+        recent_count = sum(1 for num in recent if digit in num)
+        score += recent_count * 5
+        
+        scores[digit] = score
+    
+    return scores
 
-with col2:
-    if st.button("🗑️ Reset", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
+# ==================== TẠO PHƯƠNG ÁN ====================
+def generate_strategies(numbers_list, freq_stats, cycle_stats, ml_scores, streaks, patterns):
+    """Tạo 10+ phương án dự đoán"""
+    strategies = []
+    
+    # 1. Theo tần suất cao
+    hot_numbers = sorted(freq_stats.items(), key=lambda x: x[1]["frequency"], reverse=True)
+    strategies.append({
+        "name": "🔥 CẶP NÓNG (Tần suất cao)",
+        "numbers": [hot_numbers[0][0], hot_numbers[1][0]],
+        "reasoning": f"{hot_numbers[0][0]} ({hot_numbers[0][1]['percentage']}) và {hot_numbers[1][0]} ({hot_numbers[1][1]['percentage']}) xuất hiện nhiều nhất",
+        "confidence": 75,
+        "logic": "frequency"
+    })
+    
+    # 2. Theo chu kỳ
+    due_numbers = []
+    for digit in "0123456789":
+        if digit in cycle_stats:
+            last_pos = -1
+            for idx, num in enumerate(numbers_list):
+                if digit in num:
+                    last_pos = idx
+            if last_pos != -1:
+                current_gap = len(numbers_list) - last_pos - 1
+                expected = cycle_stats[digit]["avg"]
+                if current_gap >= expected * 0.8:
+                    due_numbers.append((digit, current_gap, expected))
+    
+    due_numbers.sort(key=lambda x: x[1]/x[2] if x[2] > 0 else 0, reverse=True)
+    if len(due_numbers) >= 2:
+        strategies.append({
+            "name": "⏰ CẶP ĐẾN KỲ (Chu kỳ)",
+            "numbers": [due_numbers[0][0], due_numbers[1][0]],
+            "reasoning": f"{due_numbers[0][0]} (cách {due_numbers[0][1]} kỳ, TB: {due_numbers[0][2]:.1f}) và {due_numbers[1][0]} đến kỳ",
+            "confidence": 70,
+            "logic": "cycle"
+        })
+    
+    # 3. Theo ML score
+    ml_top = sorted(ml_scores.items(), key=lambda x: x[1], reverse=True)[:2]
+    strategies.append({
+        "name": "🤖 CẶP AI (Machine Learning)",
+        "numbers": [ml_top[0][0], ml_top[1][0]],
+        "reasoning": f"AI đánh giá {ml_top[0][0]} (score: {ml_top[0][1]:.0f}) và {ml_top[1][0]} (score: {ml_top[1][1]:.0f}) có xác suất cao",
+        "confidence": 80,
+        "logic": "ml"
+    })
+    
+    # 4. Theo số bệt
+    streak_sorted = sorted(streaks.items(), key=lambda x: x[1], reverse=True)
+    if streak_sorted:
+        strategies.append({
+            "name": "📌 CẶP BỆT (Đang hot)",
+            "numbers": [streak_sorted[0][0], streak_sorted[1][0] if len(streak_sorted) > 1 else streak_sorted[0][0]],
+            "reasoning": f"{streak_sorted[0][0]} đang bệt {streak_sorted[0][1]} kỳ liên tiếp",
+            "confidence": 65,
+            "logic": "streak"
+        })
+    
+    # 5. Theo bóng số
+    shadow_top = sorted(patterns["shadow_numbers"].items(), key=lambda x: x[1], reverse=True)[:2]
+    if len(shadow_top) >= 2:
+        strategies.append({
+            "name": "🪞 CẶP BÓNG (Mirror)",
+            "numbers": [shadow_top[0][0], shadow_top[1][0]],
+            "reasoning": f"Bóng số của {shadow_top[0][0]} và {shadow_top[1][0]} xuất hiện nhiều",
+            "confidence": 60,
+            "logic": "shadow"
+        })
+    
+    # 6. Theo chẵn lẻ cân bằng
+    if patterns["even_odd"]["even"] > patterns["even_odd"]["odd"]:
+        # Ưu tiên số lẻ
+        odd_numbers = [d for d in "13579" if freq_stats[d]["frequency"] > 8]
+        if len(odd_numbers) >= 2:
+            strategies.append({
+                "name": "⚖️ CẶP CÂN BẰNG (Chẵn-Lẻ)",
+                "numbers": [odd_numbers[0], odd_numbers[1]],
+                "reasoning": "Cân bằng xu hướng chẵn lẻ",
+                "confidence": 55,
+                "logic": "balance"
+            })
+    
+    # 7. Theo cao thấp
+    if patterns["high_low"]["high"] > patterns["high_low"]["low"]:
+        # Ưu tiên số thấp
+        low_numbers = [d for d in "01234" if freq_stats[d]["frequency"] > 5]
+        if len(low_numbers) >= 2:
+            strategies.append({
+                "name": "📊 CẶP CAO-THẤP",
+                "numbers": [low_numbers[0], low_numbers[1]],
+                "reasoning": "Cân bằng xu hướng cao-thấp",
+                "confidence": 55,
+                "logic": "highlow"
+            })
+    
+    # 8. Theo tổng
+    avg_sum = patterns["sum_total"] / len(numbers_list) if numbers_list else 22.5
+    strategies.append({
+        "name": "📐 CẶP THEO TỔNG",
+        "numbers": ["4", "7"],  # Tổng trung bình
+        "reasoning": f"Tổng trung bình kỳ: {avg_sum:.1f}, chọn cặp có tổng gần mức này",
+        "confidence": 50,
+        "logic": "sum"
+    })
+    
+    # 9. Theo số lạnh (đảo ngược)
+    cold_numbers = sorted(freq_stats.items(), key=lambda x: x[1]["frequency"])[:2]
+    strategies.append({
+        "name": "❄️ CẶP LẠNH (Đảo chiều)",
+        "numbers": [cold_numbers[0][0], cold_numbers[1][0]],
+        "reasoning": f"{cold_numbers[0][0]} và {cold_numbers[1][0]} ít xuất hiện, có thể về",
+        "confidence": 45,
+        "logic": "cold"
+    })
+    
+    # 10. Theo vị trí
+    position_stats = defaultdict(lambda: Counter())
+    for num in numbers_list[-20:]:
+        for pos, digit in enumerate(num):
+            position_stats[pos][digit] += 1
+    
+    pos0_top = position_stats[0].most_common(1)[0][0] if position_stats[0] else "0"
+    pos4_top = position_stats[4].most_common(1)[0][0] if position_stats[4] else "0"
+    strategies.append({
+        "name": "🎯 CẶP VỊ TRÍ (Đầu-Cuối)",
+        "numbers": [pos0_top, pos4_top],
+        "reasoning": f"Số hay về đầu: {pos0_top}, số hay về cuối: {pos4_top}",
+        "confidence": 60,
+        "logic": "position"
+    })
+    
+    return strategies
 
-# === HIỂN THỊ KẾT QUẢ ===
+# ==================== CHỌN TOP 3 ====================
+def select_top_picks(strategies):
+    """Chọn TOP 3 bạch thủ mạnh nhất"""
+    # Sort theo confidence
+    sorted_strategies = sorted(strategies, key=lambda x: x["confidence"], reverse=True)
+    
+    # Lấy top 3 khác nhau
+    top_picks = []
+    used_numbers = set()
+    
+    for strategy in sorted_strategies:
+        if len(top_picks) >= 3:
+            break
+        
+        nums = strategy["numbers"]
+        # Kiểm tra xem cặp này có quá giống với cái đã chọn không
+        num_set = set(nums)
+        if not num_set.issubset(used_numbers):
+            top_picks.append(strategy)
+            used_numbers.update(num_set)
+    
+    return top_picks
 
-if "last_analysis" in st.session_state:
-    analysis = st.session_state.last_analysis
-    nums = st.session_state.current_nums
+# ==================== GIAO DIỆN CHÍNH ====================
+def main():
+    st.markdown('<h1 class="main-header">🔮 TITAN V32 - AI PREDICTION SYSTEM</h1>', unsafe_allow_html=True)
     
-    # Statistics
-    st.markdown("### 📊 THỐNG KÊ CƠ BẢN")
-    col1, col2, col3, col4 = st.columns(4)
+    # Load data
+    data = load_data()
     
-    freq = engine.analyze_frequency(nums)
-    gaps = engine.analyze_gaps(nums)
-    hot, cold = engine.analyze_hot_cold(nums)
+    # Tabs
+    tab1, tab2, tab3 = st.tabs(["📊 PHÂN TÍCH", "🎯 DỰ ĐOÁN", "📋 LỊCH SỬ"])
     
-    with col1:
-        st.markdown(f"""
-        <div class="metric-box">
-            <div style="font-size:12px; color:#888;">SỐ NÓNG</div>
-            <div style="font-size:24px; font-weight:900; color:#ff0040;">{', '.join(hot)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Input
+    st.sidebar.header("📥 NHẬP DỮ LIỆU")
+    input_text = st.sidebar.text_area(
+        "Nhập kết quả (mỗi kỳ 1 dòng):",
+        height=200,
+        placeholder="46602\n32476\n14606..."
+    )
     
-    with col2:
-        st.markdown(f"""
-        <div class="metric-box">
-            <div style="font-size:12px; color:#888;">SỐ LẠNH</div>
-            <div style="font-size:24px; font-weight:900; color:#0066ff;">{', '.join(cold)}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    if st.sidebar.button("💾 LƯU VÀ PHÂN TÍCH"):
+        numbers = [line.strip() for line in input_text.split('\n') if line.strip() and re.match(r'^\d{5}$', line.strip())]
+        if numbers:
+            data["history"] = numbers
+            save_data(data)
+            st.sidebar.success(f"Đã lưu {len(numbers)} kỳ!")
     
-    with col3:
-        max_gap = max(gaps.items(), key=lambda x: x[1])
-        st.markdown(f"""
-        <div class="metric-box">
-            <div style="font-size:12px; color:#888;">GAN NHẤT</div>
-            <div style="font-size:24px; font-weight:900; color:#9900ff;">{max_gap[0]} ({max_gap[1]} kỳ)</div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Load history nếu có
+    numbers_list = data.get("history", [])
     
-    with col4:
-        total_pairs = len(engine.calculate_pair_scores(nums))
-        st.markdown(f"""
-        <div class="metric-box">
-            <div style="font-size:12px; color:#888;">PHƯƠNG ÁN</div>
-            <div style="font-size:24px; font-weight:900; color:#00ff40;">{total_pairs}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    if not numbers_list:
+        # Sử dụng dữ liệu mẫu từ input
+        sample_input = """46602
+32476
+14606
+97269
+15109
+33912
+76108
+41895
+77642
+26765
+95572
+33997
+14405
+31871
+82832
+33123
+01617
+04675
+12461
+20659
+98005
+98310
+52064
+55063
+69053
+13944
+65605
+06931
+77496
+60204
+51253
+76732
+73854
+89879"""
+        numbers_list = [line.strip() for line in sample_input.split('\n') if line.strip()]
     
-    # 10 Methods
-    st.markdown("### 🎲 10+ PHƯƠNG PHÁP DỰ ĐOÁN")
+    # Phân tích
+    freq_stats = analyze_frequency(numbers_list)
+    streaks = detect_streaks(numbers_list)
+    cycle_stats = analyze_cycles(numbers_list)
+    patterns = analyze_patterns(numbers_list)
+    ml_scores = simple_ml_predict(numbers_list, freq_stats, cycle_stats)
+    strategies = generate_strategies(numbers_list, freq_stats, cycle_stats, ml_scores, streaks, patterns)
+    top_picks = select_top_picks(strategies)
     
-    if 'final_methods' in analysis:
-        for i, method in enumerate(analysis['final_methods'][:10], 1):
-            tags = ""
-            if i <= 3:
-                tags += '<span class="tag tag-gold">TOP ' + str(i) + '</span>'
-            if 'GAP_GOLDEN' in method.get('logic', ''):
-                tags += '<span class="tag tag-gan">GAN VÀNG</span>'
-            if 'MARKOV' in method.get('name', ''):
-                tags += '<span class="tag tag-safe">MARKOV</span>'
-            
+    with tab1:
+        st.header("📊 PHÂN TÍCH THỐNG KÊ")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.subheader("🔥 SỐ NÓNG (Tần suất cao)")
+            hot_sorted = sorted(freq_stats.items(), key=lambda x: x[1]["frequency"], reverse=True)[:5]
+            for digit, stats in hot_sorted:
+                st.markdown(f"**{digit}**: {stats['percentage']} ({stats['count']} lần)")
+        
+        with col2:
+            st.subheader("❄️ SỐ LẠNH (Ít xuất hiện)")
+            cold_sorted = sorted(freq_stats.items(), key=lambda x: x[1]["frequency"])[:5]
+            for digit, stats in cold_sorted:
+                st.markdown(f"**{digit}**: {stats['percentage']} ({stats['count']} lần)")
+        
+        with col3:
+            st.subheader("📌 SỐ BỆT (Liên tiếp)")
+            if streaks:
+                streak_sorted = sorted(streaks.items(), key=lambda x: x[1], reverse=True)[:5]
+                for digit, count in streak_sorted:
+                    st.markdown(f"**{digit}**: {count} kỳ liên tiếp")
+            else:
+                st.write("Không có số bệt đáng chú ý")
+        
+        st.divider()
+        
+        st.subheader("📈 PHÂN TÍCH CHU KỲ")
+        cycle_df = pd.DataFrame([
+            {"Số": d, "TB kỳ": f"{cycle_stats[d]['avg']:.1f}" if d in cycle_stats else "N/A",
+             "Min": cycle_stats[d]['min'] if d in cycle_stats else "-",
+             "Max": cycle_stats[d]['max'] if d in cycle_stats else "-"}
+            for d in "0123456789"
+        ])
+        st.dataframe(cycle_df, use_container_width=True, hide_index=True)
+        
+        st.divider()
+        
+        st.subheader("🎭 PATTERN ĐÔNG-TÂY")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f"**Chẵn/Lẻ**: {patterns['even_odd']['even']} / {patterns['even_odd']['odd']}")
+            st.markdown(f"**Cao/Thấp**: {patterns['high_low']['high']} / {patterns['high_low']['low']}")
+        with col2:
+            st.markdown(f"**Tổng trung bình**: {patterns['sum_total']/len(numbers_list):.1f}")
+            st.markdown(f"**Số kỳ**: {len(numbers_list)}")
+    
+    with tab2:
+        st.header("🎯 DỰ ĐOÁN TOP 3 BẠCH THỦ")
+        
+        # Hiển thị TOP 3
+        for i, pick in enumerate(top_picks, 1):
             st.markdown(f"""
-            <div class="method-box">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <span style="color:#888; font-size:12px;">{i}. {method['name']}</span><br>
-                        <span style="font-size:20px; font-weight:900; color:#FFD700;">{method['pair'][0]} - {method['pair'][1]}</span>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:24px; font-weight:900; color:{'#00ff40' if method['score'] > 50 else '#ffff00'};">
-                            {method['score']:.0f}
-                        </div>
-                        <div style="font-size:10px; color:#888;">{tags}</div>
-                    </div>
-                </div>
-                <div style="font-size:11px; color:#666; margin-top:5px;">{method['logic']}</div>
+            <div class="top-pick">
+                🏆 TOP {i}: {pick['numbers'][0]} - {pick['numbers'][1]}<br>
+                <small>Độ tin cậy: {pick['confidence']}%</small>
             </div>
             """, unsafe_allow_html=True)
-    
-    # TOP 3
-    st.markdown("### 🏆 TOP 3 PHƯƠNG ÁN MẠNH NHẤT")
-    
-    if 'top3' in analysis:
-        cols = st.columns(3)
-        for i, method in enumerate(analysis['top3']):
-            with cols[i]:
+            
+            with st.expander(f"📋 Chi tiết TOP {i}: {pick['name']}"):
+                st.write(f"**Lý do**: {pick['reasoning']}")
+                st.write(f"**Logic**: {pick['logic']}")
+                st.write(f"**Độ tin cậy**: {pick['confidence']}%")
+        
+        st.divider()
+        
+        st.subheader("📋 TẤT CẢ PHƯƠNG ÁN ({})".format(len(strategies)))
+        for i, strategy in enumerate(strategies, 1):
+            with st.expander(f"{i}. {strategy['name']} - Độ tin cậy: {strategy['confidence']}%"):
                 st.markdown(f"""
-                <div class="prediction-card" style="border-color: {'#FFD700' if i == 0 else '#C0C0C0' if i == 1 else '#CD7F32'};">
-                    <div style="font-size:14px; color:#888;">#{i+1} {method['name']}</div>
-                    <div class="big-number" style="color:{'#FFD700' if i == 0 else '#C0C0C0' if i == 1 else '#CD7F32'}; font-size:36px;">
-                        {method['pair'][0]} - {method['pair'][1]}
-                    </div>
-                    <div style="font-size:18px; font-weight:900; color:#00ff40; margin-top:10px;">
-                        Score: {method['score']:.0f}
-                    </div>
-                </div>
+                **Cặp số**: {strategy['numbers'][0]} - {strategy['numbers'][1]}<br>
+                **Lý do**: {strategy['reasoning']}<br>
+                **Logic**: {strategy['logic']}
                 """, unsafe_allow_html=True)
+        
+        st.divider()
+        
+        st.subheader("💡 CHIẾN LƯỢC ĐÁNH")
+        st.info("""
+        **Khuyến nghị:**<br>
+        1. Ưu tiên TOP 1 với 70% vốn<br>
+        2. TOP 2 và TOP 3 với 20% vốn mỗi cặp<br>
+        3. Theo dõi thêm 2-3 kỳ để xác nhận xu hướng<br>
+        4. Không đánh quá 5 cặp/kỳ để tối ưu vốn
+        """)
     
-    # FINAL PICK
-    st.markdown("### 🎯 BẠCH THỦ CUỐI CÙNG")
+    with tab3:
+        st.header("📋 LỊCH SỬ DỰ ĐOÁN")
+        
+        if "predictions" in data and data["predictions"]:
+            pred_df = pd.DataFrame(data["predictions"])
+            st.dataframe(pred_df, use_container_width=True)
+        else:
+            st.write("Chưa có lịch sử dự đoán")
+        
+        st.divider()
+        
+        st.subheader("💾 Lưu dự đoán hiện tại")
+        if st.button("Lưu kết quả vào lịch sử"):
+            for pick in top_picks:
+                data["predictions"].append({
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "numbers": f"{pick['numbers'][0]}-{pick['numbers'][1]}",
+                    "confidence": pick['confidence'],
+                    "strategy": pick['name']
+                })
+            save_data(data)
+            st.success("Đã lưu TOP 3 vào lịch sử!")
     
-    if 'final_pick' in analysis and analysis['final_pick']:
-        pick = analysis['final_pick']
-        st.markdown(f"""
-        <div class="final-pick">
-            {pick['pair'][0]} - {pick['pair'][1]}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        st.markdown(f"""
-        <div class="metric-box" style="border-color:#00ff40;">
-            <div style="font-size:16px; font-weight:700;">PHÂN TÍCH CHI TIẾT</div>
-            <div style="text-align:left; margin-top:10px; font-size:13px; line-height:1.8;">
-                • <b>Phương pháp:</b> {pick['name']}<br>
-                • <b>Logic:</b> {pick['logic']}<br>
-                • <b>Điểm số:</b> {pick['score']:.0f}<br>
-                • <b>Tần suất:</b> {freq.get(pick['pair'][0], 0) + freq.get(pick['pair'][1], 0)} lần<br>
-                • <b>Khoảng cách:</b> {gaps.get(pick['pair'][0], 0) + gaps.get(pick['pair'][1], 0)} kỳ<br>
-                • <b>Phân bố:</b> {analysis.get('number_distribution', {})}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # History
-    if st.session_state.history:
-        st.markdown("### 📋 LỊCH SỬ ĐỐI SOÁT")
-        
-        df = pd.DataFrame(st.session_state.history[:15])
-        
-        def color_kq(val):
-            return 'color: #00ff40; font-weight: 900' if '🔥' in val else 'color: #ff0040; font-weight: 900'
-        
-        st.dataframe(df.style.applymap(color_kq, subset=['KQ']), 
-                     use_container_width=True, hide_index=True)
-        
-        # Win rate
-        wins = sum(1 for h in st.session_state.history if '🔥' in h['KQ'])
-        total = len(st.session_state.history)
-        rate = (wins/total*100) if total > 0 else 0
-        
-        color_rate = "#00ff40" if rate >= 40 else ("#ffff00" if rate >= 30 else "#ff0040")
-        
-        st.markdown(f"""
-        <div class="metric-box" style="border-color:{color_rate}; margin-top:15px;">
-            <div style="font-size:16px;">TỶ LỆ THẮNG</div>
-            <div style="font-size:36px; font-weight:900; color:{color_rate};">
-                {rate:.1f}% ({wins}/{total})
-            </div>
-            <div class="progress-bar">
-                <div class="progress-fill" style="width:{rate}%; background:{color_rate};">
-                    {rate:.0f}%
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+    # Tự động lưu vào session
+    data["last_analysis"] = {
+        "timestamp": datetime.now().isoformat(),
+        "total_periods": len(numbers_list),
+        "top_picks": [f"{p['numbers'][0]}-{p['numbers'][1]}" for p in top_picks]
+    }
+    save_data(data)
 
-# === FOOTER ===
-st.markdown("""
-<div style="text-align:center; color:#444; font-size:10px; margin-top:30px; padding-top:15px; border-top:1px solid #333;">
-    🎯 TITAN V52 - MASTER ANALYST | 10+ Algorithms | 3-Round Analysis | Self-Learning<br>
-    <i>Lưu ý: Tool hỗ trợ phân tích xác suất - Không đảm bảo 100% - Quản lý vốn thông minh</i>
-</div>
-""", unsafe_allow_html=True)
+if __name__ == "__main__":
+    main()
