@@ -2,577 +2,640 @@ import streamlit as st
 import re, pandas as pd, numpy as np, math
 from collections import Counter, defaultdict
 from itertools import combinations
-import hashlib, time
+from datetime import datetime
+import random
 
 # === CẤU HÌNH ===
 LUCKY_OX = [0, 2, 5, 6, 7, 8]
-st.set_page_config(page_title="TITAN V52 - QUANTUM META", page_icon="⚛️", layout="centered")
+st.set_page_config(page_title="TITAN V52 - OMNI PREDICTOR", page_icon="🎯", layout="centered")
 
-# === CSS QUANTUM ===
+# === CSS GOD MODE ===
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap');
     
     .stApp {
-        background: radial-gradient(circle at center, #0a0a1a 0%, #000000 100%);
+        background: linear-gradient(180deg, #000000 0%, #0a0a1a 50%, #000000 100%);
         color: #FFD700;
         font-family: 'Orbitron', monospace;
     }
     
-    .quantum-header {
-        font-size: 32px;
+    .god-header {
+        font-size: 38px;
         font-weight: 900;
         text-align: center;
-        background: linear-gradient(90deg, #00ffff, #ff00ff, #ffff00, #00ffff);
-        background-size: 400% 100%;
+        background: linear-gradient(90deg, #FFD700, #FF00FF, #00FFFF, #FFD700);
+        background-size: 300% 100%;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        animation: quantum-flow 4s linear infinite;
+        animation: gradient-shift 3s ease infinite;
     }
     
-    @keyframes quantum-flow {
-        0% { background-position: 0% 50%; }
-        100% { background-position: 400% 50%; }
+    @keyframes gradient-shift {
+        0%, 100% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
     
-    .approach-tabs {
-        display: flex;
-        gap: 10px;
-        margin: 15px 0;
-        flex-wrap: wrap;
+    .method-card {
+        background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+        border-radius: 12px;
+        padding: 15px;
+        margin: 8px 0;
+        border-left: 4px solid;
     }
     
-    .tab {
-        flex: 1;
-        min-width: 100px;
-        padding: 12px;
-        background: #1a1a2e;
-        border: 2px solid #333;
-        border-radius: 10px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s;
-        font-size: 11px;
-    }
+    .method-hot { border-color: #ff0040; }
+    .method-cold { border-color: #0066ff; }
+    .method-gan { border-color: #ff9900; }
+    .method-shadow { border-color: #9900ff; }
+    .method-complement { border-color: #00ff99; }
+    .method-pattern { border-color: #ffcc00; }
+    .method-frequency { border-color: #ff6600; }
+    .method-entropy { border-color: #cc00ff; }
+    .method-position { border-color: #00ccff; }
+    .method-advanced { border-color: #ff00cc; }
     
-    .tab.active {
-        border-color: #00ffff;
-        background: #0a1a2e;
-        box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
-    }
-    
-    .tab.win { border-color: #00ff40; }
-    .tab.lose { border-color: #ff0040; }
-    .tab.chaos { border-color: #ffff00; }
-    
-    .quantum-box {
-        background: linear-gradient(135deg, #1a0a2e, #0a1a2e);
-        border: 2px solid;
-        border-radius: 15px;
-        padding: 20px;
-        margin: 10px 0;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .quantum-box::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
-        background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent);
-        transform: rotate(45deg);
-        animation: shimmer 3s infinite;
-    }
-    
-    @keyframes shimmer {
-        0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
-        100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
-    }
-    
-    .number-display {
-        font-size: 48px;
+    .pair-display {
+        font-size: 42px;
         font-weight: 900;
         letter-spacing: 10px;
         text-align: center;
-        margin: 15px 0;
-        text-shadow: 0 0 20px currentColor;
-    }
-    
-    .confidence-quantum {
-        height: 30px;
-        background: #0a0a1a;
-        border-radius: 15px;
-        overflow: hidden;
-        position: relative;
+        padding: 15px;
         margin: 10px 0;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
     }
     
-    .confidence-quantum::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #ffff00, #ff0000);
-        background-size: 200% 100%;
-        animation: confidence-wave 2s linear infinite;
-        opacity: 0.3;
-    }
-    
-    @keyframes confidence-wave {
-        0% { background-position: 0% 50%; }
-        100% { background-position: 200% 50%; }
-    }
-    
-    .metric-row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-        gap: 10px;
-        margin: 15px 0;
-    }
-    
-    .metric-item {
-        background: #1a1a2e;
-        border-radius: 10px;
-        padding: 12px;
+    .final-pick {
+        font-size: 64px;
+        font-weight: 900;
+        letter-spacing: 15px;
         text-align: center;
-        border: 1px solid #333;
+        padding: 30px;
+        margin: 20px 0;
+        border-radius: 20px;
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: #000;
+        box-shadow: 0 0 40px rgba(255, 215, 0, 0.6);
+        animation: pulse-gold 2s infinite;
     }
     
-    .tag-quantum {
+    @keyframes pulse-gold {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 40px rgba(255, 215, 0, 0.6); }
+        50% { transform: scale(1.02); box-shadow: 0 0 60px rgba(255, 215, 0, 0.8); }
+    }
+    
+    .top3-card {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 10px 0;
+        border: 3px solid;
+        text-align: center;
+    }
+    
+    .top3-gold { border-color: #FFD700; box-shadow: 0 0 20px rgba(255, 215, 0, 0.4); }
+    .top3-silver { border-color: #C0C0C0; box-shadow: 0 0 20px rgba(192, 192, 192, 0.4); }
+    .top3-bronze { border-color: #CD7F32; box-shadow: 0 0 20px rgba(205, 127, 50, 0.4); }
+    
+    .tag {
         display: inline-block;
         padding: 4px 10px;
         border-radius: 15px;
-        font-size: 9px;
+        font-size: 10px;
         font-weight: bold;
         margin: 2px;
-        background: linear-gradient(135deg, #ff00ff, #00ffff);
-        color: #fff;
     }
     
-    .history-table {
-        font-size: 11px;
-    }
+    .tag-strong { background: #00ff40; color: #000; }
+    .tag-medium { background: #ffff00; color: #000; }
+    .tag-weak { background: #ff0040; color: #fff; }
+    .tag-method { background: #9900ff; color: #fff; }
     
-    .win-text { color: #00ff40; font-weight: 900; }
-    .lose-text { color: #ff0040; font-weight: 900; }
-    
-    .superposition {
-        display: flex;
-        justify-content: space-around;
-        align-items: center;
+    .metric-box {
+        background: #1a1a2e;
+        border-radius: 10px;
         padding: 15px;
-        background: #0a0a1a;
+        text-align: center;
+        margin: 5px 0;
+        border: 1px solid #333;
+    }
+    
+    .warning-box {
+        background: linear-gradient(135deg, #3a1a1a, #2a0a0a);
+        border: 2px solid #ff0040;
+        color: #ff6680;
+        padding: 15px;
         border-radius: 10px;
         margin: 10px 0;
     }
     
-    .state {
-        text-align: center;
-        padding: 10px;
-        border-radius: 8px;
-        flex: 1;
-        margin: 0 5px;
-        opacity: 0.6;
-        transition: all 0.3s;
+    .success-box {
+        background: linear-gradient(135deg, #1a3a1a, #0a2a0a);
+        border: 2px solid #00ff40;
+        color: #66ff80;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
     }
     
-    .state.active {
-        opacity: 1;
-        box-shadow: 0 0 20px currentColor;
+    .history-win { color: #00ff40; font-weight: 900; }
+    .history-lose { color: #ff0040; font-weight: 900; }
+    
+    .progress-bar {
+        height: 20px;
+        background: #1a1a1a;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+        transition: width 0.5s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        color: #000;
+    }
+    
+    .explanation-box {
+        background: #0f0f1a;
+        border-left: 4px solid #00ffff;
+        padding: 15px;
+        margin: 10px 0;
+        border-radius: 0 10px 10px 0;
+        font-size: 12px;
+        line-height: 1.6;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# === 3 APPROACHES PARALLEL ===
+# === OMNI PREDICTOR ENGINE ===
 
-class BayesianApproach:
-    """
-    Approach 1: Bayesian Inference
-    - Update prior beliefs with new evidence
-    - Calculate posterior probability for each pair
-    - Use Beta distribution for win/loss modeling
-    """
-    def __init__(self):
-        self.prior_alpha = 1  # Success prior
-        self.prior_beta = 1   # Failure prior
-        
-    def update(self, win):
-        if win:
-            self.prior_alpha += 1
-        else:
-            self.prior_beta += 1
+class OmniPredictor:
+    """Hệ thống dự đoán đa phương pháp - Top 1%"""
     
-    def get_posterior_mean(self):
-        return self.prior_alpha / (self.prior_alpha + self.prior_beta)
-    
-    def predict(self, db, history):
-        if len(db) < 15:
-            return None, 0
-        
-        # Calculate posterior for each pair
-        pairs_score = []
-        for p in combinations("0123456789", 2):
-            pair = "".join(p)
-            
-            # Likelihood from data
-            freq = sum(1 for n in db[-30:] if set(pair).issubset(set(n)))
-            gan = self._calculate_gan(db, pair)
-            
-            # Bayesian score
-            likelihood = freq / 30 if freq > 0 else 0.01
-            posterior = (self.prior_alpha + freq) / (self.prior_alpha + self.prior_beta + 30)
-            
-            # Adjust by gan
-            if 4 <= gan <= 10:
-                posterior *= 1.5
-            
-            pairs_score.append((pair, posterior * 100, gan, freq))
-        
-        pairs_score.sort(key=lambda x: x[1], reverse=True)
-        confidence = self.get_posterior_mean() * 100
-        
-        return pairs_score[:5], confidence
-    
-    def _calculate_gan(self, db, pair):
-        gan = 0
-        for num in reversed(db):
-            if not set(pair).issubset(set(num)):
-                gan += 1
-            else:
-                break
-        return gan
-
-class FractalApproach:
-    """
-    Approach 2: Fractal Time Series Analysis
-    - Detect self-similar patterns
-    - Calculate Hurst exponent
-    - Find fractal dimension
-    - Exploit long-term memory
-    """
-    def __init__(self):
-        self.window_sizes = [5, 10, 20]
-        
-    def calculate_hurst(self, series):
-        """Calculate Hurst exponent"""
-        if len(series) < 10:
-            return 0.5
-        
-        lags = range(2, min(20, len(series)//2))
-        tau = [np.std(np.subtract(series[lag:], series[:-lag])) for lag in lags]
-        
-        try:
-            hurst = np.polyfit(np.log(lags), np.log(tau), 1)[0]
-            return hurst
-        except:
-            return 0.5
-    
-    def detect_fractal_patterns(self, db):
-        """Find repeating patterns at different scales"""
-        patterns = defaultdict(list)
-        
-        for window in self.window_sizes:
-            if len(db) < window * 2:
-                continue
-            
-            for i in range(len(db) - window):
-                chunk = db[i:i+window]
-                chunk_hash = hashlib.md5("".join(chunk).encode()).hexdigest()[:8]
-                patterns[chunk_hash].append(i)
-        
-        # Find patterns that repeat
-        repeating = {k: v for k, v in patterns.items() if len(v) >= 2}
-        return repeating
-    
-    def predict(self, db, history):
-        if len(db) < 20:
-            return None, 0
-        
-        hurst = self.calculate_hurst([sum(int(d) for d in n) for n in db])
-        patterns = self.detect_fractal_patterns(db)
-        
-        # If hurst > 0.5, trend following
-        # If hurst < 0.5, mean reversion
-        # If hurst ≈ 0.5, random walk
-        
-        pairs_score = []
-        for p in combinations("0123456789", 2):
-            pair = "".join(p)
-            score = 50  # Base score
-            
-            if hurst > 0.6:
-                # Trend following - bet on recent
-                recent_freq = sum(1 for n in db[-10:] if set(pair).issubset(set(n)))
-                score += recent_freq * 10
-            elif hurst < 0.4:
-                # Mean reversion - bet on absent
-                gan = self._calculate_gan(db, pair)
-                if 5 <= gan <= 15:
-                    score += 30
-            else:
-                # Random - use frequency
-                freq = sum(1 for n in db[-30:] if set(pair).issubset(set(n)))
-                if 3 <= freq <= 7:
-                    score += 20
-            
-            pairs_score.append((pair, score, self._calculate_gan(db, pair), 0))
-        
-        pairs_score.sort(key=lambda x: x[1], reverse=True)
-        confidence = 40 + abs(hurst - 0.5) * 100
-        
-        return pairs_score[:5], confidence
-    
-    def _calculate_gan(self, db, pair):
-        gan = 0
-        for num in reversed(db):
-            if not set(pair).issubset(set(num)):
-                gan += 1
-            else:
-                break
-        return gan
-
-class MetaLearningApproach:
-    """
-    Approach 3: Ensemble Meta-Learning
-    - Combine multiple weak learners
-    - Adaptive weighting based on recent performance
-    - Stacking with meta-classifier
-    """
-    def __init__(self):
-        self.weights = {'bayesian': 0.33, 'fractal': 0.33, 'heuristic': 0.34}
-        self.recent_performance = {'bayesian': [], 'fractal': [], 'heuristic': []}
-        
-    def update_weights(self, approach_name, correct):
-        self.recent_performance[approach_name].append(1 if correct else 0)
-        
-        # Keep only last 10
-        for key in self.recent_performance:
-            self.recent_performance[key] = self.recent_performance[key][-10:]
-        
-        # Calculate accuracy for each
-        accuracies = {}
-        for key, perf in self.recent_performance.items():
-            if perf:
-                accuracies[key] = sum(perf) / len(perf)
-            else:
-                accuracies[key] = 0.33
-        
-        # Normalize weights
-        total = sum(accuracies.values())
-        if total > 0:
-            self.weights = {k: v/total for k, v in accuracies.items()}
-    
-    def heuristic_score(self, db, pair):
-        """Simple heuristic rules"""
-        score = 0
-        
-        # Frequency
-        freq = sum(1 for n in db[-30:] if set(pair).issubset(set(n)))
-        if 2 <= freq <= 8:
-            score += 30
-        
-        # Gan
-        gan = 0
-        for num in reversed(db):
-            if not set(pair).issubset(set(num)):
-                gan += 1
-            else:
-                break
-        
-        if 5 <= gan <= 12:
-            score += 40
-        
-        # Streak
-        streak = 0
-        for num in reversed(db):
-            if set(pair).issubset(set(num)):
-                streak += 1
-            else:
-                break
-        
-        if streak == 0:
-            score += 20
-        elif streak >= 3:
-            score -= 40
-        
-        return score, gan
-    
-    def predict(self, db, history):
-        if len(db) < 15:
-            return None, 0
-        
-        # Get predictions from each approach
-        bayesian = BayesianApproach()
-        fractal = FractalApproach()
-        
-        bayes_pairs, bayes_conf = bayesian.predict(db, history)
-        fractal_pairs, fractal_conf = fractal.predict(db, history)
-        
-        # Heuristic
-        heuristic_pairs = []
-        for p in combinations("0123456789", 2):
-            pair = "".join(p)
-            score, gan = self.heuristic_score(db, pair)
-            heuristic_pairs.append((pair, score, gan, 0))
-        heuristic_pairs.sort(key=lambda x: x[1], reverse=True)
-        heuristic_conf = 50
-        
-        # Ensemble voting
-        all_pairs = set()
-        for pairs in [bayes_pairs, fractal_pairs, heuristic_pairs]:
-            if pairs:
-                for p in pairs:
-                    all_pairs.add(p[0])
-        
-        ensemble_scores = []
-        for pair in all_pairs:
-            total_score = 0
-            
-            # Bayesian vote
-            if bayes_pairs:
-                for i, (p, score, _, _) in enumerate(bayes_pairs):
-                    if p == pair:
-                        total_score += score * self.weights['bayesian'] * (5-i)
-                        break
-            
-            # Fractal vote
-            if fractal_pairs:
-                for i, (p, score, _, _) in enumerate(fractal_pairs):
-                    if p == pair:
-                        total_score += score * self.weights['fractal'] * (5-i)
-                        break
-            
-            # Heuristic vote
-            if heuristic_pairs:
-                for i, (p, score, _, _) in enumerate(heuristic_pairs):
-                    if p == pair:
-                        total_score += score * self.weights['heuristic'] * (5-i)
-                        break
-            
-            ensemble_scores.append((pair, total_score, 0, 0))
-        
-        ensemble_scores.sort(key=lambda x: x[1], reverse=True)
-        confidence = (bayes_conf + fractal_conf + heuristic_conf) / 3
-        
-        return ensemble_scores[:5], confidence
-
-# === QUANTUM META-LEARNING ENGINE ===
-
-class QuantumMetaEngine:
-    """
-    Superposition of all approaches
-    Collapses to best one based on measurement (results)
-    """
-    def __init__(self, db, history):
+    def __init__(self, db, history=None):
         self.db = db
-        self.history = history
-        self.bayesian = BayesianApproach()
-        self.fractal = FractalApproach()
-        self.meta = MetaLearningApproach()
+        self.history = history or []
+        self.all_pairs = []
+        self.methods_results = {}
         
-        # Initialize from history
-        self._learn_from_history()
+    def method_1_frequency(self):
+        """Phương pháp 1: Tần suất thuần túy"""
+        results = []
+        recent_str = "".join(self.db[-50:])
+        single_pool = Counter(recent_str)
+        
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            freq = single_pool[p[0]] + single_pool[p[1]]
+            results.append({'pair': pair, 'score': freq * 5, 'method': 'FREQUENCY'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
     
-    def _learn_from_history(self):
-        """Update all approaches from history"""
-        for h in self.history[:20]:  # Last 20
-            if 'KQ' in h and 'Dự đoán' in h:
-                win = '🔥' in h['KQ']
-                self.bayesian.update(win)
-    
-    def get_approach_accuracies(self):
-        """Calculate accuracy for each approach"""
-        acc = {}
-        for name, perf in self.meta.recent_performance.items():
-            if perf:
-                acc[name] = sum(perf) / len(perf) * 100
+    def method_2_gan(self):
+        """Phương pháp 2: Số gan (vàng 5-12 kỳ)"""
+        results = []
+        
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            gan = 0
+            for num in reversed(self.db):
+                if not set(p).issubset(set(num)):
+                    gan += 1
+                else:
+                    break
+            
+            # Điểm cao nhất cho gan 5-12
+            if 5 <= gan <= 12:
+                score = 100 - abs(gan - 8.5) * 5  # Đỉnh ở gan 8-9
+            elif 2 <= gan <= 4:
+                score = 50
+            elif gan > 15:
+                score = 10
             else:
-                acc[name] = 50
-        return acc
+                score = 30
+            
+            results.append({'pair': pair, 'score': score, 'method': 'GAN', 'gan': gan})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
     
-    def should_skip(self, confidence, approach_accuracies):
-        """Decide whether to skip this round"""
-        # Skip if all approaches have low accuracy
-        avg_acc = sum(approach_accuracies.values()) / len(approach_accuracies)
-        if avg_acc < 35:
-            return True, "TẤT CẢ APPROACH ĐANG THUA"
+    def method_3_streak(self):
+        """Phương pháp 3: Bệt (nhưng tránh bệt quá dài)"""
+        results = []
         
-        # Skip if confidence too low
-        if confidence < 45:
-            return True, "ĐỘ TIN CẬY THẤP"
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            streak = 0
+            for num in reversed(self.db):
+                if set(p).issubset(set(num)):
+                    streak += 1
+                else:
+                    break
+            
+            # Ưu tiên streak 1-2, tránh >= 3
+            if streak == 1:
+                score = 80
+            elif streak == 2:
+                score = 60
+            elif streak >= 3:
+                score = 10  # Bẫy
+            else:
+                score = 40
+            
+            results.append({'pair': pair, 'score': score, 'method': 'STREAK', 'streak': streak})
         
-        # Skip if entropy too high
-        entropy = self._calculate_entropy()
-        if entropy > 3.4:
-            return True, "QUÁ HỖN LOẠN"
-        
-        return False, "OK"
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
     
-    def _calculate_entropy(self):
+    def method_4_shadow(self):
+        """Phương pháp 4: Shadow number (số đi sau)"""
         if len(self.db) < 10:
-            return 3.5
+            return []
         
-        recent = "".join(self.db[-10:])
-        counter = Counter(recent)
-        total = len(recent)
+        shadow_map = defaultdict(Counter)
+        for idx in range(len(self.db) - 1):
+            current = self.db[idx]
+            next_num = self.db[idx + 1]
+            for d in current:
+                for nd in next_num:
+                    shadow_map[d][nd] += 1
         
-        entropy = 0
-        for count in counter.values():
+        results = []
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            score = 0
+            # Check nếu p[1] là shadow của p[0] hoặc ngược lại
+            if p[1] in shadow_map[p[0]]:
+                score += shadow_map[p[0]][p[1]] * 10
+            if p[0] in shadow_map[p[1]]:
+                score += shadow_map[p[1]][p[0]] * 10
+            
+            results.append({'pair': pair, 'score': score, 'method': 'SHADOW'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def method_5_complement(self):
+        """Phương pháp 5: Số bù (9-x)"""
+        results = []
+        
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            # Check nếu là cặp bù
+            is_complement = (int(p[0]) + int(p[1])) == 9
+            
+            if is_complement:
+                score = 70
+            else:
+                # Check tần suất cặp bù xuất hiện cùng
+                complement_count = 0
+                for num in self.db[-30:]:
+                    has_p0 = p[0] in num
+                    has_comp_p1 = str(9 - int(p[1])) in num
+                    if has_p0 and has_comp_p1:
+                        complement_count += 1
+                
+                score = complement_count * 15
+            
+            results.append({'pair': pair, 'score': score, 'method': 'COMPLEMENT'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def method_6_pattern(self):
+        """Phương pháp 6: Pattern lặp"""
+        results = []
+        
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            score = 0
+            
+            # Tìm pattern lặp
+            for i in range(len(self.db) - 5):
+                if set(p).issubset(set(self.db[i])):
+                    # Check nếu xuất hiện lại sau 3-7 kỳ
+                    for j in range(i+3, min(i+8, len(self.db))):
+                        if set(p).issubset(set(self.db[j])):
+                            score += 20
+            
+            results.append({'pair': pair, 'score': score, 'method': 'PATTERN'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def method_7_position(self):
+        """Phương pháp 7: Phân tích vị trí"""
+        positions = {i: Counter() for i in range(5)}
+        for num in self.db[-30:]:
+            for i, d in enumerate(num):
+                positions[i][d] += 1
+        
+        results = []
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            score = 0
+            
+            # Check nếu 2 số này hot ở các vị trí khác nhau
+            for pos in positions:
+                if p[0] in [x[0] for x in positions[pos].most_common(3)]:
+                    score += 10
+                if p[1] in [x[0] for x in positions[pos].most_common(3)]:
+                    score += 10
+            
+            results.append({'pair': pair, 'score': score, 'method': 'POSITION'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def method_8_entropy(self):
+        """Phương pháp 8: Entropy cân bằng"""
+        recent_str = "".join(self.db[-20:])
+        counter = Counter(recent_str)
+        total = len(recent_str)
+        
+        # Tính entropy từng số
+        entropy_scores = {}
+        for d in "0123456789":
+            count = counter.get(d, 0)
             if count > 0:
                 p = count / total
-                entropy -= p * math.log2(p)
+                entropy_scores[d] = -p * math.log2(p) if p > 0 else 0
+            else:
+                entropy_scores[d] = 0.5  # Số lạnh có tiềm năng
         
-        return entropy
+        results = []
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            score = (entropy_scores.get(p[0], 0) + entropy_scores.get(p[1], 0)) * 50
+            results.append({'pair': pair, 'score': score, 'method': 'ENTROPY'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def method_9_lucky(self):
+        """Phương pháp 9: Tuổi Sửu + Ngũ hành"""
+        results = []
+        
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            score = 0
+            
+            # Tuổi Sửu
+            lucky_count = sum(1 for d in p if int(d) in LUCKY_OX)
+            score += lucky_count * 20
+            
+            # Chẵn lẻ cân bằng
+            even_count = sum(1 for d in p if int(d) % 2 == 0)
+            if even_count == 1:  # 1 chẵn 1 lẻ
+                score += 30
+            
+            # Cao thấp cân bằng
+            high_count = sum(1 for d in p if int(d) >= 5)
+            if high_count == 1:  # 1 cao 1 thấp
+                score += 25
+            
+            results.append({'pair': pair, 'score': score, 'method': 'LUCKY'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def method_10_advanced(self):
+        """Phương pháp 10: AI tổng hợp nâng cao"""
+        results = []
+        
+        # Kết hợp nhiều yếu tố
+        for p in combinations("0123456789", 2):
+            pair = "".join(p)
+            score = 0
+            
+            # 1. Tần suất 30 kỳ
+            freq = sum(1 for n in self.db[-30:] if set(p).issubset(set(n)))
+            if 3 <= freq <= 7:
+                score += 40
+            
+            # 2. Gan zone
+            gan = 0
+            for num in reversed(self.db):
+                if not set(p).issubset(set(num)):
+                    gan += 1
+                else:
+                    break
+            
+            if 5 <= gan <= 12:
+                score += 50
+            
+            # 3. Tránh bệt >= 3
+            streak = 0
+            for num in reversed(self.db):
+                if set(p).issubset(set(num)):
+                    streak += 1
+                else:
+                    break
+            
+            if streak >= 3:
+                score -= 60
+            elif streak == 1:
+                score += 30
+            
+            # 4. History learning
+            if self.history:
+                pair_losses = sum(1 for h in self.history if h.get('Dự đoán') == pair and '❌' in h.get('KQ', ''))
+                if pair_losses >= 2:
+                    score -= 40
+            
+            results.append({'pair': pair, 'score': score, 'method': 'ADVANCED'})
+        
+        return sorted(results, key=lambda x: x['score'], reverse=True)[:20]
+    
+    def generate_all_candidates(self):
+        """Tạo tất cả ứng viên từ 10 phương pháp"""
+        self.methods_results = {
+            'FREQUENCY': self.method_1_frequency(),
+            'GAN': self.method_2_gan(),
+            'STREAK': self.method_3_streak(),
+            'SHADOW': self.method_4_shadow(),
+            'COMPLEMENT': self.method_5_complement(),
+            'PATTERN': self.method_6_pattern(),
+            'POSITION': self.method_7_position(),
+            'ENTROPY': self.method_8_entropy(),
+            'LUCKY': self.method_9_lucky(),
+            'ADVANCED': self.method_10_advanced()
+        }
+        
+        # Gom tất cả vào
+        all_candidates = defaultdict(lambda: {'score': 0, 'methods': [], 'details': {}})
+        
+        for method_name, results in self.methods_results.items():
+            for i, item in enumerate(results):
+                pair = item['pair']
+                score = item['score']
+                
+                # Normalize score theo rank
+                rank_score = max(0, 20 - i) * (score / 100)
+                
+                all_candidates[pair]['score'] += rank_score
+                all_candidates[pair]['methods'].append(method_name)
+                all_candidates[pair]['details'][method_name] = score
+        
+        # Convert to list
+        self.all_pairs = [
+            {'pair': pair, 'total_score': data['score'], 'methods': data['methods'], 'details': data['details']}
+            for pair, data in all_candidates.items()
+        ]
+        
+        self.all_pairs.sort(key=lambda x: x['total_score'], reverse=True)
+    
+    def select_top_3(self):
+        """Chọn top 3 từ danh sách đã tổng hợp"""
+        if not self.all_pairs:
+            self.generate_all_candidates()
+        
+        top_3 = self.all_pairs[:3]
+        
+        # Gắn nhãn
+        labels = ['🥇 GOLD', '🥈 SILVER', '🥉 BRONZE']
+        for i, pair in enumerate(top_3):
+            pair['label'] = labels[i] if i < len(labels) else f'TOP {i+1}'
+        
+        return top_3
+    
+    def create_final_pick(self, top_3):
+        """Tạo 1 cặp FINAL tối ưu nhất"""
+        if not top_3:
+            return None
+        
+        # Phân tích sâu top 3
+        final_analysis = []
+        
+        for pair_data in top_3:
+            pair = pair_data['pair']
+            score = pair_data['total_score']
+            methods = pair_data['methods']
+            
+            # Tính thêm các yếu tố bổ sung
+            gan = 0
+            for num in reversed(self.db):
+                if not set(pair).issubset(set(num)):
+                    gan += 1
+                else:
+                    break
+            
+            streak = 0
+            for num in reversed(self.db):
+                if set(pair).issubset(set(num)):
+                    streak += 1
+                else:
+                    break
+            
+            freq = sum(1 for n in self.db[-30:] if set(pair).issubset(set(n)))
+            
+            # Final score với trọng số tối ưu
+            final_score = score
+            
+            # Bonus cho gan vàng
+            if 5 <= gan <= 12:
+                final_score *= 1.3
+            
+            # Penalty cho bệt dài
+            if streak >= 3:
+                final_score *= 0.6
+            
+            # Bonus cho nhiều phương pháp đồng thuận
+            if len(methods) >= 7:
+                final_score *= 1.2
+            
+            final_analysis.append({
+                'pair': pair,
+                'final_score': final_score,
+                'original_score': score,
+                'methods_count': len(methods),
+                'gan': gan,
+                'streak': streak,
+                'frequency': freq,
+                'methods': methods
+            })
+        
+        # Sort theo final score
+        final_analysis.sort(key=lambda x: x['final_score'], reverse=True)
+        
+        return final_analysis[0]
+    
+    def get_explanation(self, final_pick):
+        """Giải thích chi tiết vì sao chọn"""
+        if not final_pick:
+            return ""
+        
+        explanations = []
+        
+        # 1. Phương pháp đồng thuận
+        methods_str = ", ".join(final_pick['methods'][:5])
+        explanations.append(f"✅ **Đa phương pháp đồng thuận:** {final_pick['methods_count']}/10 phương pháp chọn cặp này ({methods_str})")
+        
+        # 2. Nhịp gan
+        if 5 <= final_pick['gan'] <= 12:
+            explanations.append(f"✅ **Nhịp gan vàng:** {final_pick['gan']} kỳ (vùng tối ưu 5-12)")
+        else:
+            explanations.append(f"⚠️ **Nhịp gan:** {final_pick['gan']} kỳ")
+        
+        # 3. Tần suất
+        if 3 <= final_pick['frequency'] <= 7:
+            explanations.append(f"✅ **Tần suất lý tưởng:** {final_pick['frequency']} lần/30 kỳ")
+        else:
+            explanations.append(f"📊 **Tần suất:** {final_pick['frequency']} lần/30 kỳ")
+        
+        # 4. Bệt
+        if final_pick['streak'] == 0:
+            explanations.append(f"✅ **Không bệt:** An toàn, không phải bẫy")
+        elif final_pick['streak'] == 1:
+            explanations.append(f"✅ **Bệt 1 kỳ:** Có thể rơi lại")
+        elif final_pick['streak'] >= 3:
+            explanations.append(f"❌ **Bệt {final_pick['streak']} kỳ:** Rủi ro cao, có thể là bẫy")
+        
+        # 5. Score
+        explanations.append(f" **Điểm tổng hợp:** {final_pick['final_score']:.1f} (cao nhất)")
+        
+        return "\n\n".join(explanations)
+    
+    def get_risk_warning(self, final_pick):
+        """Cảnh báo rủi ro"""
+        warnings = []
+        
+        if final_pick['streak'] >= 3:
+            warnings.append("⚠️ **RỦI RO CAO:** Đang bệt dài, có thể là bẫy nhà cái")
+        
+        if final_pick['gan'] > 15:
+            warnings.append("⚠️ **GAN QUÁ SÂU:** Số này lâu chưa về, rủi ro cao")
+        
+        if final_pick['methods_count'] < 5:
+            warnings.append("⚠️ **ÍT ĐỒNG THUẬN:** Chỉ {final_pick['methods_count']} phương pháp chọn, độ tin cậy thấp")
+        
+        # Check history
+        if self.history:
+            recent_losses = sum(1 for h in self.history[:5] if '❌' in h.get('KQ', ''))
+            if recent_losses >= 4:
+                warnings.append("⚠️ **THUA NHIỀU:** 4/5 kỳ gần thua, nên nghỉ hoặc đánh nhỏ")
+        
+        if not warnings:
+            warnings.append("✅ **RỦI RO THẤP:** Các chỉ số đều trong vùng an toàn")
+        
+        return "\n\n".join(warnings)
     
     def predict(self):
-        """Quantum prediction - superposition of approaches"""
+        """Dự đoán cuối cùng"""
         if len(self.db) < 15:
             return None
         
-        # Get predictions from all approaches
-        bayes_pairs, bayes_conf = self.bayesian.predict(self.db, self.history)
-        fractal_pairs, fractal_conf = self.fractal.predict(self.db, self.history)
-        meta_pairs, meta_conf = self.meta.predict(self.db, self.history)
-        
-        # Get approach accuracies
-        approach_acc = self.get_approach_accuracies()
-        
-        # Choose best approach based on recent performance
-        best_approach = max(approach_acc.keys(), key=lambda k: approach_acc[k])
-        
-        if best_approach == 'bayesian':
-            final_pairs = bayes_pairs
-            confidence = bayes_conf
-        elif best_approach == 'fractal':
-            final_pairs = fractal_pairs
-            confidence = fractal_conf
-        else:
-            final_pairs = meta_pairs
-            confidence = meta_conf
-        
-        # Check if should skip
-        skip, skip_reason = self.should_skip(confidence, approach_acc)
-        
-        # Top 8
-        single_pool = Counter("".join(self.db[-50:]))
-        top8 = "".join([d for d, _ in single_pool.most_common(8)])
+        self.generate_all_candidates()
+        top_3 = self.select_top_3()
+        final_pick = self.create_final_pick(top_3)
         
         return {
-            'pairs': final_pairs,
-            'confidence': confidence,
-            'skip': skip,
-            'skip_reason': skip_reason,
-            'approach_accuracies': approach_acc,
-            'best_approach': best_approach,
-            'top8': top8,
-            'bayesian_conf': bayes_conf,
-            'fractal_conf': fractal_conf,
-            'meta_conf': meta_conf
+            'all_pairs': self.all_pairs[:10],  # Top 10
+            'top_3': top_3,
+            'final': final_pick,
+            'explanation': self.get_explanation(final_pick) if final_pick else "",
+            'risk_warning': self.get_risk_warning(final_pick) if final_pick else "",
+            'methods_results': self.methods_results
         }
 
 # === XỬ LÝ DỮ LIỆU ===
@@ -585,41 +648,34 @@ def get_nums(text):
 
 # === GIAO DIỆN ===
 
-st.markdown('<h1 class="quantum-header">⚛️ TITAN V52 - QUANTUM META-LEARNING</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#888; font-size:10px;">3 Approaches | Adaptive Weighting | Quantum Selection</p>', unsafe_allow_html=True)
+st.markdown('<h1 class="god-header">🎯 TITAN V52 - OMNI PREDICTOR</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#888; font-size:11px;">10 Phương Pháp | Top 3 Selection | Final Optimization | God Mode</p>', unsafe_allow_html=True)
 
 if "history" not in st.session_state:
     st.session_state.history = []
 
 user_input = st.text_area("📥 Kết quả (kỳ mới nhất ở dưới):", height=100, 
-                          placeholder="07988\n35782")
+                          placeholder="84890\n07119\n33627")
 
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("⚛️ KÍCH HOẠT", type="primary", use_container_width=True):
+    if st.button("🎯 KÍCH HOẠT OMNI", type="primary", use_container_width=True):
         nums = get_nums(user_input)
         if len(nums) >= 15:
-            # Check result
             if "last_pred" in st.session_state and nums:
                 lp = st.session_state.last_pred
                 last = nums[-1]
-                if lp and lp['pairs'] and not lp.get('skip', False):
-                    best = lp['pairs'][0][0]
+                if lp and lp.get('final'):
+                    best = lp['final']['pair']
                     win = all(d in last for d in best)
-                    
-                    # Update meta-learning
-                    if 'best_approach' in lp:
-                        lp['meta'].update_weights(lp['best_approach'], win)
-                    
                     st.session_state.history.insert(0, {
                         'Kỳ': last,
                         'Dự đoán': best,
                         'KQ': '🔥' if win else '❌'
                     })
             
-            engine = QuantumMetaEngine(nums, st.session_state.history)
-            st.session_state.last_pred = engine.predict()
-            st.session_state.last_pred['meta'] = engine.meta  # Save for learning
+            predictor = OmniPredictor(nums, st.session_state.history)
+            st.session_state.last_pred = predictor.predict()
             st.rerun()
         else:
             st.warning(f"Cần 15+ kỳ (có {len(nums)})")
@@ -634,99 +690,79 @@ with col2:
 if "last_pred" in st.session_state:
     res = st.session_state.last_pred
     
-    # === APPROACH TABS ===
-    st.markdown("""<div style="text-align:center; margin:15px 0; font-size:14px;">📊 SO SÁNH 3 APPROACHES</div>""", unsafe_allow_html=True)
+    # === FINAL PICK ===
+    st.markdown("""<div style="text-align:center; margin:20px 0; font-size:18px;"> BẠCH THỦ FINAL</div>""", unsafe_allow_html=True)
     
-    acc = res['approach_accuracies']
-    
-    st.markdown(f"""
-    <div class="approach-tabs">
-        <div class="tab {'active' if res['best_approach'] == 'bayesian' else ''} {'win' if acc['bayesian'] >= 40 else 'lose' if acc['bayesian'] < 35 else ''}">
-            <div style="font-weight:900; font-size:12px;">BAYESIAN</div>
-            <div style="color:{'#00ff40' if acc['bayesian'] >= 40 else '#ff0040' if acc['bayesian'] < 35 else '#ffff00'}; font-size:16px;">{acc['bayesian']:.0f}%</div>
-        </div>
-        <div class="tab {'active' if res['best_approach'] == 'fractal' else ''} {'win' if acc['fractal'] >= 40 else 'lose' if acc['fractal'] < 35 else ''}">
-            <div style="font-weight:900; font-size:12px;">FRACTAL</div>
-            <div style="color:{'#00ff40' if acc['fractal'] >= 40 else '#ff0040' if acc['fractal'] < 35 else '#ffff00'}; font-size:16px;">{acc['fractal']:.0f}%</div>
-        </div>
-        <div class="tab {'active' if res['best_approach'] == 'heuristic' else ''} {'win' if acc['heuristic'] >= 40 else 'lose' if acc['heuristic'] < 35 else ''}">
-            <div style="font-weight:900; font-size:12px;">ENSEMBLE</div>
-            <div style="color:{'#00ff40' if acc['heuristic'] >= 40 else '#ff0040' if acc['heuristic'] < 35 else '#ffff00'}; font-size:16px;">{acc['heuristic']:.0f}%</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # === SKIP WARNING ===
-    if res['skip']:
+    if res['final']:
         st.markdown(f"""
-        <div class="quantum-box" style="border-color:#ff0040;">
-            <div style="font-size:24px; color:#ff0040; text-align:center; font-weight:900;">
-                ⚠️ KHÔNG NÊN ĐÁNH
-            </div>
-            <div style="text-align:center; margin-top:10px; color:#ff6680;">{res['skip_reason']}</div>
+        <div class="final-pick">
+            {res['final']['pair'][0]} - {res['final']['pair'][1]}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Giải thích
+        st.markdown("""<div style="text-align:center; margin:20px 0; font-size:16px;">📖 VÌ SAO CHỌN?</div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="explanation-box">
+        {res['explanation'].replace(chr(10), '<br>')}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Cảnh báo rủi ro
+        st.markdown("""<div style="text-align:center; margin:20px 0; font-size:16px;">⚠️ RỦI RO</div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="warning-box">
+        {res['risk_warning'].replace(chr(10), '<br>')}
         </div>
         """, unsafe_allow_html=True)
     else:
-        # === METRICS ===
-        st.markdown(f"""
-        <div class="metric-row">
-            <div class="metric-item">
-                <div style="font-size:9px; color:#888;">CONFIDENCE</div>
-                <div style="font-size:20px; font-weight:900; color:#00ffff;">{res['confidence']:.0f}%</div>
-            </div>
-            <div class="metric-item">
-                <div style="font-size:9px; color:#888;">BEST APPROACH</div>
-                <div style="font-size:16px; font-weight:900; color:#FFD700;">{res['best_approach'].upper()}</div>
-            </div>
-            <div class="metric-item">
-                <div style="font-size:9px; color:#888;">TOP PAIR</div>
-                <div style="font-size:20px; font-weight:900; color:#00ff40;">{res['pairs'][0][0]}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # === TOP PAIR ===
-        st.markdown("""<div style="text-align:center; margin:15px 0; font-size:14px;">🎯 CẶP VIP</div>""", unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="quantum-box" style="border-color:#00ffff;">
-            <div class="number-display" style="color:#00ffff;">{res['pairs'][0][0][0]} - {res['pairs'][0][0][1]}</div>
-            <div style="text-align:center;">
-                <span class="tag-quantum">SCORE: {res['pairs'][0][1]:.0f}</span>
-                <span class="tag-quantum">GAN: {res['pairs'][0][2]}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # === TOP 5 ===
-        st.markdown("""<div style="text-align:center; margin:15px 0; font-size:14px;">🎯 TOP 5</div>""", unsafe_allow_html=True)
-        
-        for i, (pair, score, gan, _) in enumerate(res['pairs'][:5]):
-            tags = ""
-            if 4 <= gan <= 10:
-                tags += '<span class="tag-quantum">GAN VÀNG</span>'
-            
-            st.markdown(f"""
-            <div style="background:#1a1a2e; border-radius:8px; padding:10px; margin:5px 0; 
-                        border-left: 4px solid {'#00ff40' if i == 0 else '#444'};">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:22px; font-weight:900; color:#FFD700;">{pair[0]}-{pair[1]}</span>
-                    <span style="font-size:16px; color:#00ff40;">{score:.0f}</span>
+        st.error("Không thể tạo dự đoán. Kiểm tra lại dữ liệu.")
+    
+    # === TOP 3 ===
+    st.markdown("""<div style="text-align:center; margin:25px 0; font-size:18px;">🥇 TOP 3 MẠNH NHẤT</div>""", unsafe_allow_html=True)
+    
+    if res['top_3']:
+        cols = st.columns(3)
+        for i, pair_data in enumerate(res['top_3']):
+            with cols[i]:
+                card_class = "top3-gold" if i == 0 else ("top3-silver" if i == 1 else "top3-bronze")
+                st.markdown(f"""
+                <div class="top3-card {card_class}">
+                    <div style="font-size:14px; margin-bottom:10px;">{pair_data['label']}</div>
+                    <div style="font-size:36px; font-weight:900; color:#FFD700; letter-spacing:6px;">
+                        {pair_data['pair'][0]} - {pair_data['pair'][1]}
+                    </div>
+                    <div style="font-size:12px; margin-top:10px; color:#888;">
+                        Score: {pair_data['total_score']:.1f}<br>
+                        Methods: {len(pair_data['methods'])}
+                    </div>
                 </div>
-                <div style="margin-top:5px;">{tags}</div>
-            </div>
-            """, unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+    
+    # === TOP 10 ===
+    st.markdown("""<div style="text-align:center; margin:25px 0; font-size:18px;">📊 TOP 10 ỨNG VIÊN</div>""", unsafe_allow_html=True)
+    
+    for i, pair_data in enumerate(res['all_pairs'][:10]):
+        methods_str = ", ".join(pair_data['methods'][:3])
         
-        # === TOP 8 ===
         st.markdown(f"""
-        <div class="quantum-box" style="border-color:#ffff00; margin-top:15px;">
-            <div style="font-size:11px; color:#888; text-align:center;">ĐỘ PHỦ SẢNH</div>
-            <div style="font-size:28px; font-weight:900; letter-spacing:6px; text-align:center; color:#ffff00;">{res['top8']}</div>
+        <div class="method-card method-advanced">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:12px; color:#888;">#{i+1}</span>
+                <span style="font-size:24px; font-weight:900; color:#FFD700; letter-spacing:4px;">
+                    {pair_data['pair'][0]} - {pair_data['pair'][1]}
+                </span>
+                <span style="font-size:16px; color:#00ff40;">{pair_data['total_score']:.1f}</span>
+            </div>
+            <div style="font-size:10px; color:#888; margin-top:5px;">
+                {methods_str}
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
     # === HISTORY ===
     if st.session_state.history:
-        st.markdown("""<div style="text-align:center; margin:20px 0; font-size:14px;">📋 LỊCH SỬ</div>""", unsafe_allow_html=True)
+        st.markdown("""<div style="text-align:center; margin:25px 0; font-size:18px;">📋 LỊCH SỬ</div>""", unsafe_allow_html=True)
         
         df = pd.DataFrame(st.session_state.history[:15])
         
@@ -744,18 +780,19 @@ if "last_pred" in st.session_state:
         color_rate = "#00ff40" if rate >= 40 else ("#ffff00" if rate >= 30 else "#ff0040")
         
         st.markdown(f"""
-        <div class="quantum-box" style="border-color:{color_rate}; margin-top:15px;">
-            <div style="font-size:12px; text-align:center;">TỶ LỆ THẮNG</div>
-            <div style="font-size:32px; font-weight:900; text-align:center; color:{color_rate};">{rate:.1f}% ({wins}/{total})</div>
-            <div class="confidence-quantum">
-                <div style="width:{rate}%; height:100%; background:{color_rate}; opacity:0.7;"></div>
+        <div class="metric-box" style="border: 2px solid {color_rate}; margin-top:15px;">
+            <div style="font-size:14px;">TỶ LỆ THẮNG</div>
+            <div style="font-size:32px; font-weight:900; color:{color_rate};">{rate:.1f}% ({wins}/{total})</div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width:{rate}%; background:{color_rate};">{rate:.0f}%</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
+# === FOOTER ===
 st.markdown("""
-<div style="text-align:center; color:#444; font-size:9px; margin-top:20px; padding-top:10px; border-top:1px solid #333;">
-    ⚛️ TITAN V52 - QUANTUM META-LEARNING | 3 Parallel Approaches | Adaptive Selection<br>
-    <i>Bayesian Inference | Fractal Analysis | Ensemble Learning</i>
+<div style="text-align:center; color:#444; font-size:10px; margin-top:30px; padding-top:15px; border-top:1px solid #333;">
+    🎯 TITAN V52 - OMNI PREDICTOR | 10 Phương Pháp | Top 3 Selection | Final Optimization<br>
+    <i>Tool hỗ trợ phân tích - Không đảm bảo 100% - Quản lý vốn thông minh</i>
 </div>
 """, unsafe_allow_html=True)
