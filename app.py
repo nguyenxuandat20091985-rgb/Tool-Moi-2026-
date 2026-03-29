@@ -3,70 +3,75 @@ import re, pandas as pd, numpy as np, math
 from collections import Counter, defaultdict
 from itertools import combinations
 from datetime import datetime
+import hashlib
 
 # === CẤU HÌNH ===
 LUCKY_OX = [0, 2, 5, 6, 7, 8]
-st.set_page_config(page_title="TITAN V51 - NEURAL GENESIS", page_icon="🧬", layout="centered")
+st.set_page_config(page_title="TITAN V52 - PHOENIX", page_icon="🔥", layout="centered")
 
-# === CSS GOD MODE ===
+# === CSS PHOENIX ===
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap');
     
     .stApp {
-        background: linear-gradient(180deg, #000000 0%, #0a0a1a 50%, #000000 100%);
+        background: linear-gradient(180deg, #0a0000 0%, #1a0a0a 50%, #0a0000 100%);
         color: #FFD700;
         font-family: 'Orbitron', monospace;
     }
     
-    .god-header {
-        font-size: 36px;
+    .phoenix-header {
+        font-size: 38px;
         font-weight: 900;
         text-align: center;
-        background: linear-gradient(90deg, #FFD700, #FF00FF, #00FFFF, #FFD700);
-        background-size: 300% 100%;
+        background: linear-gradient(90deg, #FF0000, #FFD700, #FF0000);
+        background-size: 200% 100%;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        animation: gradient-shift 3s ease infinite;
-        text-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+        animation: phoenix-glow 2s ease infinite;
     }
     
-    @keyframes gradient-shift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
+    @keyframes phoenix-glow {
+        0%, 100% { filter: brightness(1); }
+        50% { filter: brightness(1.5); }
     }
     
-    .status-box {
+    .signal-box {
         border-radius: 15px;
         padding: 20px;
         text-align: center;
         margin: 10px 0;
         border: 3px solid;
-        animation: pulse-glow 2s infinite;
     }
     
-    @keyframes pulse-glow {
-        0%, 100% { box-shadow: 0 0 20px currentColor; }
-        50% { box-shadow: 0 0 40px currentColor; }
-    }
-    
-    .status-pay {
+    .signal-green {
         background: linear-gradient(135deg, #1a3a1a, #0a2a0a);
         border-color: #00ff40;
         color: #00ff40;
+        animation: pulse-green 2s infinite;
     }
     
-    .status-take {
-        background: linear-gradient(135deg, #3a1a1a, #2a0a0a);
-        border-color: #ff0040;
-        color: #ff0040;
-    }
-    
-    .status-chaos {
+    .signal-yellow {
         background: linear-gradient(135deg, #3a3a1a, #2a2a0a);
         border-color: #ffff00;
         color: #ffff00;
+    }
+    
+    .signal-red {
+        background: linear-gradient(135deg, #3a1a1a, #2a0a0a);
+        border-color: #ff0040;
+        color: #ff0040;
+        animation: pulse-red 1s infinite;
+    }
+    
+    @keyframes pulse-green {
+        0%, 100% { box-shadow: 0 0 20px #00ff40; }
+        50% { box-shadow: 0 0 40px #00ff40; }
+    }
+    
+    @keyframes pulse-red {
+        0%, 100% { box-shadow: 0 0 20px #ff0040; }
+        50% { box-shadow: 0 0 40px #ff0040; }
     }
     
     .prediction-card {
@@ -86,36 +91,18 @@ st.markdown("""
         text-shadow: 0 0 20px #00FFFF;
     }
     
-    .skip-warning {
-        background: linear-gradient(135deg, #3a1a3a, #2a0a2a);
-        border: 3px solid #FF00FF;
-        color: #FF00FF;
-        padding: 30px;
-        border-radius: 15px;
-        text-align: center;
-        font-size: 24px;
-        font-weight: 900;
-        animation: blink-slow 2s infinite;
-    }
-    
-    @keyframes blink-slow {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
-    }
-    
-    .metric-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 10px;
+    .ensemble-meter {
+        display: flex;
+        justify-content: space-around;
         margin: 15px 0;
     }
     
-    .metric-cell {
+    .ensemble-cell {
+        text-align: center;
+        padding: 10px;
         background: #1a1a2e;
         border-radius: 10px;
-        padding: 15px 10px;
-        text-align: center;
-        border: 1px solid #333;
+        min-width: 70px;
     }
     
     .tag {
@@ -130,15 +117,47 @@ st.markdown("""
     .tag-green { background: #00ff40; color: #000; }
     .tag-red { background: #ff0040; color: #fff; }
     .tag-yellow { background: #ffff00; color: #000; }
+    .tag-blue { background: #0066ff; color: #fff; }
     .tag-purple { background: #9900ff; color: #fff; }
+    
+    .stop-loss-box {
+        background: linear-gradient(135deg, #3a0a0a, #2a0000);
+        border: 3px solid #ff0040;
+        color: #ff6680;
+        padding: 20px;
+        border-radius: 15px;
+        text-align: center;
+        font-size: 18px;
+        font-weight: 900;
+        animation: blink-fast 0.5s infinite;
+    }
+    
+    @keyframes blink-fast {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.6; }
+    }
+    
+    .bet-size-indicator {
+        font-size: 32px;
+        font-weight: 900;
+        text-align: center;
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
+    
+    .bet-max { background: #00ff40; color: #000; }
+    .bet-mid { background: #ffff00; color: #000; }
+    .bet-min { background: #ff6600; color: #000; }
+    .bet-none { background: #ff0040; color: #fff; }
     
     .history-win { color: #00ff40; font-weight: 900; }
     .history-lose { color: #ff0040; font-weight: 900; }
     
     .progress-bar {
-        height: 20px;
+        height: 25px;
         background: #1a1a1a;
-        border-radius: 10px;
+        border-radius: 12px;
         overflow: hidden;
         margin: 10px 0;
     }
@@ -146,67 +165,116 @@ st.markdown("""
     .progress-fill {
         height: 100%;
         background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
-        transition: width 0.5s;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 12px;
+        font-size: 14px;
         font-weight: bold;
         color: #000;
+        transition: width 0.5s;
+    }
+    
+    .stDataFrame {
+        background: #0a0a0a !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# === NEURAL GENESIS ENGINE ===
+# === 5-LỚP ENSEMBLE ENGINE ===
 
-class NeuralGenesis:
-    """Engine học từ sai lầm và phát hiện chu kỳ nhà cái"""
+class EnsemblePredictor:
+    """Kết hợp 5 thuật toán độc lập, chỉ bet khi đồng thuận"""
     
     def __init__(self, db, history=None):
         self.db = db
         self.history = history or []
-        self.mode = self._detect_house_mode()
-        self.learning_rate = self._calculate_learning_rate()
-        
-    def _detect_house_mode(self):
-        """
-        Phát hiện chế độ nhà cái:
-        - PAY: Đang trả thưởng (win rate cao)
-        - TAKE: Đang thu (win rate thấp)
-        - CHAOS: Không rõ pattern
-        """
-        if len(self.history) < 5:
-            return "CHAOS"
-        
-        recent_wins = sum(1 for h in self.history[:10] if '🔥' in h.get('KQ', ''))
-        win_rate = recent_wins / min(len(self.history), 10)
-        
-        if win_rate >= 0.5:
-            return "PAY"
-        elif win_rate <= 0.3:
-            return "TAKE"
-        return "CHAOS"
+        self.signals = {}
+        self._run_all_models()
     
-    def _calculate_learning_rate(self):
-        """Điều chỉnh độ tin cậy dựa trên lịch sử thua"""
-        if len(self.history) < 3:
-            return 1.0
-        
-        recent_losses = sum(1 for h in self.history[:5] if '❌' in h.get('KQ', ''))
-        
-        # Nếu thua nhiều -> giảm confidence threshold
-        if recent_losses >= 4:
-            return 0.6  # Cần confidence cao hơn mới đánh
-        elif recent_losses >= 2:
-            return 0.8
-        return 1.0
+    def _run_all_models(self):
+        """Chạy 5 model độc lập"""
+        self.signals['frequency'] = self._frequency_model()
+        self.signals['pattern'] = self._pattern_model()
+        self.signals['entropy'] = self._entropy_model()
+        self.signals['cycle'] = self._cycle_model()
+        self.signals['behavioral'] = self._behavioral_model()
     
-    def _calculate_entropy(self, window=10):
-        """Độ hỗn loạn - quyết định có nên đánh không"""
-        if len(self.db) < window:
-            return 3.5
+    def _frequency_model(self):
+        """Model 1: Phân tích tần suất thuần túy"""
+        if len(self.db) < 20:
+            return {'score': 50, 'pairs': [], 'signal': 'NEUTRAL'}
         
-        recent = "".join(self.db[-window:])
+        pair_pool = Counter()
+        for num in self.db[-50:]:
+            for p in combinations(sorted(set(num)), 2):
+                pair_pool[p] += 1
+        
+        top_pairs = []
+        for p, freq in pair_pool.most_common(10):
+            gan = 0
+            for num in reversed(self.db):
+                if not set(p).issubset(set(num)):
+                    gan += 1
+                else:
+                    break
+            
+            score = freq * 5
+            if 4 <= gan <= 10:
+                score += 40
+            elif gan > 15:
+                score -= 30
+            
+            top_pairs.append({'pair': "".join(p), 'score': score, 'gan': gan})
+        
+        top_pairs.sort(key=lambda x: x['score'], reverse=True)
+        
+        if top_pairs and top_pairs[0]['score'] > 100:
+            signal = 'BUY'
+        elif top_pairs and top_pairs[0]['score'] < 50:
+            signal = 'SELL'
+        else:
+            signal = 'NEUTRAL'
+        
+        return {'score': top_pairs[0]['score'] if top_pairs else 50, 
+                'pairs': top_pairs[:5], 'signal': signal}
+    
+    def _pattern_model(self):
+        """Model 2: Nhận diện pattern lặp"""
+        if len(self.db) < 30:
+            return {'score': 50, 'pairs': [], 'signal': 'NEUTRAL'}
+        
+        # Tìm số xuất hiện theo pattern
+        pattern_score = defaultdict(int)
+        
+        for i in range(len(self.db) - 2):
+            curr = self.db[i]
+            next_num = self.db[i + 1]
+            
+            # Pattern: số nào thường đi cùng nhau
+            for d in curr:
+                for nd in next_num:
+                    pattern_score[(d, nd)] += 10
+        
+        # Tìm cặp có pattern mạnh nhất
+        top_patterns = sorted(pattern_score.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        pairs = [{'pair': f"{p[0]}{p[1]}", 'score': s, 'gan': 0} for p, s in top_patterns]
+        
+        if top_patterns and top_patterns[0][1] > 30:
+            signal = 'BUY'
+        else:
+            signal = 'NEUTRAL'
+        
+        return {'score': top_patterns[0][1] if top_patterns else 50,
+                'pairs': pairs, 'signal': signal}
+    
+    def _entropy_model(self):
+        """Model 3: Phân tích độ hỗn loạn"""
+        if len(self.db) < 10:
+            return {'score': 50, 'pairs': [], 'signal': 'NEUTRAL'}
+        
+        # Tính entropy
+        recent = "".join(self.db[-15:])
         counter = Counter(recent)
         total = len(recent)
         
@@ -216,213 +284,191 @@ class NeuralGenesis:
                 p = count / total
                 entropy -= p * math.log2(p)
         
-        return entropy
+        # Entropy thấp -> sắp có biến động -> BUY
+        # Entropy cao -> quá hỗn loạn -> SELL
+        if entropy < 2.8:
+            signal = 'BUY'
+            score = 80 + (2.8 - entropy) * 50
+        elif entropy > 3.3:
+            signal = 'SELL'
+            score = 50 - (entropy - 3.3) * 50
+        else:
+            signal = 'NEUTRAL'
+            score = 60
+        
+        return {'score': max(0, min(100, score)), 'pairs': [], 
+                'signal': signal, 'entropy': entropy}
     
-    def _detect_cycle(self):
-        """Phát hiện chu kỳ lặp"""
+    def _cycle_model(self):
+        """Model 4: Phát hiện chu kỳ nhà cái"""
+        if len(self.history) < 5:
+            return {'score': 50, 'pairs': [], 'signal': 'NEUTRAL'}
+        
+        # Phân tích win/loss pattern trong history
+        wins = [1 if '🔥' in h.get('KQ', '') else 0 for h in self.history[:15]]
+        
+        if len(wins) < 5:
+            return {'score': 50, 'pairs': [], 'signal': 'NEUTRAL'}
+        
+        # Tìm pattern win/loss
+        win_rate = sum(wins) / len(wins)
+        
+        # Nếu đang thua nhiều -> sắp đến chu kỳ trả -> BUY
+        # Nếu đang thắng nhiều -> sắp đến chu kỳ thu -> SELL
+        recent_5 = wins[:5]
+        recent_win_rate = sum(recent_5) / len(recent_5) if recent_5 else 0.5
+        
+        if recent_win_rate < 0.3:
+            signal = 'BUY'  # Sắp trả
+            score = 70 + (0.3 - recent_win_rate) * 100
+        elif recent_win_rate > 0.6:
+            signal = 'SELL'  # Sắp thu
+            score = 50 - (recent_win_rate - 0.6) * 100
+        else:
+            signal = 'NEUTRAL'
+            score = 60
+        
+        return {'score': max(0, min(100, score)), 'pairs': [], 
+                'signal': signal, 'win_rate': recent_win_rate}
+    
+    def _behavioral_model(self):
+        """Model 5: Phân tích hành vi nhà cái"""
         if len(self.db) < 20:
-            return None
+            return {'score': 50, 'pairs': [], 'signal': 'NEUTRAL'}
         
-        # Tìm pattern lặp
-        for cycle_len in range(5, 15):
-            matches = 0
-            for i in range(len(self.db) - cycle_len - 1):
-                if self.db[i] == self.db[i + cycle_len]:
-                    matches += 1
-            
-            if matches >= 3:
-                return cycle_len
+        # Tìm số "hot" và "cold"
+        recent_str = "".join(self.db[-20:])
+        counter = Counter(recent_str)
         
-        return None
+        hot_numbers = [d for d, c in counter.most_common(3)]
+        cold_numbers = [d for d, c in counter.most_common()[:-4]]
+        
+        # Tạo cặp từ hot numbers
+        pairs = []
+        for p in combinations(hot_numbers, 2):
+            pairs.append({'pair': "".join(p), 'score': 70, 'gan': 0})
+        
+        # Thêm cặp hot-cold (số lạnh sắp nổ)
+        for hot in hot_numbers[:2]:
+            for cold in cold_numbers[:2]:
+                pairs.append({'pair': "".join(sorted(p)), 'score': 60, 'gan': 0})
+        
+        if hot_numbers:
+            signal = 'BUY'
+        else:
+            signal = 'NEUTRAL'
+        
+        return {'score': 70 if hot_numbers else 50, 'pairs': pairs, 
+                'signal': signal, 'hot': hot_numbers}
     
-    def _analyze_position_patterns(self):
-        """Phân tích pattern từng vị trí"""
-        positions = {i: defaultdict(int) for i in range(5)}
+    def get_ensemble_decision(self):
+        """
+        QUYẾT ĐỊNH ENSEMBLE:
+        Chỉ bet khi 3/5 model đồng thuận BUY
+        """
+        buy_count = sum(1 for s in self.signals.values() if s.get('signal') == 'BUY')
+        sell_count = sum(1 for s in self.signals.values() if s.get('signal') == 'SELL')
         
-        for num in self.db[-30:]:
-            for i, d in enumerate(num):
-                positions[i][d] += 1
+        # Tính score trung bình
+        avg_score = np.mean([s['score'] for s in self.signals.values()])
         
-        # Tìm số hot từng vị trí
-        hot_by_pos = {}
-        for pos in positions:
-            if positions[pos]:
-                hot_by_pos[pos] = max(positions[pos].items(), key=lambda x: x[1])[0]
+        if buy_count >= 3:
+            decision = 'BET'
+            confidence = min(95, 50 + buy_count * 15)
+        elif sell_count >= 3:
+            decision = 'SKIP'
+            confidence = min(95, 50 + sell_count * 15)
+        else:
+            decision = 'CAUTION'
+            confidence = 50
         
-        return hot_by_pos
+        return {
+            'decision': decision,
+            'confidence': confidence,
+            'buy_signals': buy_count,
+            'sell_signals': sell_count,
+            'avg_score': avg_score,
+            'signals': self.signals
+        }
+
+# === QUẢN LÝ VỐN THÔNG MINH ===
+
+class SmartBankroll:
+    """Quản lý vốn theo Kelly Criterion + Stop Loss"""
     
-    def _calculate_pair_intelligence(self, pair):
-        """
-        Tính điểm thông minh cho cặp số
-        Học từ lịch sử thua để điều chỉnh
-        """
-        score = 0
-        reasons = []
+    def __init__(self, history=None, base_bankroll=100):
+        self.history = history or []
+        self.base_bankroll = base_bankroll
+        self.current_streak = self._calculate_streak()
+        self.win_rate = self._calculate_win_rate()
+    
+    def _calculate_streak(self):
+        """Tính streak hiện tại"""
+        if not self.history:
+            return 0
         
-        # 1. Frequency analysis
-        freq = sum(1 for n in self.db[-30:] if set(pair).issubset(set(n)))
-        if 3 <= freq <= 8:
-            score += 30
-            reasons.append("FREQ_OK")
-        elif freq > 10:
-            score -= 40  # Quá nhiều -> bẫy
-            reasons.append("FREQ_TRAP")
-        
-        # 2. Gan analysis (vùng vàng 5-12)
-        gan = 0
-        for num in reversed(self.db):
-            if not set(pair).issubset(set(num)):
-                gan += 1
-            else:
-                break
-        
-        if 5 <= gan <= 12:
-            score += 50
-            reasons.append("GAN_VANG")
-        elif 2 <= gan <= 4:
-            score += 25
-        elif gan > 18:
-            score -= 30
-        
-        # 3. Streak analysis (tránh bệt >= 3)
         streak = 0
-        for num in reversed(self.db):
-            if set(pair).issubset(set(num)):
+        for h in self.history:
+            if '🔥' in h.get('KQ', ''):
                 streak += 1
             else:
                 break
-        
-        if streak >= 3:
-            score -= 60
-            reasons.append("BET_TRAP")
-        elif streak == 1:
-            score += 30
-        
-        # 4. Learning from history
-        if self.history:
-            # Check nếu cặp này từng thua nhiều
-            pair_losses = sum(1 for h in self.history if h.get('Dự đoán') == pair and '❌' in h.get('KQ', ''))
-            if pair_losses >= 2:
-                score -= 50
-                reasons.append("HISTORY_LOSE")
-        
-        # 5. Position pattern match
-        hot_pos = self._analyze_position_patterns()
-        pos_match = 0
-        for pos, hot_num in hot_pos.items():
-            if hot_num in pair:
-                pos_match += 1
-        score += pos_match * 15
-        
-        # 6. House mode adjustment
-        if self.mode == "TAKE":
-            score *= 0.7  # Giảm score khi nhà cái đang thu
-            reasons.append("HOUSE_TAKE")
-        elif self.mode == "PAY":
-            score *= 1.2
-            reasons.append("HOUSE_PAY")
-        
-        # 7. Lucky ox bonus
-        if any(int(d) in LUCKY_OX for d in pair):
-            score += 10
-        
-        # 8. Entropy adjustment
-        entropy = self._calculate_entropy()
-        if entropy < 2.8:
-            score += 20  # Sắp có biến động
-            reasons.append("LOW_ENTROPY")
-        elif entropy > 3.3:
-            score -= 20  # Quá hỗn loạn
-            reasons.append("HIGH_ENTROPY")
-        
-        return score, reasons
+        return streak
     
-    def should_skip_bet(self, top_score, confidence):
-        """
-        QUYẾT ĐỊNH QUAN TRỌNG: Có nên đánh kỳ này không?
-        """
-        # Skip nếu house đang TAKE mode
-        if self.mode == "TAKE" and confidence < 75:
-            return True, "NHÀ CÁI ĐANG THU"
+    def _calculate_win_rate(self, window=20):
+        """Tính win rate trong window kỳ"""
+        if not self.history:
+            return 0.5
         
-        # Skip nếu entropy quá cao
-        entropy = self._calculate_entropy()
-        if entropy > 3.3:
-            return True, "QUÁ HỖN LOẠN"
-        
-        # Skip nếu score quá thấp
-        if top_score < 80:
-            return True, "ĐỘ TIN CẬY THẤP"
-        
-        # Skip nếu thua 3 kỳ liên tiếp
-        if len(self.history) >= 3:
-            recent_losses = sum(1 for h in self.history[:3] if '❌' in h.get('KQ', ''))
-            if recent_losses == 3:
-                return True, "THUA 3 KỲ LIÊN TIẾP - NGHỈ"
-        
-        return False, "OK"
+        recent = self.history[:window]
+        wins = sum(1 for h in recent if '🔥' in h.get('KQ', ''))
+        return wins / len(recent) if recent else 0.5
     
-    def predict(self):
-        """Dự đoán thông minh"""
-        if len(self.db) < 15:
-            return None
+    def get_bet_size(self, confidence, ensemble_decision):
+        """
+        Tính kích thước bet:
+        - MAX: Confidence > 80% + ensemble BUY
+        - MID: Confidence 60-80% + ensemble CAUTION
+        - MIN: Confidence < 60% hoặc ensemble SKIP
+        - NONE: Stop loss triggered
+        """
+        # Stop loss: thua 5 kỳ liên tiếp
+        losses = 0
+        for h in self.history:
+            if '❌' in h.get('KQ', ''):
+                losses += 1
+            else:
+                break
         
-        # Generate tất cả cặp
-        all_pairs = []
-        for p in combinations("0123456789", 2):
-            pair = "".join(p)
-            score, reasons = self._calculate_pair_intelligence(pair)
-            all_pairs.append({
-                'pair': pair,
-                'score': score,
-                'reasons': reasons
-            })
+        if losses >= 5:
+            return 'NONE', 0, "STOP LOSS - THUA 5 KỲ LIÊN TIẾP"
         
-        all_pairs.sort(key=lambda x: x['score'], reverse=True)
-        top_pairs = all_pairs[:5]
+        # Kelly Criterion điều chỉnh
+        kelly = (confidence / 100 * 1.85 - (1 - confidence / 100)) / 0.85
+        kelly = max(0, min(kelly, 0.25))  # 0-25%
         
-        # Tính confidence
-        if top_pairs:
-            base_confidence = 40 + (top_pairs[0]['score'] / 5)
-            base_confidence = min(95, max(30, base_confidence))
-            
-            # Adjust theo learning rate
-            confidence = base_confidence * self.learning_rate
+        if ensemble_decision == 'BET' and confidence >= 80:
+            return 'MAX', min(kelly * 2, 0.25), "TIN CẬY CAO"
+        elif ensemble_decision == 'BET' and confidence >= 60:
+            return 'MID', kelly, "TIN CẬY TB"
+        elif ensemble_decision == 'CAUTION':
+            return 'MIN', kelly * 0.5, "THẬN TRỌNG"
         else:
-            confidence = 50
+            return 'NONE', 0, "KHÔNG NÊN BET"
+    
+    def get_recommendation(self, confidence, ensemble_decision):
+        """Khuyến nghị hành động"""
+        bet_size, percentage, reason = self.get_bet_size(confidence, ensemble_decision)
         
-        # Quyết định có đánh không
-        skip, skip_reason = self.should_skip_bet(
-            top_pairs[0]['score'] if top_pairs else 0,
-            confidence
-        )
-        
-        # Top 3 triples
-        triples = []
-        for t in combinations("0123456789", 3):
-            score = sum(
-                next((p['score'] for p in top_pairs if p['pair'] == ''.join(c)), 0)
-                for c in combinations(t, 2)
-            )
-            triples.append((''.join(t), score))
-        triples.sort(key=lambda x: x[1], reverse=True)
-        
-        # Top 8
-        single_pool = Counter("".join(self.db[-50:]))
-        top8 = "".join([d for d, _ in single_pool.most_common(8)])
-        
-        return {
-            'pairs': top_pairs,
-            'triples': triples[:3],
-            'top8': top8,
-            'confidence': confidence,
-            'skip': skip,
-            'skip_reason': skip_reason,
-            'house_mode': self.mode,
-            'entropy': self._calculate_entropy(),
-            'cycle': self._detect_cycle(),
-            'learning_rate': self.learning_rate
+        bet_class = f"bet-{bet_size.lower()}"
+        bet_text = {
+            'MAX': 'VÀO TIỀN MẠNH',
+            'MID': 'VÀO TIỀN TB',
+            'MIN': 'VÀO TIỀN NHỎ',
+            'NONE': 'KHÔNG BET'
         }
+        
+        return bet_class, bet_text.get(bet_size, ''), percentage, reason
 
 # === XỬ LÝ DỮ LIỆU ===
 
@@ -434,25 +480,28 @@ def get_nums(text):
 
 # === GIAO DIỆN ===
 
-st.markdown('<h1 class="god-header">🧬 TITAN V51 - NEURAL GENESIS</h1>', unsafe_allow_html=True)
-st.markdown('<p style="text-align:center; color:#888; font-size:11px;">Học Từ Sai Lầm | Phát Hiện Chu Kỳ | Biết Khi Nào Nên Nghỉ</p>', unsafe_allow_html=True)
+st.markdown('<h1 class="phoenix-header">🔥 TITAN V52 - PHOENIX RISING</h1>', unsafe_allow_html=True)
+st.markdown('<p style="text-align:center; color:#888; font-size:11px;">5-Lớp Ensemble | Smart Bankroll | Stop Loss | Adaptive Learning</p>', unsafe_allow_html=True)
 
 if "history" not in st.session_state:
     st.session_state.history = []
 
+if "bankroll" not in st.session_state:
+    st.session_state.bankroll = 100
+
 user_input = st.text_area("📥 Kết quả (kỳ mới nhất ở dưới):", height=100, 
-                          placeholder="07988\n35782\n01053")
+                          placeholder="99180\n50655\n06213")
 
 col1, col2 = st.columns(2)
 with col1:
-    if st.button("🧬 KÍCH HOẠT", type="primary", use_container_width=True):
+    if st.button("🔥 KÍCH HOẠT PHOENIX", type="primary", use_container_width=True):
         nums = get_nums(user_input)
         if len(nums) >= 15:
             # Check kết quả kỳ trước
             if "last_pred" in st.session_state and nums:
                 lp = st.session_state.last_pred
                 last = nums[-1]
-                if lp and lp['pairs'] and not lp.get('skip', False):
+                if lp and lp.get('decision') == 'BET' and lp['pairs']:
                     best = lp['pairs'][0]['pair']
                     win = all(d in last for d in best)
                     st.session_state.history.insert(0, {
@@ -461,8 +510,22 @@ with col1:
                         'KQ': '🔥' if win else '❌'
                     })
             
-            engine = NeuralGenesis(nums, st.session_state.history)
-            st.session_state.last_pred = engine.predict()
+            ensemble = EnsemblePredictor(nums, st.session_state.history)
+            decision = ensemble.get_ensemble_decision()
+            
+            bankroll = SmartBankroll(st.session_state.history)
+            bet_class, bet_text, percentage, reason = bankroll.get_recommendation(
+                decision['confidence'], 
+                decision['decision']
+            )
+            
+            st.session_state.last_pred = {
+                **decision,
+                'bet_class': bet_class,
+                'bet_text': bet_text,
+                'bet_percentage': percentage,
+                'bet_reason': reason
+            }
             st.rerun()
         else:
             st.warning(f"Cần 15+ kỳ (có {len(nums)})")
@@ -477,69 +540,104 @@ with col2:
 if "last_pred" in st.session_state:
     res = st.session_state.last_pred
     
-    # === HOUSE MODE STATUS ===
-    mode_class = "status-pay" if res['house_mode'] == "PAY" else ("status-take" if res['house_mode'] == "TAKE" else "status-chaos")
-    mode_icon = "💰" if res['house_mode'] == "PAY" else ("🦈" if res['house_mode'] == "TAKE" else "🌪️")
-    mode_text = "TRẢ THƯỞNG" if res['house_mode'] == "PAY" else ("ĐANG THU" if res['house_mode'] == "TAKE" else "HỖN LOẠN")
+    # === SIGNAL BOX ===
+    if res['decision'] == 'BET':
+        signal_class = "signal-green"
+        signal_text = "✅ TÍN HIỆU BET"
+        signal_detail = f"{res['buy_signals']}/5 model đồng thuận"
+    elif res['decision'] == 'SKIP':
+        signal_class = "signal-red"
+        signal_text = "⚠️ KHÔNG NÊN BET"
+        signal_detail = f"{res['sell_signals']}/5 model báo rủi ro"
+    else:
+        signal_class = "signal-yellow"
+        signal_text = "⚡ THẬN TRỌNG"
+        signal_detail = "Không đủ đồng thuận"
     
     st.markdown(f"""
-    <div class="status-box {mode_class}">
-        <div style="font-size:14px;">CHẾ ĐỘ NHÀ CÁI</div>
-        <div style="font-size:28px; font-weight:900;">{mode_icon} {mode_text}</div>
-        <div style="font-size:11px; margin-top:5px;">Entropy: {res['entropy']:.2f} | Learning Rate: {res['learning_rate']:.1f}</div>
+    <div class="signal-box {signal_class}">
+        <div style="font-size:24px; font-weight:900;">{signal_text}</div>
+        <div style="font-size:14px; margin-top:5px;">{signal_detail}</div>
     </div>
     """, unsafe_allow_html=True)
     
-    # === SKIP WARNING ===
-    if res['skip']:
+    # === BET SIZE INDICATOR ===
+    if res['bet_class'] != 'bet-none':
         st.markdown(f"""
-        <div class="skip-warning">
-            ⚠️ KHÔNG NÊN ĐÁNH KỲ NÀY<br>
-            <span style="font-size:16px; font-weight:700;">{res['skip_reason']}</span>
+        <div class="bet-size-indicator {res['bet_class']}">
+            {res['bet_text']} ({res['bet_percentage']*100:.1f}% vốn)<br>
+            <span style="font-size:14px; font-weight:500;">{res['bet_reason']}</span>
         </div>
         """, unsafe_allow_html=True)
     else:
-        # === METRICS GRID ===
         st.markdown(f"""
-        <div class="metric-grid">
-            <div class="metric-cell">
-                <div style="font-size:10px; color:#888;">TIN CẬY</div>
-                <div style="font-size:24px; font-weight:900; color:#00ffff;">{res['confidence']:.0f}%</div>
-            </div>
-            <div class="metric-cell">
-                <div style="font-size:10px; color:#888;">TOP PAIR</div>
-                <div style="font-size:24px; font-weight:900; color:#FFD700;">{res['pairs'][0]['pair']}</div>
-            </div>
-            <div class="metric-cell">
-                <div style="font-size:10px; color:#888;">SCORE</div>
-                <div style="font-size:24px; font-weight:900; color:#00ff40;">{res['pairs'][0]['score']:.0f}</div>
-            </div>
+        <div class="stop-loss-box">
+            🛑 {res['bet_text']}<br>
+            <span style="font-size:14px; font-weight:500;">{res['bet_reason']}</span>
         </div>
         """, unsafe_allow_html=True)
-        
-        # === TOP PAIR ===
-        st.markdown("""<div style="text-align:center; margin:15px 0; font-size:14px;">🎯 CẶP VIP</div>""", unsafe_allow_html=True)
-        
-        reasons_tags = "".join([f'<span class="tag tag-purple">{r}</span>' for r in res['pairs'][0]['reasons'][:3]])
-        
-        st.markdown(f"""
-        <div class="prediction-card">
-            <div class="big-number">{res['pairs'][0]['pair'][0]} - {res['pairs'][0]['pair'][1]}</div>
-            <div style="margin-top:10px;">{reasons_tags}</div>
+    
+    # === ENSEMBLE METER ===
+    st.markdown("""<div style="text-align:center; margin:15px 0; font-size:14px;">📊 5-LỚP MODEL</div>""", unsafe_allow_html=True)
+    
+    signals = res.get('signals', {})
+    st.markdown(f"""
+    <div class="ensemble-meter">
+        <div class="ensemble-cell">
+            <div style="font-size:10px; color:#888;">FREQ</div>
+            <div style="font-size:16px; font-weight:900; color:{'#00ff40' if signals.get('frequency', {}).get('signal') == 'BUY' else '#ff0040'};">
+                {signals.get('frequency', {}).get('signal', '-')}
+            </div>
         </div>
-        """, unsafe_allow_html=True)
+        <div class="ensemble-cell">
+            <div style="font-size:10px; color:#888;">PATTERN</div>
+            <div style="font-size:16px; font-weight:900; color:{'#00ff40' if signals.get('pattern', {}).get('signal') == 'BUY' else '#ff0040'};">
+                {signals.get('pattern', {}).get('signal', '-')}
+            </div>
+        </div>
+        <div class="ensemble-cell">
+            <div style="font-size:10px; color:#888;">ENTROPY</div>
+            <div style="font-size:16px; font-weight:900; color:{'#00ff40' if signals.get('entropy', {}).get('signal') == 'BUY' else '#ff0040'};">
+                {signals.get('entropy', {}).get('signal', '-')}
+            </div>
+        </div>
+        <div class="ensemble-cell">
+            <div style="font-size:10px; color:#888;">CYCLE</div>
+            <div style="font-size:16px; font-weight:900; color:{'#00ff40' if signals.get('cycle', {}).get('signal') == 'BUY' else '#ff0040'};">
+                {signals.get('cycle', {}).get('signal', '-')}
+            </div>
+        </div>
+        <div class="ensemble-cell">
+            <div style="font-size:10px; color:#888;">BEHAV</div>
+            <div style="font-size:16px; font-weight:900; color:{'#00ff40' if signals.get('behavioral', {}).get('signal') == 'BUY' else '#ff0040'};">
+                {signals.get('behavioral', {}).get('signal', '-')}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # === CONFIDENCE ===
+    st.markdown(f"""
+    <div class="prediction-card">
+        <div style="font-size:14px; color:#888;">ĐỘ TIN CẬY ENSEMBLE</div>
+        <div style="font-size:42px; font-weight:900; color:{'#00ff40' if res['confidence'] >= 70 else '#ffff00' if res['confidence'] >= 50 else '#ff0040'};">
+            {res['confidence']:.0f}%
+        </div>
+        <div class="progress-bar">
+            <div class="progress-fill" style="width:{res['confidence']}%;">{res['confidence']:.0f}%</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # === TOP PAIRS ===
+    if res['decision'] == 'BET' and 'pairs' in res.get('signals', {}).get('frequency', {}):
+        st.markdown("""<div style="text-align:center; margin:15px 0; font-size:14px;">🎯 TOP 5 PAIRS</div>""", unsafe_allow_html=True)
         
-        # === TOP 5 PAIRS ===
-        st.markdown("""<div style="text-align:center; margin:15px 0; font-size:14px;">🎯 TOP 5</div>""", unsafe_allow_html=True)
-        
-        for i, p in enumerate(res['pairs'][:5]):
+        freq_pairs = res['signals']['frequency'].get('pairs', [])
+        for i, p in enumerate(freq_pairs[:5]):
             tags = ""
-            if "GAN_VANG" in p['reasons']:
+            if p.get('gan', 0) >= 4 and p.get('gan', 0) <= 10:
                 tags += '<span class="tag tag-green">GAN VÀNG</span>'
-            if "BET_TRAP" in p['reasons']:
-                tags += '<span class="tag tag-red">BẪY</span>'
-            if "HOUSE_PAY" in p['reasons']:
-                tags += '<span class="tag tag-yellow">NHÀ CÁI TRẢ</span>'
             
             st.markdown(f"""
             <div style="background:#1a1a2e; border-radius:10px; padding:12px; margin:5px 0; 
@@ -551,18 +649,10 @@ if "last_pred" in st.session_state:
                 <div style="margin-top:5px;">{tags}</div>
             </div>
             """, unsafe_allow_html=True)
-        
-        # === TOP 8 ===
-        st.markdown(f"""
-        <div class="prediction-card" style="margin-top:15px;">
-            <div style="font-size:12px; color:#888;">ĐỘ PHỦ SẢNH</div>
-            <div style="font-size:32px; font-weight:900; letter-spacing:8px; color:#00ffff;">{res['top8']}</div>
-        </div>
-        """, unsafe_allow_html=True)
     
     # === HISTORY ===
     if st.session_state.history:
-        st.markdown("""<div style="text-align:center; margin:20px 0; font-size:16px;">📋 LỊCH SỬ ĐỐI SOÁT</div>""", unsafe_allow_html=True)
+        st.markdown("""<div style="text-align:center; margin:20px 0; font-size:16px;">📋 LỊCH SỬ</div>""", unsafe_allow_html=True)
         
         df = pd.DataFrame(st.session_state.history[:15])
         
@@ -572,7 +662,7 @@ if "last_pred" in st.session_state:
         st.dataframe(df.style.applymap(color_kq, subset=['KQ']), 
                      use_container_width=True, hide_index=True)
         
-        # Win rate với progress bar
+        # Win rate
         wins = sum(1 for h in st.session_state.history if '🔥' in h['KQ'])
         total = len(st.session_state.history)
         rate = (wins/total*100) if total > 0 else 0
@@ -580,7 +670,7 @@ if "last_pred" in st.session_state:
         color_rate = "#00ff40" if rate >= 40 else ("#ffff00" if rate >= 30 else "#ff0040")
         
         st.markdown(f"""
-        <div class="status-box" style="border-color:{color_rate}; color:{color_rate}; margin-top:15px;">
+        <div class="signal-box" style="border-color:{color_rate}; color:{color_rate}; margin-top:15px;">
             <div style="font-size:14px;">TỶ LỆ THẮNG</div>
             <div style="font-size:36px; font-weight:900;">{rate:.1f}% ({wins}/{total})</div>
             <div class="progress-bar">
@@ -603,7 +693,7 @@ if "last_pred" in st.session_state:
 # === FOOTER ===
 st.markdown("""
 <div style="text-align:center; color:#444; font-size:10px; margin-top:30px; padding-top:15px; border-top:1px solid #333;">
-    🧬 TITAN V51 - NEURAL GENESIS | Học Từ Sai Lầm | Phát Hiện Chu Kỳ | Biết Khi Nên Nghỉ<br>
+    🔥 TITAN V52 - PHOENIX RISING | 5-Lớp Ensemble | Smart Bankroll | Stop Loss<br>
     <i>Tool hỗ trợ phân tích - Không đảm bảo 100% - Quản lý vốn thông minh</i>
 </div>
 """, unsafe_allow_html=True)
