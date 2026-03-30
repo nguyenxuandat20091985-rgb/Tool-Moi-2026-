@@ -1,37 +1,30 @@
 import streamlit as st
-import json, os, re, math, random
+import json, os, re, math
 import pandas as pd
 import numpy as np
 from collections import Counter, defaultdict
 from itertools import combinations
 from datetime import datetime
 import google.generativeai as genai
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
-import warnings
-warnings.filterwarnings('ignore')
 
 # === CẤU HÌNH ===
 DB_FILE = "titan_v52_data.json"
-NVIDIA_API_KEY = "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"
 GEMINI_API_KEY = "AIzaSyD1-XMO6FsA9ZgAf2P6nIiXLPp8moTPMrc"
 
 genai.configure(api_key=GEMINI_API_KEY)
 gemini_model = genai.GenerativeModel('gemini-pro')
 
-st.set_page_config(page_title="TITAN V52 - AI NEURAL", page_icon="🧠", layout="centered")
+st.set_page_config(page_title="TITAN V52 - AI MASTER", page_icon="🧠", layout="centered")
 
-# === CSS CAO CẤP ===
+# === CSS DARK NEON ===
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
-    
     .stApp {
-        background: linear-gradient(180deg, #000000 0%, #0a0a1a 50%, #000000 100%);
+        background: linear-gradient(180deg, #000000 0%, #0a0e27 100%);
         color: #00ffff;
         font-family: 'Orbitron', sans-serif;
     }
-    
     .main-header {
         font-size: 32px;
         font-weight: 900;
@@ -41,119 +34,113 @@ st.markdown("""
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         animation: gradient-shift 3s ease infinite;
-        text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+        margin-bottom: 10px;
     }
-    
     @keyframes gradient-shift {
-        0%, 100% { background-position: 0% 50%; }
+        0% { background-position: 0% 50%; }
         50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
-    
     .tab-btn {
-        background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+        background: linear-gradient(135deg, #1a1f3a, #0f1428);
         border: 2px solid #00ffff;
         color: #00ffff;
-        padding: 10px;
+        padding: 10px 15px;
         border-radius: 10px;
+        margin: 3px;
         font-weight: bold;
         cursor: pointer;
         transition: all 0.3s;
-        text-align: center;
+        font-size: 12px;
     }
-    
-    .tab-btn:hover {
+    .tab-btn:hover, .tab-btn.active {
         background: #00ffff;
         color: #000;
         box-shadow: 0 0 20px #00ffff;
     }
-    
-    .prediction-card {
-        background: linear-gradient(135deg, #0f0f1a, #1a1a2e);
+    .prediction-box {
+        background: linear-gradient(135deg, #0f1428, #1a1f3a);
         border: 2px solid #00ffff;
         border-radius: 15px;
         padding: 20px;
         margin: 10px 0;
         text-align: center;
-        box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
     }
-    
     .big-number {
         font-size: 48px;
         font-weight: 900;
-        letter-spacing: 10px;
         color: #00ffff;
         text-shadow: 0 0 20px #00ffff;
+        letter-spacing: 10px;
     }
-    
-    .confidence-box {
-        background: linear-gradient(90deg, #ff0040, #ffff00, #00ff40);
-        padding: 3px;
-        border-radius: 10px;
-        margin: 10px 0;
-    }
-    
-    .confidence-fill {
-        background: #000;
-        border-radius: 8px;
-        padding: 8px;
-        text-align: center;
+    .score-badge {
+        background: linear-gradient(90deg, #00ffff, #0080ff);
+        color: #000;
+        padding: 5px 15px;
+        border-radius: 20px;
         font-weight: bold;
-        color: #fff;
-    }
-    
-    .tag {
         display: inline-block;
-        padding: 4px 10px;
-        border-radius: 15px;
-        font-size: 10px;
+        margin: 5px;
+        font-size: 12px;
+    }
+    .streak-hot {
+        background: linear-gradient(90deg, #ff0040, #ff8000);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
         font-weight: bold;
-        margin: 3px;
+        animation: pulse 1.5s infinite;
+        display: inline-block;
     }
-    
-    .tag-hot { background: #ff0040; color: white; }
-    .tag-gan { background: #9900ff; color: white; }
-    .tag-safe { background: #00ff40; color: black; }
-    .tag-ai { background: #ff00ff; color: white; }
-    
-    .skip-box {
-        background: linear-gradient(135deg, #2a0a2a, #1a0a1a);
-        border: 3px solid #ff00ff;
-        color: #ff00ff;
-        padding: 30px;
-        border-radius: 15px;
-        text-align: center;
-        font-size: 24px;
-        font-weight: 900;
-        animation: pulse 2s infinite;
-    }
-    
     @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 20px #ff00ff; }
-        50% { box-shadow: 0 0 40px #ff00ff; }
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
     }
-    
+    .gan-cold {
+        background: linear-gradient(90deg, #8000ff, #ff00ff);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-weight: bold;
+        display: inline-block;
+    }
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 8px;
+        gap: 10px;
         margin: 15px 0;
     }
-    
     .metric-cell {
-        background: #0f0f1a;
+        background: #0f1428;
         border: 1px solid #00ffff;
         border-radius: 10px;
-        padding: 12px 8px;
+        padding: 15px 10px;
         text-align: center;
     }
-    
     .win { color: #00ff40; font-weight: 900; }
     .lose { color: #ff0040; font-weight: 900; }
-    
     textarea {
-        background: #0a0a1a !important;
+        background: #0a0e27 !important;
         border: 1px solid #00ffff !important;
         color: #00ffff !important;
+    }
+    .confidence-bar {
+        height: 25px;
+        background: #0a0e27;
+        border-radius: 12px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+    .confidence-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: #000;
+        transition: width 0.5s;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -161,9 +148,12 @@ st.markdown("""
 # === DATA MANAGEMENT ===
 def load_data():
     if os.path.exists(DB_FILE):
-        with open(DB_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {"results": [], "predictions": [], "model_weights": {}, "strategies": {}}
+        try:
+            with open(DB_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {"results": [], "predictions": [], "weights": {"freq": 1.0, "gap": 1.0, "streak": 1.0}}
 
 def save_data(data):
     with open(DB_FILE, 'w', encoding='utf-8') as f:
@@ -174,20 +164,45 @@ def parse_numbers(text):
     return [n for n in re.findall(r'\d{5}', clean) if n]
 
 # === ADVANCED STATISTICAL ENGINE ===
-class AdvancedStatsEngine:
+class StatisticalEngine:
     def __init__(self, results):
         self.results = results
         self.digits = "".join(results) if results else ""
         
     def frequency_analysis(self, window=None):
-        data = self.results[-window:] if window else self.results
-        counter = Counter("".join(data))
-        total = len(counter) or 1
+        data = self.digits if window is None else "".join(self.results[-window:])
+        counter = Counter(data)
+        total = len(data) or 1
         return {d: {"count": counter.get(d, 0), "freq": counter.get(d, 0)/total*100} 
                 for d in "0123456789"}
     
-    def markov_chain_advanced(self, order=2):
-        """Markov chain với order linh hoạt"""
+    def calculate_gap(self):
+        gaps = {}
+        for d in "0123456789":
+            gap = 0
+            for r in reversed(self.results):
+                if d in r:
+                    break
+                gap += 1
+            gaps[d] = gap
+        return gaps
+    
+    def detect_streaks(self):
+        streaks = {}
+        for d in "0123456789":
+            count = 0
+            for r in reversed(self.results):
+                if d in r:
+                    count += 1
+                else:
+                    break
+            streaks[d] = count
+        return streaks
+    
+    def markov_probability(self, order=1):
+        if len(self.digits) < order + 1:
+            return {}
+        
         transitions = defaultdict(lambda: defaultdict(int))
         for i in range(len(self.digits) - order):
             state = self.digits[i:i+order]
@@ -197,599 +212,381 @@ class AdvancedStatsEngine:
         probs = {}
         for state, next_counts in transitions.items():
             total = sum(next_counts.values())
-            probs[state] = {d: c/total for d, c in next_counts.items()}
+            probs[state] = {d: c/total*100 for d, c in next_counts.items()}
+        
         return probs
     
-    def calculate_digit_probability(self, digit, position=None):
-        """Tính xác suất xuất hiện của từng số"""
-        if not self.results:
-            return 0.0
-        
-        if position is not None:
-            # Xác suất theo vị trí
-            count = sum(1 for r in self.results if r[position] == digit)
-        else:
-            # Xác suất tổng quát
-            count = sum(1 for r in self.results if digit in r)
-        
-        return count / len(self.results) * 100
-    
-    def detect_cycle(self, digit):
-        """Phát hiện chu kỳ xuất hiện của số"""
-        positions = [i for i, r in enumerate(self.results) if digit in r]
-        if len(positions) < 3:
-            return None
-        
-        gaps = [positions[i+1] - positions[i] for i in range(len(positions)-1)]
-        if not gaps:
-            return None
-        
-        avg_gap = sum(gaps) / len(gaps)
-        return avg_gap
-    
-    def entropy_analysis(self, window=20):
-        """Tính entropy - độ hỗn loạn"""
-        if len(self.results) < window:
-            return 3.5
-        
-        recent = "".join(self.results[-window:])
-        counter = Counter(recent)
-        total = len(recent)
-        
-        entropy = 0
-        for count in counter.values():
-            if count > 0:
-                p = count / total
-                entropy -= p * math.log2(p)
-        
+    def calculate_entropy(self):
+        if not self.digits:
+            return 0
+        counter = Counter(self.digits)
+        total = len(self.digits)
+        entropy = -sum((c/total) * math.log2(c/total) for c in counter.values() if c > 0)
         return entropy
     
-    def get_position_hot_numbers(self):
-        """Số hot theo từng vị trí"""
-        positions = {i: Counter() for i in range(5)}
-        for num in self.results[-30:]:
-            for i, d in enumerate(num):
-                positions[i][d] += 1
-        
-        hot_by_pos = {}
-        for pos in positions:
-            if positions[pos]:
-                hot_by_pos[pos] = [d for d, _ in positions[pos].most_common(2)]
-        
-        return hot_by_pos
-
-# === MACHINE LEARNING ENGINE ===
-class MLEngine:
-    def __init__(self, results):
-        self.results = results
-        self.model = RandomForestClassifier(n_estimators=100, random_state=42)
-        self.is_trained = False
-        
-    def prepare_features(self):
-        """Chuẩn bị features cho ML"""
-        if len(self.results) < 20:
-            return None, None
-        
-        X = []
-        y = []
-        
-        for i in range(10, len(self.results)):
-            # Features: tần suất 10 kỳ gần
-            recent = self.results[i-10:i]
-            freq = Counter("".join(recent))
-            features = [freq.get(str(d), 0) for d in range(10)]
-            
-            # Gap features
-            for d in "0123456789":
-                gap = 0
-                for r in reversed(recent):
-                    if d in r:
-                        break
-                    gap += 1
-                features.append(gap)
-            
-            # Label: số nào xuất hiện trong kỳ tiếp theo
-            next_num = self.results[i]
-            labels = [1 if str(d) in next_num else 0 for d in range(10)]
-            
-            X.append(features)
-            y.append(labels)
-        
-        return np.array(X), np.array(y)
+    def pattern_matching(self, target_pair):
+        matches = 0
+        for i in range(len(self.results) - 1):
+            if set(target_pair).issubset(set(self.results[i])):
+                next_result = self.results[i + 1]
+                if set(target_pair).issubset(set(next_result)):
+                    matches += 1
+        return matches
     
-    def train(self):
-        """Huấn luyện model"""
-        X, y = self.prepare_features()
-        if X is None:
-            return False
+    def calculate_pair_score(self, pair, data_weights):
+        score = 0
+        details = {}
         
-        self.model.fit(X, y)
-        self.is_trained = True
-        return True
-    
-    def predict_next(self, recent_results):
-        """Dự đoán kỳ tiếp theo"""
-        if not self.is_trained or len(recent_results) < 10:
-            return None
+        freq = self.frequency_analysis(window=30)
+        gaps = self.calculate_gap()
+        streaks = self.detect_streaks()
         
-        # Chuẩn bị features từ 10 kỳ gần nhất
-        freq = Counter("".join(recent_results[-10:]))
-        features = [freq.get(str(d), 0) for d in range(10)]
+        p1, p2 = pair[0], pair[1]
         
-        for d in "0123456789":
-            gap = 0
-            for r in reversed(recent_results[-10:]):
-                if d in r:
-                    break
-                gap += 1
-            features.append(gap)
+        freq_score = (freq[p1]["freq"] + freq[p2]["freq"]) / 2 * data_weights["freq"]
+        score += freq_score
+        details["freq"] = freq_score
         
-        probs = self.model.predict_proba([features])[0]
-        return {str(i): prob for i, prob in enumerate(probs)}
+        gap_bonus = 0
+        if 3 <= gaps[p1] <= 10:
+            gap_bonus += 30 * data_weights["gap"]
+        if 3 <= gaps[p2] <= 10:
+            gap_bonus += 30 * data_weights["gap"]
+        score += gap_bonus
+        details["gap"] = gap_bonus
+        
+        streak_bonus = 0
+        if streaks[p1] >= 2:
+            streak_bonus += 20 * data_weights["streak"]
+        if streaks[p2] >= 2:
+            streak_bonus += 20 * data_weights["streak"]
+        if streaks[p1] >= 4 or streaks[p2] >= 4:
+            streak_bonus -= 30
+        score += streak_bonus
+        details["streak"] = streak_bonus
+        
+        pattern_match = self.pattern_matching(pair)
+        pattern_score = pattern_match * 15
+        score += pattern_score
+        details["pattern"] = pattern_score
+        
+        entropy = self.calculate_entropy()
+        if entropy < 3.0:
+            score += 20
+            details["entropy"] = 20
+        else:
+            details["entropy"] = 0
+        
+        return score, details
 
-# === AI ANALYZER ===
-class AIAnalyzer:
-    def __init__(self, results):
+# === AI ENHANCED PREDICTION ===
+class AIPredictor:
+    def __init__(self, results, data):
         self.results = results
-        self.stats = AdvancedStatsEngine(results)
-        self.ml = MLEngine(results)
-        
-    def analyze_with_gemini(self):
-        """Sử dụng Gemini AI để phân tích"""
+        self.data = data
+        self.stats = StatisticalEngine(results)
+    
+    def get_gemini_analysis(self):
         if len(self.results) < 15:
             return None
         
-        freq = self.stats.frequency_analysis(30)
-        entropy = self.stats.entropy_analysis()
+        freq = self.stats.frequency_analysis(window=30)
+        gaps = self.stats.calculate_gap()
+        streaks = self.stats.detect_streaks()
         
         prompt = f"""
-        Phân tích xổ số 5D chuyên sâu. 20 kỳ gần nhất:
-        {', '.join(self.results[-20:])}
+        Bạn là chuyên gia phân tích xổ số 5D. Hãy phân tích:
+        
+        20 kỳ gần nhất: {', '.join(self.results[-20:])}
         
         Thống kê:
-        - Tần suất: {json.dumps(freq)}
-        - Entropy: {entropy:.2f}
+        - Tần suất 30 kỳ: {json.dumps(freq)}
+        - Độ gan: {json.dumps(gaps)}
+        - Số bệt: {json.dumps(streaks)}
         
-        Đề xuất TOP 3 cặp 2 số mạnh nhất.
-        Trả về JSON: {{"predictions": [["0","1"], ["2","3"]], "confidence": [85, 75, 65], "reasons": ["lý do 1", "lý do 2"]}}
+        Đề xuất TOP 3 cặp 2 số (0-9) có khả năng ra cao nhất kỳ tiếp theo.
+        Trả về JSON format:
+        {{
+            "predictions": [
+                {{"pair": "12", "confidence": 85, "reason": "lý do"}},
+                {{"pair": "34", "confidence": 75, "reason": "lý do"}},
+                {{"pair": "56", "confidence": 68, "reason": "lý do"}}
+            ]
+        }}
         """
         
         try:
             response = gemini_model.generate_content(prompt)
             text = response.text
+            
             if "{" in text and "}" in text:
                 start = text.index("{")
                 end = text.rindex("}") + 1
-                return json.loads(text[start:end])
-        except:
+                result = json.loads(text[start:end])
+                return result.get("predictions", [])
+        except Exception as e:
             pass
+        
         return None
     
-    def hybrid_score(self, pair):
-        """Tính điểm tổng hợp"""
-        score = 0
-        reasons = []
+    def calculate_adaptive_weights(self):
+        if len(self.data.get("predictions", [])) < 5:
+            return {"freq": 1.0, "gap": 1.0, "streak": 1.0}
         
-        p1, p2 = pair[0], pair[1]
+        recent_preds = self.data["predictions"][-10:]
+        wins = [p for p in recent_preds if p.get("result") == "WIN"]
         
-        # 1. Frequency score
-        freq = self.stats.frequency_analysis(30)
-        if freq[p1]["freq"] > 7 and freq[p2]["freq"] > 7:
-            score += 30
-            reasons.append("TẦN SUẤT CAO")
+        if len(wins) < 2:
+            return self.data.get("weights", {"freq": 1.0, "gap": 1.0, "streak": 1.0})
         
-        # 2. Gap score (vùng vàng 4-10)
-        for p in [p1, p2]:
-            gap = 0
-            for r in reversed(self.results):
-                if p in r:
-                    break
-                gap += 1
-            
-            if 4 <= gap <= 10:
-                score += 25
-                reasons.append("GAN VÀNG")
-            elif gap > 15:
-                score -= 20
+        freq_success = sum(1 for w in wins if "Tần suất" in w.get("reason", ""))
+        gap_success = sum(1 for w in wins if "gan" in w.get("reason", "").lower())
+        streak_success = sum(1 for w in wins if "bệt" in w.get("reason", "").lower())
         
-        # 3. Streak score
-        for p in [p1, p2]:
-            streak = 0
-            for r in reversed(self.results):
-                if p in r:
-                    streak += 1
-                else:
-                    break
-            
-            if streak >= 3:
-                score -= 40
-                reasons.append("BỆT QUÁ DÀI")
-            elif streak == 1:
-                score += 20
+        total_wins = len(wins) or 1
         
-        # 4. Position match
-        hot_pos = self.stats.get_position_hot_numbers()
-        pos_match = 0
-        for pos, hot_nums in hot_pos.items():
-            if p1 in hot_nums or p2 in hot_nums:
-                pos_match += 1
-        score += pos_match * 10
-        
-        # 5. ML prediction
-        if self.ml.is_trained:
-            ml_probs = self.ml.predict_next(self.results[-10:])
-            if ml_probs:
-                ml_score = (float(ml_probs.get(p1, 0)) + float(ml_probs.get(p2, 0))) * 20
-                score += ml_score
-        
-        # 6. Cycle detection
-        for p in [p1, p2]:
-            cycle = self.stats.detect_cycle(p)
-            if cycle and abs(len(self.results) % cycle - cycle) <= 2:
-                score += 15
-                reasons.append("THEO CHU KỲ")
-        
-        return min(100, score), reasons
-
-# === PREDICTION SYSTEM ===
-class PredictionSystem:
-    def __init__(self, results, history=None):
-        self.results = results
-        self.history = history or []
-        self.stats = AdvancedStatsEngine(results)
-        self.ai = AIAnalyzer(results)
-        
-    def detect_house_mode(self):
-        """Phát hiện chế độ nhà cái"""
-        if len(self.history) < 5:
-            return "CHAOS", 0.5
-        
-        recent_wins = sum(1 for h in self.history[:10] if h.get('result') == 'WIN')
-        win_rate = recent_wins / min(len(self.history), 10)
-        
-        if win_rate >= 0.5:
-            return "PAY", win_rate
-        elif win_rate <= 0.25:
-            return "TAKE", win_rate
-        return "CHAOS", win_rate
-    
-    def should_skip(self, confidence):
-        """Quyết định có nên đánh không"""
-        mode, win_rate = self.detect_house_mode()
-        entropy = self.stats.entropy_analysis()
-        
-        if mode == "TAKE" and confidence < 75:
-            return True, "NHÀ CÁI ĐANG THU"
-        
-        if entropy > 3.3:
-            return True, "QUÁ HỖN LOẠN"
-        
-        if len(self.history) >= 3:
-            recent_losses = sum(1 for h in self.history[:3] if h.get('result') == 'LOSE')
-            if recent_losses == 3:
-                return True, "THUA 3 KỲ - NGHỈ"
-        
-        return False, "OK"
+        return {
+            "freq": 0.5 + (freq_success / total_wins),
+            "gap": 0.5 + (gap_success / total_wins),
+            "streak": 0.5 + (streak_success / total_wins)
+        }
     
     def generate_predictions(self):
-        """Tạo dự đoán"""
-        if len(self.results) < 15:
-            return None
-        
-        # Train ML model
-        self.ai.ml.train()
-        
-        # Generate all pairs
+        weights = self.calculate_adaptive_weights()
         all_pairs = list(combinations("0123456789", 2))
-        scored = []
         
+        scored_pairs = []
         for pair in all_pairs:
-            score, reasons = self.ai.hybrid_score(pair)
-            scored.append({
-                "pair": "".join(pair),
+            pair_str = "".join(pair)
+            score, details = self.stats.calculate_pair_score(pair, weights)
+            
+            reasons = []
+            if details["freq"] > 10:
+                reasons.append("Tần suất cao")
+            if details["gap"] > 20:
+                reasons.append("Độ gan vàng")
+            if details["streak"] > 15:
+                reasons.append("Đang bệt")
+            if details["pattern"] > 15:
+                reasons.append("Pattern lặp")
+            
+            scored_pairs.append({
+                "pair": pair_str,
                 "score": score,
+                "details": details,
                 "reasons": reasons
             })
         
-        scored.sort(key=lambda x: x["score"], reverse=True)
-        top_pairs = scored[:5]
+        scored_pairs.sort(key=lambda x: x["score"], reverse=True)
         
-        # Calculate confidence
-        if top_pairs:
-            confidence = min(95, max(30, 40 + top_pairs[0]["score"] / 3))
-        else:
-            confidence = 50
+        ai_suggestions = self.get_gemini_analysis()
+        if ai_suggestions:
+            for ai_pred in ai_suggestions[:3]:
+                pair = ai_pred.get("pair", "")
+                if pair and len(pair) == 2:
+                    for sp in scored_pairs:
+                        if sp["pair"] == pair:
+                            sp["score"] += ai_pred.get("confidence", 0) * 0.5
+                            sp["reasons"].append(f"AI: {ai_pred.get('reason', '')}")
+                            break
         
-        # Check if should skip
-        skip, skip_reason = self.should_skip(confidence)
+        scored_pairs.sort(key=lambda x: x["score"], reverse=True)
         
-        # House mode
-        house_mode, win_rate = self.detect_house_mode()
-        
-        # Top 8 numbers
-        freq = self.stats.frequency_analysis(50)
-        top8 = "".join([d for d, _ in sorted(freq.items(), key=lambda x: x[1]["count"], reverse=True)[:8]])
-        
-        return {
-            "pairs": top_pairs,
-            "confidence": confidence,
-            "skip": skip,
-            "skip_reason": skip_reason,
-            "house_mode": house_mode,
-            "win_rate": win_rate,
-            "entropy": self.stats.entropy_analysis(),
-            "top8": top8
-        }
+        return scored_pairs[:5], weights
 
 # === UI COMPONENTS ===
 def render_input_tab(data):
     st.markdown("### 📥 NHẬP KẾT QUẢ")
     
-    new_input = st.text_area("Dán kết quả (mỗi kỳ 1 dòng):", height=120, 
-                             placeholder="12345\n67890\n...", key="input_area")
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        new_input = st.text_area("Dán kết quả (mỗi kỳ 1 dòng):", height=120, 
+                                 placeholder="12345\n67890\n13579\n...",
+                                 label_visibility="collapsed")
     
-    if st.button("💾 LƯU & PHÂN TÍCH", type="primary", use_container_width=True):
-        nums = parse_numbers(new_input)
-        if nums:
-            data["results"].extend(nums)
-            data["results"] = data["results"][-200:]
-            save_data(data)
-            st.success(f"✅ Đã lưu {len(nums)} kỳ")
+    with col2:
+        if st.button("💾 LƯU", type="primary", use_container_width=True):
+            nums = parse_numbers(new_input)
+            if nums:
+                data["results"].extend(nums)
+                data["results"] = data["results"][-200:]
+                save_data(data)
+                st.success(f"✅ {len(nums)} kỳ")
+                st.rerun()
+    
+    if st.button("🗑️ XÓA DATA", use_container_width=True):
+        if os.path.exists(DB_FILE):
+            os.remove(DB_FILE)
+            st.session_state.clear()
+            st.success("Đã xóa toàn bộ data")
             st.rerun()
-        else:
-            st.error("❌ Không tìm thấy số hợp lệ")
     
     if data["results"]:
-        st.markdown(f"**📊 Tổng số kỳ:** {len(data['results'])}")
-        st.markdown(f"**📌 10 kỳ gần nhất:**")
-        st.write(", ".join(data["results"][-10:]))
+        st.markdown(f"**📊 Tổng: {len(data['results'])} kỳ**")
+        st.markdown(f"**Mới nhất:** {' → '.join(data['results'][-5:])}")
 
 def render_prediction_tab(data):
-    st.markdown("### 🎯 DỰ ĐOÁN THÔNG MINH")
+    st.markdown("### 🎯 DỰ ĐOÁN 2 SỐ")
     
-    if len(data["results"]) < 15:
-        st.warning("⚠️ Cần ít nhất 15 kỳ dữ liệu")
+    if len(data["results"]) < 10:
+        st.warning("⚠️ Cần ít nhất 10 kỳ dữ liệu")
         return
     
-    pred_sys = PredictionSystem(data["results"], data.get("predictions", []))
-    result = pred_sys.generate_predictions()
+    predictor = AIPredictor(data["results"], data)
+    predictions, weights = predictor.generate_predictions()
     
-    if not result:
-        st.error("Không thể tạo dự đoán")
-        return
-    
-    # House mode indicator
-    mode_colors = {
-        "PAY": ("#00ff40", "💰 ĐANG TRẢ"),
-        "TAKE": ("#ff0040", "🦈 ĐANG THU"),
-        "CHAOS": ("#ffff00", "🌪️ HỖN LOẠN")
-    }
-    
-    color, text = mode_colors.get(result["house_mode"], ("#888", "❓"))
-    
-    st.markdown(f"""
-    <div style="background: linear-gradient(135deg, #1a1a2e, #0f0f1a); 
-                border: 2px solid {color}; 
-                border-radius: 15px; 
-                padding: 20px; 
-                text-align: center; 
-                margin: 10px 0;">
-        <div style="font-size: 28px; color: {color}; font-weight: 900;">{text}</div>
-        <div style="margin-top: 10px; color: #888;">
-            Win Rate: {result['win_rate']*100:.1f}% | Entropy: {result['entropy']:.2f}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Skip warning
-    if result["skip"]:
-        st.markdown(f"""
-        <div class="skip-box">
-            ⚠️ {result['skip_reason']}<br>
-            <span style="font-size: 16px;">KHÔNG NÊN ĐÁNH KỲ NÀY</span>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    # Metrics
+    st.markdown("#### 📊 TRỌNG SỐ HIỆN TẠI:")
     st.markdown(f"""
     <div class="metric-grid">
         <div class="metric-cell">
-            <div style="font-size:10px; color:#888;">TIN CẬY</div>
-            <div style="font-size:24px; font-weight:900; color:#00ffff;">{result['confidence']:.0f}%</div>
+            <div style="font-size:10px; color:#888;">TẦN SUẤT</div>
+            <div style="font-size:20px; font-weight:900; color:#00ffff;">{weights['freq']:.2f}x</div>
         </div>
         <div class="metric-cell">
-            <div style="font-size:10px; color:#888;">TOP PAIR</div>
-            <div style="font-size:20px; font-weight:900; color:#FFD700;">{result['pairs'][0]['pair']}</div>
+            <div style="font-size:10px; color:#888;">ĐỘ GAN</div>
+            <div style="font-size:20px; font-weight:900; color:#ff00ff;">{weights['gap']:.2f}x</div>
         </div>
         <div class="metric-cell">
-            <div style="font-size:10px; color:#888;">SCORE</div>
-            <div style="font-size:20px; font-weight:900; color:#00ff40;">{result['pairs'][0]['score']:.0f}</div>
+            <div style="font-size:10px; color:#888;">BỆT</div>
+            <div style="font-size:20px; font-weight:900; color:#00ff40;">{weights['streak']:.2f}x</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Top pair
-    st.markdown("#### 🎯 CẶP VIP:")
-    top = result["pairs"][0]
-    tags = "".join([f'<span class="tag tag-safe">{r}</span>' for r in top["reasons"][:3]])
-    
-    st.markdown(f"""
-    <div class="prediction-card">
-        <div class="big-number">{top['pair'][0]} - {top['pair'][1]}</div>
-        <div style="margin: 10px 0;">{tags}</div>
-        <div style="font-size: 18px; color: #00ff40;">Score: {top['score']:.0f}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Top 5
-    st.markdown("#### 📊 TOP 5 PAIRS:")
-    for i, pair_data in enumerate(result["pairs"][1:5], 1):
-        tags = "".join([f'<span class="tag tag-gan">{r}</span>' for r in pair_data["reasons"][:2]])
-        st.markdown(f"""
-        <div style="background: #0f0f1a; border-left: 4px solid #00ffff; 
-                    padding: 12px; margin: 5px 0; border-radius: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-size: 24px; font-weight: 900; color: #FFD700;">
-                    {pair_data['pair'][0]} - {pair_data['pair'][1]}
-                </span>
-                <span style="font-size: 16px; color: #00ff40;">{pair_data['score']:.0f}</span>
-            </div>
-            <div style="margin-top: 5px;">{tags}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Top 8
-    st.markdown(f"""
-    <div class="prediction-card" style="margin-top: 15px;">
-        <div style="font-size: 12px; color: #888;">ĐỘ PHỦ SẢNH (8 SỐ)</div>
-        <div style="font-size: 32px; font-weight: 900; letter-spacing: 6px; color: #00ffff;">
-            {result['top8']}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Save prediction
-    if st.button("💾 LƯU DỰ ĐOÁN", use_container_width=True):
-        prediction_record = {
-            "date": datetime.now().isoformat(),
-            "pair": result["pairs"][0]["pair"],
-            "confidence": result["confidence"],
-            "result": None
-        }
-        data["predictions"].insert(0, prediction_record)
-        data["predictions"] = data["predictions"][-50:]
-        save_data(data)
-        st.success("✅ Đã lưu dự đoán")
-        st.rerun()
-
-def render_stats_tab(data):
-    st.markdown("### 📊 THỐNG KÊ CHI TIẾT")
-    
-    if len(data["results"]) < 10:
-        st.warning("Cần ít nhất 10 kỳ dữ liệu")
-        return
-    
-    stats = AdvancedStatsEngine(data["results"])
-    
-    # Frequency
-    st.markdown("#### 🔥 TẦN SUẤT (30 kỳ gần)")
-    freq = stats.frequency_analysis(30)
-    
-    cols = st.columns(5)
-    for i, (digit, info) in enumerate(sorted(freq.items(), key=lambda x: x[1]["count"], reverse=True)):
-        with cols[i % 5]:
-            color = "#00ff40" if info["count"] > 15 else ("#ff0040" if info["count"] < 5 else "#ffff00")
+    if predictions:
+        st.markdown("### 🏆 TOP 3 CẶP VIP:")
+        
+        for i, pred in enumerate(predictions[:3]):
+            medal = "🥇" if i == 0 else ("🥈" if i == 1 else "🥉")
+            confidence = min(95, max(40, pred["score"] / 3))
+            
+            reasons_str = ", ".join(pred["reasons"][:3]) if pred["reasons"] else "Phân tích thống kê"
+            
             st.markdown(f"""
-            <div style="background: #0f0f1a; border: 1px solid {color}; 
-                        border-radius: 10px; padding: 10px; text-align: center; margin: 5px 0;">
-                <div style="font-size: 24px; font-weight: 900; color: {color};">{digit}</div>
-                <div style="font-size: 12px; color: #888;">{info['count']} lần</div>
+            <div class="prediction-box" style="border-color: {'#FFD700' if i == 0 else '#C0C0C0' if i == 1 else '#CD7F32'};">
+                <div style="font-size:18px; margin-bottom:10px;">{medal} CẶP {pred['pair'][0]} - {pred['pair'][1]}</div>
+                <div class="big-number">{pred['pair']}</div>
+                <div style="margin:10px 0;">
+                    <span class="score-badge">Score: {pred['score']:.1f}</span>
+                    <span class="score-badge" style="background:linear-gradient(90deg,#00ff40,#80ff80);color:#000">
+                        Tin cậy: {confidence:.0f}%
+                    </span>
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width:{confidence}%; background:{'#00ff40' if confidence >= 70 else '#ffff00' if confidence >= 50 else '#ff0040'};">
+                        {confidence:.0f}%
+                    </div>
+                </div>
+                <div style="font-size:11px; color:#888; margin-top:10px;">{reasons_str}</div>
             </div>
             """, unsafe_allow_html=True)
+        
+        if st.button("🔮 PHÂN TÍCH AI CHI TIẾT"):
+            with st.spinner("Đang phân tích với Gemini AI..."):
+                ai_result = predictor.get_gemini_analysis()
+                if ai_result:
+                    st.success("✅ Gemini AI đề xuất:")
+                    for ai_pred in ai_result:
+                        st.markdown(f"**{ai_pred['pair']}** - {ai_pred['confidence']}%: {ai_pred.get('reason', 'N/A')}")
+                else:
+                    st.warning("AI chưa đưa ra kết quả")
+
+def render_streak_tab(data):
+    st.markdown("### 🔥 SỐ BỆT")
     
-    # Gaps
-    st.markdown("#### ❄️ SỐ GAN")
-    gaps = {}
-    for d in "0123456789":
-        gap = 0
-        for r in reversed(data["results"]):
-            if d in r:
-                break
-            gap += 1
-        gaps[d] = gap
+    if len(data["results"]) < 5:
+        st.warning("Cần ít nhất 5 kỳ")
+        return
+    
+    stats = StatisticalEngine(data["results"])
+    streaks = stats.detect_streaks()
+    
+    active_streaks = [(d, s) for d, s in streaks.items() if s >= 2]
+    active_streaks.sort(key=lambda x: x[1], reverse=True)
+    
+    if active_streaks:
+        for digit, streak in active_streaks:
+            status = "✅ THEO" if streak <= 3 else "⚠️ CẨN THẬN" if streak <= 5 else "❌ TRÁNH"
+            st.markdown(f"""
+            <div class="prediction-box">
+                <span class="streak-hot">Số {digit} - Bệt {streak} kỳ</span>
+                <div style="margin-top:10px; font-size:14px;">{status}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("Không có số bệt đáng chú ý")
+
+def render_gap_tab(data):
+    st.markdown("### ❄️ SỐ GAN")
+    
+    if len(data["results"]) < 10:
+        st.warning("Cần ít nhất 10 kỳ")
+        return
+    
+    stats = StatisticalEngine(data["results"])
+    gaps = stats.calculate_gap()
     
     sorted_gaps = sorted(gaps.items(), key=lambda x: x[1], reverse=True)
     
     for digit, gap in sorted_gaps[:5]:
-        status = "🔥 SẮP VỀ" if gap >= 8 else "⏳ THEO DÕI"
+        status = "🔥 SẮP VỀ" if gap >= 8 else "⏳ THEO DÕI" if gap >= 5 else "❄️ LẠNH"
         st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; 
-                    background: #0f0f1a; padding: 10px; margin: 5px 0; border-radius: 8px;">
-            <span style="font-size: 20px; font-weight: 900;">Số {digit}</span>
-            <span style="color: #ff00ff;">{gap} kỳ</span>
-            <span>{status}</span>
+        <div class="prediction-box">
+            <span class="gan-cold" style="font-size:24px;">Số {digit}</span>
+            <div style="margin:10px 0; font-size:16px;">{gap} kỳ chưa về</div>
+            <div style="font-size:14px;">{status}</div>
         </div>
         """, unsafe_allow_html=True)
 
 def render_history_tab(data):
-    st.markdown("### 📋 LỊCH SỬ DỰ ĐOÁN")
+    st.markdown("### 📊 LỊCH SỬ")
     
     if not data.get("predictions"):
-        st.info("Chưa có lịch sử dự đoán")
+        st.info("Chưa có lịch sử")
         return
     
-    # Input result for last prediction
-    if data["predictions"] and data["predictions"][0].get("result") is None:
-        st.markdown("#### ✅ CẬP NHẬT KẾT QUẢ")
-        last_result = st.text_input("Nhập kết quả kỳ gần nhất:", placeholder="12345")
-        
-        if st.button("XÁC NHẬN KẾT QUẢ", use_container_width=True):
-            if len(last_result) == 5 and last_result.isdigit():
-                pair = data["predictions"][0]["pair"]
-                is_win = all(d in last_result for d in pair)
-                data["predictions"][0]["result"] = "WIN" if is_win else "LOSE"
-                data["predictions"][0]["actual"] = last_result
-                save_data(data)
-                st.success(f"✅ {'THẮNG! 🎉' if is_win else 'THUA ❌'}")
-                st.rerun()
-    
-    # Display history
-    df_data = []
-    for pred in data["predictions"][:20]:
-        df_data.append({
-            "Ngày": pred.get("date", "")[:16].replace("T", " "),
-            "Dự đoán": pred.get("pair", ""),
-            "Confidence": f"{pred.get('confidence', 0):.0f}%",
-            "Kết quả": pred.get("result", "Chờ"),
-            "Thực tế": pred.get("actual", "-")
-        })
-    
-    df = pd.DataFrame(df_data)
+    df = pd.DataFrame(data["predictions"][-20:])
     
     def color_result(val):
         if val == "WIN":
             return "color: #00ff40; font-weight: 900"
-        elif val == "LOSE":
-            return "color: #ff0040; font-weight: 900"
-        return "color: #888"
+        return "color: #ff0040; font-weight: 900"
     
-    st.dataframe(df.style.applymap(color_result, subset=['Kết quả']), 
+    st.dataframe(df.style.applymap(color_result, subset=['result']), 
                  use_container_width=True, hide_index=True)
     
-    # Win rate
     if data["predictions"]:
         wins = sum(1 for p in data["predictions"] if p.get("result") == "WIN")
-        total_with_result = sum(1 for p in data["predictions"] if p.get("result"))
+        total = len(data["predictions"])
+        rate = wins/total*100 if total > 0 else 0
         
-        if total_with_result > 0:
-            rate = wins / total_with_result * 100
-            
-            st.markdown(f"""
-            <div class="prediction-card" style="margin-top: 20px; 
-                        border-color: {'#00ff40' if rate >= 40 else '#ff0040'};">
-                <div style="font-size: 16px;">TỶ LỆ THẮNG</div>
-                <div style="font-size: 36px; font-weight: 900; 
-                            color: {'#00ff40' if rate >= 40 else '#ff0040'};">
-                    {rate:.1f}% ({wins}/{total_with_result})
-                </div>
+        color = "#00ff40" if rate >= 40 else "#ffff00" if rate >= 30 else "#ff0040"
+        
+        st.markdown(f"""
+        <div class="prediction-box" style="border-color:{color};">
+            <div style="font-size:16px;">TỶ LỆ THẮNG</div>
+            <div style="font-size:36px; font-weight:900; color:{color};">
+                {rate:.1f}% ({wins}/{total})
             </div>
-            """, unsafe_allow_html=True)
+            <div class="confidence-bar">
+                <div class="confidence-fill" style="width:{rate}%; background:{color};">{rate:.0f}%</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # === MAIN APP ===
 def main():
     data = load_data()
     
-    st.markdown('<div class="main-header">🧠 TITAN V52 - AI NEURAL</div>', unsafe_allow_html=True)
-    st.markdown('<div style="text-align:center; color:#888; margin-bottom:15px; font-size:11px;">ML + Markov + Gemini AI | Self-Learning System</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🧠 TITAN V52 - AI MASTER</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center; color:#888; margin-bottom:15px; font-size:12px;">Statistical + Gemini AI | Auto-Learning</div>', unsafe_allow_html=True)
     
-    # Tabs
-    tabs = ["📥 Nhập", "🎯 Dự Đoán", "📊 Thống Kê", "📋 Lịch Sử"]
+    tabs = ["📥 Nhập", "🎯 Dự đoán", "🔥 Bệt", "❄️ Gan", "📊 Lịch sử"]
     
     if "active_tab" not in st.session_state:
-        st.session_state.active_tab = tabs[0]
+        st.session_state.active_tab = tabs[1]
     
-    cols = st.columns(4)
+    cols = st.columns(len(tabs))
     for i, tab in enumerate(tabs):
         with cols[i]:
             if st.button(tab, key=f"tab_{i}", use_container_width=True):
@@ -801,13 +598,40 @@ def main():
         render_input_tab(data)
     elif st.session_state.active_tab == tabs[1]:
         render_prediction_tab(data)
+        
+        if data["results"] and st.button("✅ ĐÁNH DẤU KẾT QUẢ"):
+            latest = data["results"][-1]
+            pred_col = st.columns(3)
+            with pred_col[0]:
+                num1 = st.selectbox("Số 1", list("0123456789"), key="check1")
+            with pred_col[1]:
+                num2 = st.selectbox("Số 2", list("0123456789"), key="check2")
+            with pred_col[2]:
+                if st.button("Lưu KQ", type="primary"):
+                    pair = "".join(sorted([num1, num2]))
+                    win = all(d in latest for d in pair)
+                    
+                    data["predictions"].append({
+                        "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "result_number": latest,
+                        "predicted": pair,
+                        "result": "WIN" if win else "LOSE",
+                        "reason": "Manual check"
+                    })
+                    data["predictions"] = data["predictions"][-100:]
+                    save_data(data)
+                    st.success("✅ WIN!" if win else "❌ LOSE")
+                    st.rerun()
+    
     elif st.session_state.active_tab == tabs[2]:
-        render_stats_tab(data)
+        render_streak_tab(data)
     elif st.session_state.active_tab == tabs[3]:
+        render_gap_tab(data)
+    elif st.session_state.active_tab == tabs[4]:
         render_history_tab(data)
     
     st.markdown("---")
-    st.markdown('<div style="text-align:center; color:#444; font-size:10px; margin-top:20px;">TITAN V52 | AI-Powered | Self-Learning</div>', unsafe_allow_html=True)
+    st.markdown('<div style="text-align:center; color:#444; font-size:10px; margin-top:20px;">TITAN V52 | No Sklearn | Pure Stats + AI</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
