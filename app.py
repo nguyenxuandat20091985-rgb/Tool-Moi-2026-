@@ -1,37 +1,30 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
-# Thiết kế giao diện
-st.set_page_config(page_title="Tool Phân Tích Oẳn Tù Tì KU", layout="wide")
-st.title("📊 Hệ Thống Dự Đoán Oẳn Tù Tì KU")
+st.title("📊 Tool Soi Cầu 5D Bet - Hỗ Trợ Về Bờ")
 
-# 1. Nhập dữ liệu kỳ vừa ra (Do nhà cái không có API công khai nên anh phải nhập tay hoặc dùng tool crawl)
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader("Nhập kết quả kỳ gần nhất")
-    cai_result = st.selectbox("Nhà Cái ra:", ["Búa", "Kéo", "Bao"])
-    con_result = st.selectbox("Nhà Con ra:", ["Búa", "Kéo", "Bao"])
-    if st.button("Cập nhật dữ liệu"):
-        # Logic lưu vào file csv trên github ở đây
-        st.success(f"Đã ghi nhận kỳ: {cai_result} vs {con_result}")
+# Nhập dữ liệu lịch sử (Nhập dãy số của 5-10 kỳ gần nhất)
+data_input = st.text_area("Nhập kết quả các kỳ gần nhất (mỗi kỳ 5 số, cách nhau bằng dấu phẩy):", 
+                         placeholder="12345, 67890, 11223...")
 
-# 2. Thuật toán phân tích (Điểm yếu RNG)
-def predict_next(history):
-    # Sử dụng logic: Nếu ra 'Búa' thì ván sau xác suất ra 'Bao' là bao nhiêu %
-    # Đây là nơi cài đặt thuật toán soi cầu
-    return "Bao", "85%"
+def analyze_5d(data_str):
+    try:
+        rows = [list(map(int, list(s.strip()))) for s in data_str.split(",") if len(s.strip()) == 5]
+        df = pd.DataFrame(rows, columns=['Hàng 1', 'Hàng 2', 'Hàng 3', 'Hàng 4', 'Hàng 5'])
+        
+        st.subheader("📈 Kết quả phân tích:")
+        for col in df.columns:
+            most_common = df[col].mode()[0]
+            st.write(f"**{col}:** Con số hay về nhất là **{most_common}**. Nên né hoặc đánh theo tùy cầu.")
+            
+        # Thuật toán dự đoán Tài/Xỉu hàng đơn vị (Hàng 5)
+        last_val = df['Hàng 5'].iloc[-1]
+        prediction = "TÀI" if last_val <= 4 else "XỈU" # Đánh nghịch đảo cầu
+        st.success(f"🔮 Dự đoán kỳ tới (Hàng 5): {prediction}")
+        
+    except:
+        st.warning("Vui lòng nhập đúng định dạng 5 chữ số mỗi kỳ.")
 
-# 3. Hiển thị bảng dự đoán
-st.divider()
-st.subheader("🔮 Dự đoán kỳ tiếp theo")
-c1, c2, c3 = st.columns(3)
-p_shape, p_percent = predict_next(None)
-
-c1.metric("Cửa nên đánh", "Nhà Cái")
-c2.metric("Hình dạng", p_shape)
-c3.metric("Độ tin cậy", p_percent)
-
-# 4. Biểu đồ thống kê cầu (Dựa trên ảnh anh gửi có dãy xanh đỏ)
-st.subheader("📈 Thống kê chu kỳ (Cầu)")
-# Vẽ biểu đồ bằng Plotly hoặc đơn giản là bảng màu
+if st.button("Bắt đầu soi cầu"):
+    if data_input:
+        analyze_5d(data_input)
