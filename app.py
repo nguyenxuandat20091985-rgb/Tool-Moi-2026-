@@ -1,95 +1,97 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import plotly.express as px
 
-# Thiết lập giao diện
-st.set_page_config(page_title="5D Bet Master - Đối Soát & Soi Cầu", layout="wide")
-
-# CSS tùy chỉnh để dễ nhìn trên điện thoại
+# Cấu hình giao diện chuyên nghiệp
+st.set_page_config(page_title="AI 5D BET PREDICTOR", layout="wide")
 st.markdown("""
     <style>
-    .big-font { font-size:20px !important; font-weight: bold; }
-    .win { color: #2ecc71; }
-    .loss { color: #e74c3c; }
+    .main { background-color: #0e1117; color: white; }
+    .stMetric { background-color: #1e2130; padding: 15px; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏆 5D BET - HỆ THỐNG ĐỐI SOÁT & DỰ ĐOÁN")
+st.title("🤖 AI 5D BET - TRỢ LÝ ĐỐI SOÁT & DỰ ĐOÁN")
 
-# --- PHẦN 1: NHẬP DỮ LIỆU & ĐỐI SOÁT ---
-st.header("🔍 Đối Soát Kết Quả")
-with st.expander("Nhấn để nhập kỳ vừa mở", expanded=True):
-    col1, col2 = st.columns(2)
-    with col1:
-        ky_id = st.text_input("Mã kỳ (VD: 123):")
-        so_mo = st.text_input("Nhập 5 số mở thưởng (VD: 56789):")
-    with col2:
-        cuoc_cua = st.selectbox("Anh đã đặt cửa nào?", ["Chưa đặt", "Tài", "Xỉu"])
-        tien_cuoc = st.number_input("Số tiền cược (k):", min_value=0, value=0)
-
-if st.button("✅ KIỂM TRA & LƯU LỊCH SỬ"):
-    if len(so_mo) == 5 and so_mo.isdigit():
-        digits = [int(d) for d in so_mo]
-        tong = sum(digits)
-        ket_qua = "Tài" if tong >= 23 else "Xỉu"
-        
-        st.subheader(f"Kết quả Tổng: {tong} ➡ {ket_qua.upper()}")
-        
-        # Kiểm tra thắng thua
-        if cuoc_cua != "Chưa đặt":
-            if cuoc_cua == ket_qua:
-                st.balloons()
-                st.success(f"CHÚC MỪNG! Anh thắng {tien_cuoc * 1.95}k")
-            else:
-                st.error(f"RẤT TIẾC! Kỳ này anh chưa may mắn.")
-        
-        # Lưu vào bộ nhớ tạm (Session State)
-        if 'history' not in st.session_state:
-            st.session_state.history = []
-        st.session_state.history.append({"Kỳ": ky_id, "Số": so_mo, "Tổng": tong, "Kết Quả": ket_qua})
-    else:
-        st.warning("Vui lòng nhập đúng 5 chữ số!")
-
-# --- PHẦN 2: LỊCH SỬ & SOI CẦU ---
-if 'history' in st.session_state and len(st.session_state.history) > 0:
-    st.divider()
-    st.header("📊 Phân Tích Soi Cầu")
-    df = pd.DataFrame(st.session_state.history)
-    
-    col_l, col_r = st.columns([2, 1])
-    with col_l:
-        st.write("Lịch sử 10 kỳ gần nhất:")
-        st.table(df.tail(10))
-    
-    with col_r:
-        # Thuật toán soi cầu đơn giản
-        last_results = df['Kết Quả'].tail(5).tolist()
-        tai_count = last_results.count("Tài")
-        xiu_count = last_results.count("Xỉu")
-        
-        st.write("**Thống kê 5 kỳ cuối:**")
-        st.write(f"- Tài: {tai_count}")
-        st.write(f"- Xỉu: {xiu_count}")
-        
-        # Gợi ý lệnh tiếp theo
-        st.subheader("🔮 GỢI Ý KỲ TỚI")
-        if tai_count >= 4:
-            st.warning("Cầu bệt TÀI - Cân nhắc theo bệt hoặc dừng.")
-            st.button("VÀO LỆNH: TÀI", b_type="primary")
-        elif xiu_count >= 4:
-            st.warning("Cầu bệt XỈU - Cân nhắc theo bệt hoặc dừng.")
-            st.button("VÀO LỆNH: XỈU", b_type="primary")
-        else:
-            st.info("Cầu đang biến động - Đánh nhẹ tay.")
-
-# --- PHẦN 3: QUẢN LÝ VỐN (NÂNG CẤP ĐÁNG GIÁ) ---
-st.divider()
-st.header("💰 Quản Lý Vốn Smart-Bet")
-vốn = st.number_input("Tổng vốn hiện tại (k):", value=1000)
-st.write("Bảng đi tiền Gấp thếp (nếu anh muốn gỡ):")
-steps = [vốn*0.01, vốn*0.02, vốn*0.04, vốn*0.08, vốn*0.16]
-st.write(f"Lệnh 1: {steps[0]:.1f}k | Lệnh 2: {steps[1]:.1f}k | Lệnh 3: {steps[2]:.1f}k | Lệnh 4: {steps[3]:.1f}k")
-st.caption("Lời khuyên: Nếu thua đến Lệnh 4 mà chưa về, hãy DỪNG LẠI. Đừng cháy túi vì một dây bệt!")
-
-if st.button("🗑 XÓA DỮ LIỆU LÀM MỚI"):
+# Khởi tạo bộ nhớ (Session State) để lưu lịch sử thắng thua
+if 'history' not in st.session_state:
     st.session_state.history = []
-    st.rerun()
+
+# --- KHU VỰC NHẬP DỮ LIỆU ---
+with st.sidebar:
+    st.header("🎮 Nhập Kết Quả Kỳ Hiện Tại")
+    ky_so = st.number_input("Số kỳ (Ví dụ: 123)", min_value=1, step=1)
+    ket_qua = st.text_input("Nhập 5 số mở thưởng (VD: 56789)", max_length=5)
+    
+    if st.button("🚀 Phân Tích & Đối Soát"):
+        if len(ket_qua) == 5 and ket_qua.isdigit():
+            nums = [int(d) for d in ket_qua]
+            tong = sum(nums)
+            status = "TÀI" if tong >= 23 else "XỈU"
+            
+            # Lưu vào lịch sử
+            st.session_state.history.append({
+                "Kỳ": ky_so,
+                "Kết quả": ket_qua,
+                "Tổng": tong,
+                "Hệ thống": status
+            })
+            st.success(f"Đã lưu kỳ {ky_so}!")
+        else:
+            st.error("Vui lòng nhập đúng 5 chữ số!")
+
+# --- KHU VỰC THỐNG KÊ & AI ---
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader("📊 Nhật Ký Đối Soát Tự Động")
+    if st.session_state.history:
+        df = pd.DataFrame(st.session_state.history)
+        st.table(df.tail(10)) # Hiển thị 10 kỳ gần nhất
+        
+        # Biểu đồ xu hướng tổng điểm
+        fig = px.line(df, x="Kỳ", y="Tổng", title="Biểu đồ xu hướng Tổng 5 banh", markers=True)
+        fig.add_hline(y=22.5, line_dash="dash", line_color="red", annotation_text="Ranh giới Tài/Xỉu")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Chưa có dữ liệu. Hãy nhập kỳ đầu tiên ở bên trái.")
+
+with col2:
+    st.subheader("🔮 AI Dự Đoán Kỳ Tiếp")
+    if len(st.session_state.history) >= 3:
+        df = pd.DataFrame(st.session_state.history)
+        last_3 = df['Hệ thống'].tail(3).tolist()
+        
+        # Thuật toán AI đơn giản: Nhận diện cầu bệt hoặc cầu nghiêng
+        tai_count = df['Hệ thống'].tail(10).tolist().count("TÀI")
+        xiu_count = 10 - tai_count
+        
+        st.metric("Tỉ lệ Tài/Xỉu (10 kỳ)", f"{tai_count*10}% / {xiu_count*10}%")
+        
+        # Logic dự đoán
+        if last_3 == ["TÀI", "TÀI", "TÀI"]:
+            prediction = "XỈU"
+            reason = "Cầu bệt dài, AI dự báo bẻ cầu (Hồi đầu)"
+        elif last_3 == ["XỈU", "XỈU", "XỈU"]:
+            prediction = "TÀI"
+            reason = "Cầu bệt dài, AI dự báo bẻ cầu"
+        else:
+            prediction = "TÀI" if xiu_count > tai_count else "XỈU"
+            reason = "Đánh theo thuật toán bù trừ xác suất"
+
+        st.markdown(f"### Lệnh nên đánh: **{prediction}**")
+        st.caption(f"Lý do: {reason}")
+        
+        # Quản lý vốn
+        st.warning("💰 Mức vào tiền gợi ý: 1% - 2% vốn")
+    else:
+        st.write("Cần tối thiểu 3 kỳ để AI bắt đầu soi cầu.")
+
+# --- NÂNG CẤP ĐÁNG GIÁ ---
+st.divider()
+st.subheader("🚀 Các nâng cấp AI anh nhận được:")
+c1, c2, c3 = st.columns(3)
+c1.write("✅ **Tự động tính Tổng:** Anh không cần bấm máy tính, nhập 5 số là xong.")
+c2.write("✅ **Báo lỗi nhập:** Nếu nhập thiếu số hoặc sai định dạng, tool sẽ chặn ngay.")
+c3.write("✅ **Nhận diện Cầu Bệt:** AI tự động cảnh báo khi một bên ra quá nhiều.")
