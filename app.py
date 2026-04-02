@@ -1,100 +1,104 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 
-# Cấu hình trang
-st.set_page_config(page_title="AI 5D-Bet Pro", layout="wide")
-
-# Giao diện chính
-st.title("🤖 AI Phân Tích 5D Bet - Tổng 5 Banh")
+# Cấu hình giao diện
+st.set_page_config(page_title="AI 5D Bet Pro", layout="wide")
+st.title("🚀 AI 5D BET PRO - TỔNG 5 BANH")
 st.markdown("---")
 
-# Khởi tạo trạng thái lưu trữ nếu chưa có
-if 'history' not in st.session_state:
-    st.session_state.history = []
+# 1. Khởi tạo trạng thái hệ thống (Vốn & Quản lý cược)
 if 'balance' not in st.session_state:
-    st.session_state.balance = 100000
-if 'last_bet' not in st.session_state:
-    st.session_state.last_bet = None
+    st.session_state.balance = 100000 # Vốn 100k
 if 'bet_step' not in st.session_state:
     st.session_state.bet_step = 0
-
-# Cấu hình mức tiền gấp thếp nhẹ cho vốn 100k
-BET_STAGES = [2000, 4000, 9000, 19000, 40000]
-
-def predict_logic(history):
-    if len(history) < 3:
-        return "Đợi thêm dữ liệu", 50
-    
-    sums = [sum([int(d) for d in str(k)]) for k in history]
-    # Thuật toán AI: Tính toán độ lệch trung bình (Mean Reversion)
-    avg_sum = np.mean(sums)
-    
-    # Nếu tổng trung bình đang quá cao (>25), xác suất về Xỉu cao hơn và ngược lại
-    if avg_sum > 25:
-        return "XỈU", 72
-    elif avg_sum < 20:
-        return "TÀI", 75
-    else:
-        # Check cầu bệt
-        last_type = "TÀI" if sums[-1] >= 23 else "XỈU"
-        return last_type, 65
-
-# --- KHU VỰC NHẬP LIỆU ---
-col1, col2 = st.columns([1, 2])
-
-with col1:
-    st.subheader("📥 Nhập kỳ mới")
-    new_val = st.text_input("Nhập 5 số vừa ra:", placeholder="Ví dụ: 56789", max_chars=5)
-    
-    if st.button("Xác nhận & Đối soát"):
-        if len(new_val) == 5 and new_val.isdigit():
-            current_sum = sum([int(d) for d in new_val])
-            current_type = "TÀI" if current_sum >= 23 else "XỈU"
-            
-            # Đối soát thắng thua
-            if st.session_state.last_bet:
-                if st.session_state.last_bet == current_type:
-                    win_amt = BET_STAGES[st.session_state.bet_step] * 0.95
-                    st.session_state.balance += win_amt
-                    st.session_state.bet_step = 0 # Thắng thì về mức 1
-                    st.balloons()
-                    st.success(f"THẮNG! +{win_amt:,.0f}đ")
-                else:
-                    st.session_state.balance -= BET_STAGES[st.session_state.bet_step]
-                    st.session_state.bet_step = min(st.session_state.bet_step + 1, len(BET_STAGES)-1)
-                    st.error(f"THUA! -{BET_STAGES[st.session_state.bet_step-1]:,.0f}đ")
-            
-            st.session_state.history.append(new_val)
-        else:
-            st.error("Vui lòng nhập đúng 5 chữ số!")
-
-# --- KHU VỰC HIỂN THỊ ---
-with col2:
-    st.subheader("📈 Phân tích AI & Quản lý vốn")
-    
-    prediction, confidence = predict_logic(st.session_state.history)
-    st.session_state.last_bet = prediction
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Số dư hiện tại", f"{st.session_state.balance:,.0f}đ")
-    c2.metric("Dự đoán kỳ tiếp", prediction)
-    c3.metric("Độ tin cậy", f"{confidence}%")
-    
-    st.warning(f"👉 Lệnh đánh tiếp theo: **{BET_STAGES[st.session_state.bet_step]:,.0f}đ** vào cửa **{prediction}**")
-
-# Bảng lịch sử
-if st.session_state.history:
-    st.subheader("📜 Lịch sử đối soát")
-    hist_data = []
-    for h in reversed(st.session_state.history):
-        s = sum([int(d) for d in h])
-        t = "TÀI" if s >= 23 else "XỈU"
-        hist_data.append({"Số": h, "Tổng": s, "Kết quả": t})
-    st.table(pd.DataFrame(hist_data))
-
-if st.button("Xóa lịch sử / Reset vốn"):
+if 'history' not in st.session_state:
     st.session_state.history = []
+
+# Danh sách gấp thếp nhẹ (1k, 2k, 3k, 5k, 8k, 13k...) - Dãy Fibonacci
+bet_amounts = [1000, 2000, 3000, 5000, 8000, 13000, 21000]
+
+def get_prediction(history_sums):
+    """AI dự đoán dựa trên xu hướng tổng số"""
+    if len(history_sums) < 3:
+        return "CHỜ DỮ LIỆU"
+    
+    avg_sum = sum(history_sums) / len(history_sums)
+    last_sum = history_sums[-1]
+    
+    # Logic AI: Dự đoán dựa trên sự hồi quy về mức trung bình (Regression to Mean)
+    # Nếu tổng vừa rồi quá cao (>30), xác suất kỳ tới về Xỉu (<22) tăng lên.
+    if last_sum > 30:
+        return "XỈU"
+    elif last_sum < 15:
+        return "TÀI"
+    else:
+        # Nếu đang ở giữa, đánh theo cầu bệt (Trend Following)
+        return "TÀI" if last_sum >= 23 else "XỈU"
+
+# 2. Giao diện nhập liệu
+st.sidebar.header("🕹️ BÀN ĐIỀU KHIỂN")
+st.sidebar.write(f"💰 Vốn hiện tại: **{st.session_state.balance:,} VNĐ**")
+if st.sidebar.button("Reset Vốn (100k)"):
     st.session_state.balance = 100000
     st.session_state.bet_step = 0
     st.rerun()
+
+current_input = st.text_input("Nhập kết quả kỳ vừa ra (5 số viết liền, VD: 56789):", "")
+
+if st.button("CẬP NHẬT & ĐỐI SOÁT"):
+    if len(current_input) == 5 and current_input.isdigit():
+        digits = [int(d) for d in current_input]
+        total = sum(digits)
+        result_type = "TÀI" if total >= 23 else "XỈU"
+        
+        # Đối soát thắng thua
+        if len(st.session_state.history) > 0:
+            last_pred = st.session_state.history[-1]['prediction']
+            bet_value = bet_amounts[st.session_state.bet_step]
+            
+            if last_pred == result_type:
+                st.balloons()
+                st.success(f"THẮNG! Kỳ trước ra {total} ({result_type})")
+                st.session_state.balance += (bet_value * 0.95) # Trừ phế nhà cái
+                st.session_state.bet_step = 0 # Thắng thì về mức cược ban đầu
+            else:
+                st.error(f"THUA! Kỳ trước ra {total} ({result_type})")
+                st.session_state.balance -= bet_value
+                st.session_state.bet_step = min(st.session_state.bet_step + 1, len(bet_amounts)-1)
+
+        # Lưu lịch sử
+        st.session_state.history.append({
+            "input": current_input,
+            "total": total,
+            "type": result_type,
+            "prediction": "" # Sẽ cập nhật ở bước sau
+        })
+    else:
+        st.warning("Vui lòng nhập đúng 5 chữ số!")
+
+# 3. Phân tích và đưa ra lệnh đánh
+if len(st.session_state.history) >= 1:
+    history_totals = [h['total'] for h in st.session_state.history]
+    next_pred = get_prediction(history_totals)
+    st.session_state.history[-1]['prediction'] = next_pred
+    
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("LỆNH TIẾP THEO", next_pred)
+    with col2:
+        current_bet = bet_amounts[st.session_state.bet_step]
+        st.metric("TIỀN CƯỢC", f"{current_bet:,} VNĐ")
+    with col3:
+        status = "NÊN ĐÁNH" if st.session_state.bet_step < 4 else "CẢNH BÁO: CẦU BIẾN"
+        st.metric("TRẠNG THÁI", status)
+
+# 4. Hiển thị bảng lịch sử để theo dõi
+if st.session_state.history:
+    st.subheader("📋 Nhật ký đối soát")
+    df = pd.DataFrame(st.session_state.history).tail(10)
+    st.table(df)
+
+st.markdown("---")
+st.caption("Lưu ý: Tool dựa trên xác suất. Hãy dừng lại khi thắng 20% vốn mỗi ngày để tránh bị nhà cái quét ID.")
