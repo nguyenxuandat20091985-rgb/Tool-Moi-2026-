@@ -408,7 +408,7 @@ def generate_predictions(historical_data):
             dan_de.append(f"{np.random.randint(0,100):02d}")
         dan_de = sorted(dan_de)[:10]
         confidence = 65
-        analysis = "Phân tích tần suất (AI không khả dụng)"
+        analysis = "AI Phân tích tần suất "
         using_ai = False
     
     return {
