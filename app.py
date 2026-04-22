@@ -1,5 +1,5 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - GEMINI ENHANCED
+# 💎 AI-QUANTUM PRO 2026 - GEMINI POWERED
 # =============================================================================
 import streamlit as st
 import requests
@@ -7,28 +7,24 @@ from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
-from streamlit_autorefresh import st_autorefresh
 from collections import Counter
 import json
 import time
-import google.generativeai as genai
+import re
+import os
 
 # =============================================================================
 # 🔧 CẤU HÌNH
 # =============================================================================
 st.set_page_config(
-    page_title="💎 AI-QUANTUM PRO 2026 - GEMINI",
+    page_title="💎 AI-QUANTUM PRO 2026 | Gemini AI",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Gemini API Configuration
+# Gemini API Key
 GEMINI_API_KEY = "AIzaSyARQk3lpoHnK51LQ62OR4vciH0XMFFIZjg"
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
-
-st_autorefresh(interval=120000, key="live_update")
 
 # =============================================================================
 # 🎨 CSS
@@ -40,7 +36,7 @@ st.markdown("""
         background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #B8962E 100%);
         padding: 20px; border-radius: 15px; text-align: center; 
         color: #000; font-weight: bold; margin-bottom: 20px;
-        box-shadow: 0 4px 20px rgba(212, 175, 55, 0.6);
+        box-shadow: 0 4px 20px rgba(212, 175, 55, 0.5);
     }
     .stat-card {
         background: linear-gradient(135deg, #1a1a2e, #16213e);
@@ -49,64 +45,90 @@ st.markdown("""
     }
     .stat-value { font-size: 28px; font-weight: bold; color: #FFD700; }
     .stat-label { font-size: 12px; color: #888; margin-top: 5px; }
-    .gan-number {
-        background: rgba(255, 75, 75, 0.3);
-        border: 1px solid #ff4b4b;
-        padding: 5px 10px; border-radius: 5px;
-        margin: 2px; display: inline-block;
-    }
-    .hot-number {
-        background: rgba(0, 255, 136, 0.3);
-        border: 1px solid #00ff88;
-        padding: 5px 10px; border-radius: 5px;
-        margin: 2px; display: inline-block;
-    }
+    .win { color: #00ff88; }
+    .loss { color: #ff4b4b; }
     .pred-box {
         border: 2px solid #D4AF37; border-radius: 12px;
         padding: 20px; background: linear-gradient(135deg, #111, #1a1a2e);
         text-align: center; margin: 8px 0;
+        transition: transform 0.2s;
     }
-    .ai-badge {
-        background: linear-gradient(135deg, #4285f4, #34a853);
-        color: white; padding: 3px 10px; border-radius: 12px;
-        font-size: 11px; font-weight: bold; margin-left: 5px;
-    }
+    .pred-box:hover { transform: translateY(-3px); }
     .disclaimer {
         background: rgba(255, 107, 107, 0.15);
         border-left: 4px solid #ff6b6b;
         padding: 12px; border-radius: 0 8px 8px 0;
         margin: 15px 0; font-size: 13px;
     }
+    .analysis-box {
+        background: rgba(212, 175, 55, 0.1);
+        border: 1px solid #D4AF37;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 10px 0;
+        font-size: 13px;
+    }
+    .gan-number {
+        background: rgba(255, 75, 75, 0.2);
+        color: #ff4b4b;
+        padding: 3px 8px;
+        border-radius: 5px;
+        margin: 2px;
+        display: inline-block;
+    }
+    .hot-number {
+        background: rgba(0, 255, 136, 0.2);
+        color: #00ff88;
+        padding: 3px 8px;
+        border-radius: 5px;
+        margin: 2px;
+        display: inline-block;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 💾 AUTO HISTORY MANAGEMENT
+# 💾 STATISTICS MANAGEMENT
 # =============================================================================
-def init_history():
-    """Khởi tạo lịch sử tự động"""
-    if 'daily_history' not in st.session_state:
-        st.session_state.daily_history = {
+def init_statistics():
+    if 'statistics' not in st.session_state:
+        st.session_state.statistics = {
             'predictions': [],
             'daily_stats': {},
-            'last_updated': None
+            'total_predictions': 0,
+            'wins': 0,
+            'losses': 0
         }
     
-    # Load từ file nếu có (persistent storage)
+    # Load từ file nếu có (cho Streamlit Cloud)
+    if os.path.exists('statistics.json'):
+        try:
+            with open('statistics.json', 'r', encoding='utf-8') as f:
+                st.session_state.statistics = json.load(f)
+        except:
+            pass
+
+def save_statistics():
+    """Lưu statistics ra file"""
     try:
-        import os
-        if os.path.exists('history.json'):
-            with open('history.json', 'r', encoding='utf-8') as f:
-                st.session_state.daily_history = json.load(f)
+        with open('statistics.json', 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.statistics, f, ensure_ascii=False, indent=2)
     except:
         pass
 
-def save_daily_prediction(date_str, pred_type, numbers, result_numbers, is_win, confidence=0):
-    """Lưu dự đoán tự động theo ngày"""
-    today = datetime.now().strftime("%Y-%m-%d")
+def save_prediction(date_str, pred_type, numbers, result_numbers, is_win, confidence=0):
+    today = date_str
+    if today not in st.session_state.statistics['daily_stats']:
+        st.session_state.statistics['daily_stats'][today] = {
+            'date': today,
+            'predictions': 0,
+            'wins': 0,
+            'losses': 0
+        }
     
     pred = {
-        'date': date_str,
+        'date': today,
+        'time': datetime.now().strftime("%H:%M"),
         'type': pred_type,
         'numbers': numbers,
         'result_numbers': result_numbers,
@@ -115,66 +137,39 @@ def save_daily_prediction(date_str, pred_type, numbers, result_numbers, is_win, 
         'timestamp': datetime.now().isoformat()
     }
     
-    st.session_state.daily_history['predictions'].append(pred)
+    st.session_state.statistics['predictions'].append(pred)
+    st.session_state.statistics['total_predictions'] += 1
+    st.session_state.statistics['daily_stats'][today]['predictions'] += 1
     
-    # Update daily stats
-    if today not in st.session_state.daily_history['daily_stats']:
-        st.session_state.daily_history['daily_stats'][today] = {
-            'total': 0, 'wins': 0, 'losses': 0
-        }
-    
-    st.session_state.daily_history['daily_stats'][today]['total'] += 1
     if is_win:
-        st.session_state.daily_history['daily_stats'][today]['wins'] += 1
+        st.session_state.statistics['wins'] += 1
+        st.session_state.statistics['daily_stats'][today]['wins'] += 1
     else:
-        st.session_state.daily_history['daily_stats'][today]['losses'] += 1
+        st.session_state.statistics['losses'] += 1
+        st.session_state.statistics['daily_stats'][today]['losses'] += 1
     
-    st.session_state.daily_history['last_updated'] = datetime.now().isoformat()
-    save_history_to_file()
+    save_statistics()
 
-def save_history_to_file():
-    """Lưu lịch sử ra file JSON"""
-    try:
-        with open('history.json', 'w', encoding='utf-8') as f:
-            json.dump(st.session_state.daily_history, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        st.error(f"❌ Không thể lưu lịch sử: {e}")
-
-def get_loto_gan(all_results, days_threshold=7):
-    """Phát hiện số bệt/loto gan - số lâu chưa về"""
-    counter = Counter(all_results)
-    all_possible = [f"{i:02d}" for i in range(100)]
-    
-    # Số chưa xuất hiện hoặc rất ít
-    gan_numbers = []
-    for num in all_possible:
-        count = counter.get(num, 0)
-        if count == 0 or count < 2:
-            gan_numbers.append((num, count))
-    
-    # Sort theo số lần xuất hiện (ít nhất lên đầu)
-    gan_numbers.sort(key=lambda x: x[1])
-    return gan_numbers[:10]  # Top 10 số gan nhất
-
-def get_hot_numbers(all_results):
-    """Số nóng - xuất hiện nhiều"""
-    counter = Counter(all_results)
-    return counter.most_common(10)
+def get_daily_stats():
+    """Lấy thống kê theo ngày"""
+    return st.session_state.statistics.get('daily_stats', {})
 
 # =============================================================================
-# 📡 SCRAPING
+# 📡 DATA SCRAPING - MULTIPLE SOURCES
 # =============================================================================
 @st.cache_data(ttl=300)
 def get_live_xsmb():
-    """Crawl kết quả XSMB"""
-    urls = [
+    """Crawl từ nhiều nguồn"""
+    sources = [
         "https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html",
         "https://xoso.com.vn/xsmb.html"
     ]
     
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
     
-    for url in urls:
+    for url in sources:
         try:
             res = requests.get(url, headers=headers, timeout=15)
             soup = BeautifulSoup(res.content, 'html.parser')
@@ -183,7 +178,7 @@ def get_live_xsmb():
                 item = soup.find("span", class_=cls)
                 return item.text.strip() if item else "..."
             
-            return {
+            data = {
                 "Đặc Biệt": get_txt("special-temp"),
                 "Giải Nhất": get_txt("g1-temp"),
                 "Giải Nhì": [get_txt(f"g2_{i}-temp") for i in range(2)],
@@ -192,314 +187,413 @@ def get_live_xsmb():
                 "Giải Năm": [get_txt(f"g5_{i}-temp") for i in range(6)],
                 "Giải Sáu": [get_txt(f"g6_{i}-temp") for i in range(3)],
                 "Giải Bảy": [get_txt(f"g7_{i}-temp") for i in range(4)],
-                "time": datetime.now().strftime("%H:%M:%S %d/%m")
+                "time": datetime.now().strftime("%H:%M:%S %d/%m"),
+                "source": url
             }
-        except:
+            
+            if data["Đặc Biệt"] != "...":
+                return data
+                
+        except Exception as e:
             continue
     
     return None
 
+def get_historical_data(days=30):
+    """Giả lập dữ liệu lịch sử (trong thực tế cần crawl thêm)"""
+    # Đây là mock data - trong thực tế cần API hoặc crawl thêm
+    historical = {}
+    for i in range(days):
+        date = (datetime.now() - timedelta(days=i)).strftime("%d/%m")
+        np.random.seed(i * 1000)
+        historical[date] = {
+            "Đặc Biệt": f"{np.random.randint(10000, 99999):05d}",
+            "Giải Nhất": f"{np.random.randint(10000, 99999):05d}",
+            "Giải Nhì": [f"{np.random.randint(10000, 99999):05d}" for _ in range(2)],
+            "Giải Ba": [f"{np.random.randint(10000, 99999):05d}" for _ in range(6)],
+            "Giải Tư": [f"{np.random.randint(1000, 9999):04d}" for _ in range(4)],
+            "Giải Năm": [f"{np.random.randint(1000, 9999):04d}" for _ in range(6)],
+            "Giải Sáu": [f"{np.random.randint(100, 999):03d}" for _ in range(3)],
+            "Giải Bảy": [f"{np.random.randint(0, 99):02d}" for _ in range(4)],
+        }
+    return historical
+
 # =============================================================================
-# 🧠 GEMINI AI PREDICTION
+# 🧠 ADVANCED ANALYSIS ENGINE
 # =============================================================================
-def gemini_predict(hot_numbers, gan_numbers, recent_results):
-    """
-    Sử dụng Gemini AI để phân tích và dự đoán
-    """
-    try:
-        prompt = f"""
-        Bạn là chuyên gia phân tích xổ số với 20 năm kinh nghiệm.
+class AdvancedAnalyzer:
+    def __init__(self, historical_data):
+        self.historical = historical_data
+        self.all_loto = self._extract_all_loto()
+    
+    def _extract_all_loto(self):
+        """Tách tất cả số 2 chữ số từ lịch sử"""
+        loto = []
+        for date, data in self.historical.items():
+            for key, val in data.items():
+                if isinstance(val, list):
+                    for v in val:
+                        if v and len(v) >= 2:
+                            loto.append(v[-2:])
+                elif val and len(val) >= 2:
+                    loto.append(val[-2:])
+        return loto
+    
+    def analyze_frequency(self):
+        """Phân tích tần suất"""
+        counter = Counter(self.all_loto)
+        total = len(self.all_loto)
         
-        Dữ liệu hiện tại:
-        - Số NÓNG (xuất hiện nhiều): {', '.join([n[0] for n in hot_numbers[:5]])}
-        - Số LẠNH/GAN (lâu chưa về): {', '.join([n[0] for n in gan_numbers[:5]])}
-        - Kết quả gần đây: {', '.join(recent_results[-10:])}
+        frequency = {}
+        for num, count in counter.items():
+            frequency[num] = {
+                'count': count,
+                'percentage': (count / total * 100) if total > 0 else 0,
+                'expected': total / 100  # Expected nếu random đều
+            }
         
-        Hãy phân tích và đưa ra dự đoán:
-        1. Bạch thủ (1 số 2 chữ số) - độ tin cậy %
-        2. Song thủ (2 số) - độ tin cậy %
-        3. Dàn đề 10 số
+        return frequency
+    
+    def analyze_gap(self):
+        """Phân tích số gan (số lâu chưa về)"""
+        gap = {}
+        all_nums = [f"{i:02d}" for i in range(100)]
         
-        Phân tích dựa trên:
-        - Quy luật xác suất
-        - Chu kỳ lặp lại
-        - Xu hướng gần đây
+        for num in all_nums:
+            days_since = 0
+            for date, data in self.historical.items():
+                found = False
+                for key, val in data.items():
+                    if isinstance(val, list):
+                        if any(v.endswith(num) for v in val if v):
+                            found = True
+                            break
+                    elif val and val.endswith(num):
+                        found = True
+                        break
+                
+                if found:
+                    break
+                days_since += 1
+            
+            gap[num] = days_since
         
-        Trả lời theo format JSON:
-        {{
-            "bach_thu": "76",
-            "bach_thu_confidence": 75,
-            "song_thu": ["09", "90"],
-            "song_thu_confidence": 65,
-            "dan_de": ["01", "12", "23", "34", "45", "56", "67", "78", "89", "90"],
-            "analysis": "Giải thích ngắn gọn lý do chọn các số này"
-        }}
-        """
-        
-        response = model.generate_content(prompt)
-        
-        # Parse JSON từ response
-        try:
-            # Tìm JSON trong response
-            import re
-            json_match = re.search(r'\{.*\}', response.text, re.DOTALL)
-            if json_match:
-                result = json.loads(json_match.group())
-                return result
-        except:
-            pass
-        
-        # Fallback nếu parse failed
-        return {
-            "bach_thu": hot_numbers[0][0] if hot_numbers else "76",
-            "bach_thu_confidence": 70,
-            "song_thu": [hot_numbers[1][0] if len(hot_numbers) > 1 else "09", 
-                        gan_numbers[0][0] if gan_numbers else "90"],
-            "song_thu_confidence": 60,
-            "dan_de": [f"{i:02d}" for i in range(10)],
-            "analysis": "Phân tích AI không khả dụng"
+        return gap
+    
+    def analyze_patterns(self):
+        """Phân tích cầu, tổng, chạm"""
+        patterns = {
+            'total_db': [],  # Tổng đặc biệt
+            'first_last': [],  # Đầu đuôi
+            'pairs': []  # Cặp hay đi cùng
         }
         
+        for date, data in self.historical.items():
+            db = data.get("Đặc Biệt", "")
+            if db and len(db) == 5:
+                # Tổng đặc biệt
+                total = sum(int(d) for d in db)
+                patterns['total_db'].append(total)
+                
+                # Đầu đuôi
+                patterns['first_last'].append(db[0] + db[-1])
+        
+        return patterns
+    
+    def get_hot_numbers(self, top_n=10):
+        """Lấy số nóng (về nhiều)"""
+        freq = self.analyze_frequency()
+        sorted_freq = sorted(freq.items(), key=lambda x: x[1]['count'], reverse=True)
+        return [num for num, _ in sorted_freq[:top_n]]
+    
+    def get_cold_numbers(self, top_n=10):
+        """Lấy số lạnh (ít về)"""
+        freq = self.analyze_frequency()
+        sorted_freq = sorted(freq.items(), key=lambda x: x[1]['count'])
+        return [num for num, _ in sorted_freq[:top_n]]
+    
+    def get_gan_numbers(self, top_n=10):
+        """Lấy số gan (lâu chưa về)"""
+        gap = self.analyze_gap()
+        sorted_gap = sorted(gap.items(), key=lambda x: x[1], reverse=True)
+        return [(num, days) for num, days in sorted_gap[:top_n]]
+
+# =============================================================================
+# 🤖 GEMINI AI INTEGRATION
+# =============================================================================
+def query_gemini_for_prediction(hot_nums, cold_nums, gan_nums, current_data):
+    """Sử dụng Gemini AI để phân tích và dự đoán"""
+    
+    prompt = f"""
+Bạn là chuyên gia xổ số với 20 năm kinh nghiệm. Hãy phân tích và dự đoán XSMB.
+
+DỮ LIỆU PHÂN TÍCH:
+- Số NÓNG (hay về): {', '.join(hot_nums[:5])}
+- Số LẠNH (ít về): {', '.join(cold_nums[:5])}
+- Số GAN (lâu chưa về): {', '.join([f"{num}({days} ngày)" for num, days in gan_nums[:5]])}
+
+YÊU CẦU:
+1. Phân tích ngắn gọn xu hướng
+2. Đề xuất 1 số BẠCH THỦ (2 chữ số)
+3. Đề xuất 2 số SONG THỦ
+4. Đề xuất 10 số cho DÀN ĐỀ
+5. Đánh giá độ tin cậy (0-100%)
+
+TRẢ LỜI THEO ĐỊNH DẠNG JSON:
+{{
+    "analysis": "Phân tích ngắn",
+    "bach_thu": "XX",
+    "song_thu": ["XX", "YY"],
+    "dan_de": ["01", "23", ...],
+    "confidence": 85
+}}
+"""
+    
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        
+        payload = {
+            "contents": [{
+                "parts": [{
+                    "text": prompt
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 500
+            }
+        }
+        
+        headers = {"Content-Type": "application/json"}
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        
+        if response.status_code == 200:
+            result = response.json()
+            text = result['candidates'][0]['content']['parts'][0]['text']
+            
+            # Parse JSON từ response
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+        
+        return None
+        
     except Exception as e:
-        st.error(f"⚠️ Gemini AI error: {e}")
+        st.warning(f"⚠️ Gemini AI error: {str(e)[:100]}")
         return None
 
 # =============================================================================
-# 🎲 TRUYỀN THỐNG + AI PREDICTION
+# 🎲 PREDICTION ENGINE
 # =============================================================================
-def advanced_predictions(all_loto, data):
-    """
-    Hệ thống dự đoán đa lớp:
-    1. Phân tích tần suất truyền thống
-    2. Phát hiện số gan
-    3. Gemini AI analysis
-    4. Kết hợp kết quả
-    """
+def generate_predictions_with_ai(data, historical_data):
+    """Tạo dự đoán kết hợp AI và thuật toán"""
     
-    # 1. Phân tích cơ bản
-    hot = get_hot_numbers(all_loto)
-    gan = get_loto_gan(all_loto)
+    analyzer = AdvancedAnalyzer(historical_data)
     
-    # 2. Gemini AI prediction
-    recent_results = all_loto[-30:] if len(all_loto) >= 30 else all_loto
-    ai_pred = gemini_predict(hot, gan, recent_results)
+    # Phân tích
+    hot_nums = analyzer.get_hot_numbers(10)
+    cold_nums = analyzer.get_cold_numbers(10)
+    gan_nums = analyzer.get_gan_numbers(10)
+    patterns = analyzer.analyze_patterns()
     
-    # 3. Truyền thống prediction
-    traditional_bt = hot[0][0] if hot else f"{np.random.randint(0,100):02d}"
-    traditional_st = [
-        hot[1][0] if len(hot) > 1 else f"{np.random.randint(0,100):02d}",
-        gan[0][0] if gan else f"{np.random.randint(0,100):02d}"
-    ]
+    # Query Gemini AI
+    gemini_result = query_gemini_for_prediction(hot_nums, cold_nums, gan_nums, data)
     
-    # 4. Kết hợp AI + Truyền thống
-    if ai_pred:
-        final_bt = ai_pred.get('bach_thu', traditional_bt)
-        final_st = ai_pred.get('song_thu', traditional_st)
-        final_dan = ai_pred.get('dan_de', [f"{i:02d}" for i in range(10)])
-        ai_confidence = ai_pred.get('bach_thu_confidence', 70)
-        analysis = ai_pred.get('analysis', '')
+    # Nếu Gemini fail, fallback về thuật toán thường
+    if gemini_result is None:
+        # Thuật toán truyền thống
+        bt = hot_nums[0] if hot_nums else f"{np.random.randint(0,100):02d}"
+        st1 = hot_nums[1] if len(hot_nums) > 1 else gan_nums[0][0] if gan_nums else f"{np.random.randint(0,100):02d}"
+        st2 = cold_nums[0] if cold_nums else f"{np.random.randint(0,100):02d}"
+        
+        dan_de = list(set(hot_nums[:4] + cold_nums[:3] + [num for num, _ in gan_nums[:3]]))
+        while len(dan_de) < 10:
+            dan_de.append(f"{np.random.randint(0,100):02d}")
+        dan_de = sorted(dan_de)[:10]
+        
+        confidence = 65  # Default
+        analysis = "Phân tích dựa trên tần suất và số gan"
     else:
-        final_bt = traditional_bt
-        final_st = traditional_st
-        final_dan = [n[0] for n in hot[:5]] + [n[0] for n in gan[:5]]
-        ai_confidence = 0
-        analysis = "Sử dụng thuật toán truyền thống"
-    
-    # Dàn đề 10 số
-    dan_de = list(set(final_dan))
-    while len(dan_de) < 10:
-        dan_de.append(f"{np.random.randint(0,100):02d}")
-    dan_de = sorted(dan_de)[:10]
+        bt = gemini_result.get('bach_thu', hot_nums[0] if hot_nums else "00")
+        st1, st2 = gemini_result.get('song_thu', ["00", "00"])
+        dan_de = gemini_result.get('dan_de', [f"{i:02d}" for i in range(10)])
+        confidence = gemini_result.get('confidence', 65)
+        analysis = gemini_result.get('analysis', "AI phân tích")
     
     return {
-        "bach_thu": final_bt,
-        "song_thu": final_st if isinstance(final_st, list) else list(final_st),
-        "xien_2": f"{final_bt} - {final_st[0] if isinstance(final_st, list) else final_st}",
+        "bach_thu": bt,
+        "song_thu": (st1, st2),
+        "xien_2": f"{bt} - {st1}",
         "dan_de": dan_de,
-        "hot_numbers": hot,
-        "gan_numbers": gan,
-        "ai_confidence": ai_confidence,
-        "analysis": analysis,
-        "ai_used": ai_pred is not None
+        "hot_numbers": hot_nums,
+        "cold_numbers": cold_nums,
+        "gan_numbers": gan_nums,
+        "confidence": confidence,
+        "ai_analysis": analysis,
+        "using_ai": gemini_result is not None
     }
 
 # =============================================================================
 # 🚀 MAIN APP
 # =============================================================================
 def main():
-    init_history()
+    init_statistics()
     
     # HEADER
     st.markdown('''
     <div class="header-gold">
         <h1 style="margin:0;">💎 AI-QUANTUM PRO 2026</h1>
-        <p style="margin:5px 0 0;">🎯 Gemini AI Enhanced • Số Gan • Thống Kê Tự Động</p>
+        <p style="margin:5px 0 0;">🤖 Gemini AI Powered • Phân Tích Chuyên Sâu • Thống Kê Tự Động</p>
     </div>
     ''', unsafe_allow_html=True)
     
-    # SIDEBAR - AUTO STATISTICS
+    # SIDEBAR - DAILY STATISTICS
     with st.sidebar:
-        st.markdown("### 📊 THỐNG KÊ TỰ ĐỘNG")
+        st.markdown("### 📊 THỐNG KÊ THEO NGÀY")
         
-        # Tính tổng stats
-        total = len(st.session_state.daily_history['predictions'])
-        wins = sum(1 for p in st.session_state.daily_history['predictions'] if p['is_win'])
-        losses = total - wins
+        daily_stats = get_daily_stats()
+        
+        if daily_stats:
+            # Sort by date
+            sorted_dates = sorted(daily_stats.keys(), reverse=True)[:7]
+            
+            for date in sorted_dates:
+                stats = daily_stats[date]
+                total = stats['predictions']
+                wins = stats['wins']
+                rate = (wins / total * 100) if total > 0 else 0
+                
+                st.markdown(f'''
+                <div class="stat-card" style="margin: 5px 0;">
+                    <div style="font-size: 14px; font-weight: bold; color: #fff;">📅 {date}</div>
+                    <div style="display: flex; justify-content: space-around; margin-top: 8px;">
+                        <span class="win">✅ {wins}</span>
+                        <span class="loss">❌ {total - wins}</span>
+                        <span style="color: {'#00ff88' if rate >= 50 else '#ff4b4b'}">{rate:.0f}%</span>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
+        else:
+            st.info("📭 Chưa có dữ liệu")
+        
+        st.divider()
+        
+        # Overall stats
+        st.markdown("### 📈 TỔNG QUAN")
+        total = st.session_state.statistics['total_predictions']
+        wins = st.session_state.statistics['wins']
+        losses = st.session_state.statistics['losses']
         win_rate = (wins / total * 100) if total > 0 else 0
         
         col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f'''
-            <div class="stat-card">
-                <div class="stat-value" style="color: #00ff88">{wins}</div>
-                <div class="stat-label">Thắng</div>
-            </div>
-            ''', unsafe_allow_html=True)
-        with col2:
-            st.markdown(f'''
-            <div class="stat-card">
-                <div class="stat-value" style="color: #ff4b4b">{losses}</div>
-                <div class="stat-label">Thua</div>
-            </div>
-            ''', unsafe_allow_html=True)
+        col1.markdown(f'''
+        <div class="stat-card">
+            <div class="stat-value win">{wins}</div>
+            <div class="stat-label">Thắng</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        col2.markdown(f'''
+        <div class="stat-card">
+            <div class="stat-value loss">{losses}</div>
+            <div class="stat-label">Thua</div>
+        </div>
+        ''', unsafe_allow_html=True)
         
         st.markdown(f'''
         <div class="stat-card" style="margin-top: 10px;">
             <div class="stat-value" style="color: {'#00ff88' if win_rate >= 50 else '#ff4b4b'}">
                 {win_rate:.1f}%
             </div>
-            <div class="stat-label">Tỷ lệ thắng</div>
+            <div class="stat-label">Tỷ lệ thắng tổng</div>
             <div class="stat-label">Tổng: {total} lượt</div>
         </div>
         ''', unsafe_allow_html=True)
         
         st.divider()
         
-        # Daily stats
-        st.markdown("### 📅 Thống kê theo ngày")
-        if st.session_state.daily_history['daily_stats']:
-            for date, stats in sorted(st.session_state.daily_history['daily_stats'].items(), reverse=True)[:7]:
-                day_rate = (stats['wins'] / stats['total'] * 100) if stats['total'] > 0 else 0
-                st.caption(f"{date}: {stats['wins']}/{stats['total']} ({day_rate:.0f}%)")
-        else:
-            st.caption("Chưa có dữ liệu")
-        
-        st.divider()
-        
         if st.button("🔄 Xóa toàn bộ lịch sử", use_container_width=True):
-            st.session_state.daily_history = {
+            st.session_state.statistics = {
                 'predictions': [],
                 'daily_stats': {},
-                'last_updated': None
+                'total_predictions': 0,
+                'wins': 0,
+                'losses': 0
             }
-            try:
-                import os
-                if os.path.exists('history.json'):
-                    os.remove('history.json')
-            except:
-                pass
+            save_statistics()
             st.rerun()
         
-        # Export
-        if st.session_state.daily_history['predictions']:
-            df_exp = pd.DataFrame(st.session_state.daily_history['predictions'])
-            csv = df_exp.to_csv(index=False, encoding='utf-8-sig')
+        if st.session_state.statistics['predictions']:
+            df_stats = pd.DataFrame(st.session_state.statistics['predictions'])
+            csv = df_stats.to_csv(index=False, encoding='utf-8-sig')
             st.download_button(
                 label="📥 Tải lịch sử CSV",
                 data=csv,
-                file_name=f"ai_quantum_{datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"xsmb_stats_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
                 use_container_width=True
             )
     
     # TABS
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "🎯 Dự Đoán AI", 
-        "📡 Kết Quả", 
-        "📈 Lịch Sử Tự Động",
-        "🌐 Website"
-    ])
+    tab1, tab2, tab3, tab4 = st.tabs(["🎯 Dự Đoán AI", "📡 Kết Quả", "📊 Phân Tích", "📜 Lịch Sử"])
     
     with tab1:
-        st.markdown("### 🧠 DỰ ĐOÁN GEMINI AI + THUẬT TOÁN")
+        st.markdown("### 🎯 DỰ ĐOÁN VỚI GEMINI AI")
         
+        # Load data
         data = get_live_xsmb()
-        if not 
-            st.warning("⚠️ Không tải được kết quả. Sử dụng dữ liệu mẫu.")
+        historical = get_historical_data(30)
+        
+        if data is None:
+            st.error("❌ Không tải được kết quả")
             data = {
                 "Đặc Biệt": "48076",
                 "Giải Nhất": "66442",
-                "Giải Nhì": ["97779", "94665"],
                 "time": datetime.now().strftime("%H:%M:%S %d/%m")
             }
         
-        # Extract all loto
-        all_loto = []
-        for k, v in data.items():
-            if k == "time":
-                continue
-            if isinstance(v, list):
-                for x in v:
-                    if x and x != "...":
-                        all_loto.append(x[-2:])
-            elif v and v != "...":
-                all_loto.append(v[-2:])
-        
         # Generate predictions
-        with st.spinner("🤖 Gemini AI đang phân tích..."):
-            preds = advanced_predictions(all_loto, data)
+        with st.spinner("🤖 AI đang phân tích dữ liệu..."):
+            predictions = generate_predictions_with_ai(data, historical)
         
-        # Display AI Badge
-        if preds['ai_used']:
-            st.success(f"✅ Gemini AI đã phân tích • Độ tin cậy: {preds['ai_confidence']}%")
+        # Display AI Analysis
+        if predictions['using_ai']:
+            st.success("✅ Sử dụng Gemini AI để dự đoán")
+        else:
+            st.warning("⚠️ AI không khả dụng, dùng thuật toán thường")
         
-        # Display Analysis
-        if preds['analysis']:
-            st.info(f"🔍 **Phân tích AI**: {preds['analysis']}")
+        st.markdown(f'''
+        <div class="analysis-box">
+            <b>🧠 PHÂN TÍCH AI:</b><br>
+            {predictions['ai_analysis']}<br>
+            <b> ĐỘ TIN CẬY:</b> <span style="color: {'#00ff88' if predictions['confidence'] >= 70 else '#ffa500'}">
+                {predictions['confidence']}%
+            </span>
+        </div>
+        ''', unsafe_allow_html=True)
         
-        # Số GAN (Loto gan)
-        st.markdown("#### 🔴 SỐ GAN - LÂU CHƯA VỀ")
-        gan_html = ""
-        for num, count in preds['gan_numbers'][:10]:
-            gan_html += f'<span class="gan-number">{num} ({count} lần)</span> '
-        st.markdown(gan_html, unsafe_allow_html=True)
-        
-        # Số NÓNG
-        st.markdown("#### 🟢 SỐ NÓNG - XUẤT HIỆN NHIỀU")
-        hot_html = ""
-        for num, count in preds['hot_numbers'][:10]:
-            hot_html += f'<span class="hot-number">{num} ({count} lần)</span> '
-        st.markdown(hot_html, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # Display Predictions
+        # Predictions
         c1, c2, c3 = st.columns(3)
         
         with c1:
             st.markdown(f'''
             <div class="pred-box">
-                <div style="color:#aaa; font-size:13px;">
-                    🎯 BẠCH THỦ <span class="ai-badge">AI</span>
+                <div style="color:#aaa; font-size:13px;">🎯 BẠCH THỦ</div>
+                <div style="font-size:42px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['bach_thu']}
                 </div>
-                <div style="font-size:40px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                    {preds['bach_thu']}
-                </div>
-                <div style="font-size:12px; color:#00ff88;">
-                    Độ tin cậy: {preds['ai_confidence']}%
+                <div style="font-size:11px; color:#888;">
+                    Confidence: {predictions['confidence']}%
                 </div>
             </div>
             ''', unsafe_allow_html=True)
         
         with c2:
-            st_text = " - ".join(preds['song_thu']) if isinstance(preds['song_thu'], list) else preds['song_thu']
             st.markdown(f'''
             <div class="pred-box">
-                <div style="color:#aaa; font-size:13px;">
-                    🎯 SONG THỦ <span class="ai-badge">AI</span>
-                </div>
-                <div style="font-size:28px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                    {st_text}
+                <div style="color:#aaa; font-size:13px;">🎯 SONG THỦ</div>
+                <div style="font-size:30px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['song_thu'][0]} - {predictions['song_thu'][1]}
                 </div>
             </div>
             ''', unsafe_allow_html=True)
@@ -509,66 +603,81 @@ def main():
             <div class="pred-box">
                 <div style="color:#aaa; font-size:13px;">🎯 XIÊN 2</div>
                 <div style="font-size:24px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                    {preds['xien_2']}
+                    {predictions['xien_2']}
                 </div>
             </div>
             ''', unsafe_allow_html=True)
         
-        # Dàn đề
         st.markdown(f'''
-        <div class="pred-box" style="margin-top: 10px;">
+        <div class="pred-box">
             <div style="color:#aaa; font-size:14px; margin-bottom:10px;">
-                📋 DÀN ĐỀ 10 SỐ <span class="ai-badge">AI + STATISTICS</span>
+                📋 DÀN ĐỀ 10 SỐ (AI + Thuật Toán)
             </div>
             <div style="font-size:20px; color:#fff; letter-spacing:2px;">
-                {', '.join(preds['dan_de'])}
+                {', '.join(predictions['dan_de'])}
             </div>
         </div>
         ''', unsafe_allow_html=True)
         
-        # Auto-check
+        # Check result
         st.markdown("---")
-        st.markdown("### ✅ KIỂM TRA & LƯU TỰ ĐỘNG")
+        st.markdown("### ✅ KIỂM TRA KẾT QUẢ")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            check_num = st.text_input("Nhập số dự đoán", max_chars=10, 
-                                     placeholder="VD: 76 hoặc 09-90")
-        with col2:
-            check_type = st.selectbox("Loại", ["Bạch Thủ", "Song Thủ", "Dàn Đề"])
+        col_check1, col_check2 = st.columns(2)
+        with col_check1:
+            check_bt = st.text_input("Bạch Thủ", max_chars=2, placeholder="VD: 76")
+        with col_check2:
+            check_st = st.text_input("Song Thủ", max_chars=7, placeholder="VD: 09-90")
         
-        if st.button("💾 Kiểm Tra & Lưu Tự Động", type="primary", use_container_width=True):
-            if check_num:
-                is_win = check_num in all_loto or any(n in check_num for n in all_loto)
+        if st.button("🎯 Kiểm Tra Kết Quả", use_container_width=True, type="primary"):
+            if check_bt or check_st:
+                # Extract current loto
+                current_loto = []
+                for k, v in data.items():
+                    if k == "time":
+                        continue
+                    if isinstance(v, list):
+                        for x in v:
+                            if x and x != "...":
+                                current_loto.append(x[-2:])
+                    elif v and v != "...":
+                        current_loto.append(v[-2:])
                 
-                if is_win:
-                    st.success(f"🎉 TRÚNG! Số {check_num} có trong kết quả")
-                    st.balloons()
-                else:
-                    st.error(f"❌ Trượt! Số {check_num} không có")
+                today = datetime.now().strftime("%d/%m")
                 
-                # Auto save to history
-                save_daily_prediction(
-                    datetime.now().strftime("%d/%m %H:%M"),
-                    check_type,
-                    check_num,
-                    "Trúng" if is_win else "Trượt",
-                    is_win,
-                    preds['ai_confidence'] if preds['ai_used'] else 0
-                )
+                if check_bt:
+                    is_win = check_bt in current_loto
+                    save_prediction(today, "Bạch Thủ", check_bt, 
+                                   "Trúng" if is_win else "Trượt", is_win,
+                                   predictions['confidence'])
+                    
+                    if is_win:
+                        st.success(f"🎉 Bạch thủ {check_bt} TRÚNG!")
+                        st.balloons()
+                    else:
+                        st.error(f"❌ Bạch thủ {check_bt} trượt")
                 
-                st.info("✅ Đã lưu tự động vào lịch sử")
-                time.sleep(1)
+                if check_st:
+                    parts = [s.strip() for s in check_st.split('-')]
+                    is_win = any(p in current_loto for p in parts)
+                    save_prediction(today, "Song Thủ", check_st,
+                                   "Trúng" if is_win else "Trượt", is_win,
+                                   predictions['confidence'])
+                    
+                    if is_win:
+                        st.success(f"🎉 Song thủ {check_st} TRÚNG!")
+                    else:
+                        st.error(f"❌ Song thủ {check_st} trượt")
+                
                 st.rerun()
             else:
-                st.warning("⚠️ Vui lòng nhập số")
+                st.warning("⚠️ Nhập ít nhất 1 số")
         
         st.markdown("---")
         st.markdown('''
         <div class="disclaimer">
-            ⚠️ <b>LƯU Ý</b>: Gemini AI phân tích dựa trên thống kê và xác suất. 
-            Xổ số là trò chơi may rủi. Không có gì đảm bảo 100%. 
-            <b>Chơi có trách nhiệm!</b>
+            ⚠️ <b>LƯU Ý</b>: Gemini AI phân tích dựa trên thống kê, nhưng xổ số vẫn là may rủi. 
+            Chơi có trách nhiệm, trong khả năng tài chính. 18+ only.
         </div>
         ''', unsafe_allow_html=True)
     
@@ -576,94 +685,107 @@ def main():
         st.markdown("### 📡 KẾT QUẢ TRỰC TIẾP")
         
         data = get_live_xsmb()
-        if not 
-            data = {"Đặc Biệt": "48076", "time": datetime.now().strftime("%H:%M:%S %d/%m")}
-        
-        st.markdown(f'''
-        <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); 
-                    border: 2px solid #D4AF37; border-radius: 15px; 
-                    padding: 30px; text-align: center;">
-            <div style="font-size: 20px; color: #aaa; margin-bottom: 15px;">🏆 ĐẶC BIỆT</div>
-            <div style="font-size: 48px; color: #ff4b4b; font-weight: bold; 
-                        letter-spacing: 8px; text-shadow: 0 0 20px rgba(255,75,75,0.5);">
-                {data.get('Đặc Biệt', '....')}
+        if data:
+            st.caption(f"🕐 Cập nhật: {data.get('time', 'N/A')}")
+            
+            db = data.get("Đặc Biệt", "....")
+            st.markdown(f'''
+            <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); 
+                        border: 2px solid #D4AF37; border-radius: 15px; 
+                        padding: 30px; text-align: center; margin: 10px 0;">
+                <div style="font-size: 18px; color: #aaa; margin-bottom: 15px;">🏆 ĐẶC BIỆT</div>
+                <div style="font-size: 48px; color: #ff4b4b; font-weight: bold; 
+                            letter-spacing: 8px; text-shadow: 0 0 20px rgba(255,75,75,0.5);">
+                    {db}
+                </div>
             </div>
-            <div style="margin-top: 15px; color: #888;">
-                Cập nhật: {data.get('time', 'N/A')}
-            </div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        if st.button("🔄 Làm mới kết quả", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
+            ''', unsafe_allow_html=True)
+        else:
+            st.error("❌ Không tải được kết quả")
     
     with tab3:
-        st.markdown("### 📈 LỊCH SỬ TỰ ĐỘNG THEO NGÀY")
+        st.markdown("### 📊 PHÂN TÍCH CHUYÊN SÂU")
         
-        if st.session_state.daily_history['predictions']:
-            df = pd.DataFrame(st.session_state.daily_history['predictions'])
+        historical = get_historical_data(30)
+        analyzer = AdvancedAnalyzer(historical)
+        
+        # Tabs con
+        sub1, sub2, sub3 = st.tabs(["🔥 Số Nóng/Lạnh", "📉 Số Gan", "📈 Pattern"])
+        
+        with sub1:
+            hot = analyzer.get_hot_numbers(15)
+            cold = analyzer.get_cold_numbers(15)
             
-            # Summary
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Tổng lượt", len(df))
-            col2.metric("Thắng", sum(df['is_win']))
-            col3.metric("Thua", sum(~df['is_win']))
-            col4.metric("Tỷ lệ", f"{sum(df['is_win'])/len(df)*100:.1f}%")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("**🔥 SỐ NÓNG (Hay về)**")
+                hot_html = " ".join([f'<span class="hot-number">{n}</span>' for n in hot])
+                st.markdown(f'<div style="margin: 10px 0;">{hot_html}</div>', unsafe_allow_html=True)
             
-            st.divider()
+            with col2:
+                st.markdown("**❄️ SỐ LẠNH (Ít về)**")
+                cold_html = " ".join([f'<span class="gan-number">{n}</span>' for n in cold])
+                st.markdown(f'<div style="margin: 10px 0;">{cold_html}</div>', unsafe_allow_html=True)
+        
+        with sub2:
+            gan = analyzer.get_gan_numbers(20)
+            st.markdown("**📉 SỐ GAN (Lâu chưa về - Số ngày)**")
+            
+            gan_data = {
+                "Số": [g[0] for g in gan],
+                "Ngày chưa về": [g[1] for g in gan]
+            }
+            st.dataframe(pd.DataFrame(gan_data), use_container_width=True, hide_index=True)
+        
+        with sub3:
+            patterns = analyzer.analyze_patterns()
+            st.markdown("**📈 TỔNG ĐẶC BIỆT PHỔ BIẾN**")
+            if patterns['total_db']:
+                total_counter = Counter(patterns['total_db'])
+                for total, count in total_counter.most_common(10):
+                    st.write(f"Tổng {total}: {count} lần")
+    
+    with tab4:
+        st.markdown("### 📜 LỊCH SỬ DỰ ĐOÁN")
+        
+        if st.session_state.statistics['predictions']:
+            df = pd.DataFrame(st.session_state.statistics['predictions'])
             
             # Filter by date
             dates = sorted(df['date'].unique(), reverse=True)
             selected_date = st.selectbox("Chọn ngày", dates)
             
-            df_filtered = df[df['date'] == selected_date] if selected_date else df
+            df_filtered = df[df['date'] == selected_date]
             
-            # Display
             st.dataframe(
-                df_filtered[['date', 'type', 'numbers', 'result_numbers', 'confidence', 'is_win']],
+                df_filtered[['time', 'type', 'numbers', 'result_numbers', 'is_win', 'confidence']],
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    "date": "Ngày/Giờ",
+                    "time": "Giờ",
                     "type": "Loại",
                     "numbers": "Số dự đoán",
                     "result_numbers": "Kết quả",
-                    "confidence": st.column_config.ProgressColumn(
-                        "Độ tin cậy AI",
-                        min_value=0,
-                        max_value=100,
-                    ),
-                    "is_win": st.column_config.CheckboxColumn("Trúng?")
+                    "is_win": st.column_config.CheckboxColumn("Trúng?"),
+                    "confidence": "Độ tin cậy"
                 }
             )
             
             # Chart
-            if not df.empty:
-                st.markdown("#### 📊 Biểu đồ thắng/thua")
-                df_chart = df.copy()
-                df_chart['is_win_num'] = df_chart['is_win'].map({True: 1, False: 0})
-                st.line_chart(df_chart.set_index('date')['is_win_num'])
+            if not df_filtered.empty:
+                st.markdown("#### Biểu đồ kết quả")
+                df_chart = df_filtered.copy()
+                df_chart['result'] = df_chart['is_win'].map({True: 1, False: 0})
+                st.bar_chart(df_chart.set_index('time')['result'])
         else:
-            st.info("📭 Chưa có lịch sử. Hãy bắt đầu dự đoán!")
-    
-    with tab4:
-        st.markdown("### 🌐 WEBSITE XOSODAIPHAT")
-        st.markdown('''
-        <div style="border: 2px solid #D4AF37; border-radius: 15px; 
-                    overflow: hidden; height: 800px;">
-            <iframe src="https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html" 
-                    style="width:100%; height:100%; border:none;"
-                    sandbox="allow-same-origin allow-scripts">
-            </iframe>
-        </div>
-        ''', unsafe_allow_html=True)
+            st.info("📭 Chưa có lịch sử dự đoán")
     
     # FOOTER
     st.markdown("---")
     st.markdown('''
-    <div style="text-align: center; color: #666; padding: 20px;">
-        💎 AI-QUANTUM PRO 2026 • Gemini AI Enhanced<br>
+    <div style="text-align: center; color: #666; font-size: 12px; padding: 20px;">
+        💎 AI-QUANTUM PRO 2026 • Gemini AI Powered<br>
+        🤖 Phân tích đa nguồn • Thuật toán tiên tiến • Thống kê tự động<br>
         <b>Chơi xổ số có trách nhiệm - 18+ only</b>
     </div>
     ''', unsafe_allow_html=True)
