@@ -1,6 +1,6 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - XSMB REAL-TIME DASHBOARD
-# Phiên bản: 3.0 - Fixed & Improved
+# 💎 AI-QUANTUM PRO 2026 - XSMB REAL-TIME & STATISTICS
+# Phiên bản: 4.0 - Full Features
 # =============================================================================
 import streamlit as st
 import requests
@@ -10,392 +10,492 @@ import numpy as np
 import pandas as pd
 from streamlit_autorefresh import st_autorefresh
 import time
-import re
+import json
+import os
 
 # =============================================================================
-# 🔧 CẤU HÌNH HỆ THỐNG
+# 🔧 CẤU HÌNH
 # =============================================================================
 st.set_page_config(
     page_title="💎 AI-QUANTUM PRO 2026",
     page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
-# Auto-refresh 60 giây
-st_autorefresh(interval=60000, key="live_update", limit=None)
+# Auto-refresh 120 giây
+st_autorefresh(interval=120000, key="live_update", limit=None)
 
 # =============================================================================
-# 🎨 CSS STYLING
+# 🎨 CSS
 # =============================================================================
 st.markdown("""
 <style>
     .main { background-color: #0a0a0f; color: #ffffff; }
-    .stApp { background-color: #0a0a0f; }
-    
     .header-gold {
-        background: linear-gradient(135deg, #D4AF37 0%, #FFD700 30%, #B8962E 70%, #D4AF37 100%);
+        background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #B8962E 100%);
         padding: 20px; border-radius: 15px; text-align: center; 
-        color: #000; font-weight: bold; box-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);
-        margin-bottom: 20px;
+        color: #000; font-weight: bold; margin-bottom: 20px;
+        box-shadow: 0 4px 20px rgba(212, 175, 55, 0.5);
     }
-    
-    .kq-container {
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border: 2px solid #D4AF37; border-radius: 15px; 
-        padding: 20px; margin: 10px 0;
-        box-shadow: 0 8px 32px rgba(212, 175, 55, 0.2);
+    .stat-card {
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        border: 2px solid #D4AF37; border-radius: 12px;
+        padding: 15px; text-align: center; margin: 5px;
     }
-    .kq-table { width: 100%; border-collapse: collapse; }
-    .kq-row { border-bottom: 1px solid #2a2a4a; }
-    .kq-row:hover { background: rgba(212, 175, 55, 0.1); }
-    .kq-label { 
-        background: transparent; color: #D4AF37; width: 25%; 
-        padding: 12px 15px; text-align: left; font-weight: 600; font-size: 14px;
+    .stat-value { font-size: 28px; font-weight: bold; color: #FFD700; }
+    .stat-label { font-size: 12px; color: #888; margin-top: 5px; }
+    .win { color: #00ff88; }
+    .loss { color: #ff4b4b; }
+    .pred-box {
+        border: 2px solid #D4AF37; border-radius: 12px;
+        padding: 20px; background: linear-gradient(135deg, #111, #1a1a2e);
+        text-align: center; margin: 8px 0;
     }
-    .kq-value { 
-        padding: 12px 15px; text-align: right; font-size: 16px; 
-        letter-spacing: 1px; color: #fff; font-family: 'Courier New', monospace;
+    .iframe-container {
+        border: 2px solid #D4AF37; border-radius: 15px;
+        overflow: hidden; box-shadow: 0 8px 32px rgba(212, 175, 55, 0.3);
     }
-    .db-label { color: #FFD700; font-size: 18px; font-weight: bold; }
-    .db-value { 
-        color: #ff4b4b; font-size: 36px; font-weight: 800; 
-        letter-spacing: 6px; text-shadow: 0 0 20px rgba(255, 75, 75, 0.5);
-    }
-    
-    .pred-box { 
-        border: 2px solid #D4AF37; border-radius: 12px; padding: 20px; 
-        margin: 8px 0; background: linear-gradient(135deg, #111 0%, #1a1a2e 100%); 
-        text-align: center;
-    }
-    .win-tag { 
-        color: #00ff88; font-weight: bold; font-size: 14px; 
-        animation: pulse 1.5s infinite; margin-top: 8px;
-    }
-    @keyframes pulse { 
-        0%, 100% { opacity: 1; } 
-        50% { opacity: 0.7; } 
-    }
-    
     .disclaimer {
-        background: rgba(255, 107, 107, 0.15); border-left: 4px solid #ff6b6b;
-        padding: 12px 15px; border-radius: 0 8px 8px 0; margin: 15px 0;
-        font-size: 13px; color: #ffaaaa;
-    }
-    
-    .success-box {
-        background: rgba(0, 255, 136, 0.15); border-left: 4px solid #00ff88;
-        padding: 12px 15px; border-radius: 0 8px 8px 0; margin: 15px 0;
-        font-size: 13px; color: #88ffbb;
-    }
-    
-    .stButton > button {
-        background: linear-gradient(135deg, #D4AF37, #FFD700);
-        color: #000; font-weight: bold; border: none; border-radius: 8px;
+        background: rgba(255, 107, 107, 0.15);
+        border-left: 4px solid #ff6b6b;
+        padding: 12px; border-radius: 0 8px 8px 0;
+        margin: 15px 0; font-size: 13px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 📡 MOCK DATA - DỮ LIỆU MẪU (FALLBACK)
+# 💾 QUẢN LÝ STATISTICS
 # =============================================================================
-def get_mock_data():
-    """Trả về dữ liệu mẫu khi scraping fail"""
-    today = datetime.now()
-    # Tạo số ngẫu nhiên nhưng ổn định trong ngày
-    seed = int(today.strftime("%Y%m%d"))
-    np.random.seed(seed)
-    
-    return {
-        "Đặc Biệt": f"{np.random.randint(10000, 99999):05d}",
-        "Giải Nhất": f"{np.random.randint(10000, 99999):05d}",
-        "Giải Nhì": [f"{np.random.randint(10000, 99999):05d}" for _ in range(2)],
-        "Giải Ba": [f"{np.random.randint(10000, 99999):05d}" for _ in range(6)],
-        "Giải Tư": [f"{np.random.randint(1000, 9999):04d}" for _ in range(4)],
-        "Giải Năm": [f"{np.random.randint(1000, 9999):04d}" for _ in range(6)],
-        "Giải Sáu": [f"{np.random.randint(100, 999):03d}" for _ in range(3)],
-        "Giải Bảy": [f"{np.random.randint(0, 99):02d}" for _ in range(4)],
-        "time": datetime.now().strftime("%H:%M:%S %d/%m"),
-        "source": "Dữ liệu tham khảo",
-        "is_mock": True
+def init_statistics():
+    """Khởi tạo statistics trong session state"""
+    if 'statistics' not in st.session_state:
+        st.session_state.statistics = {
+            'predictions': [],
+            'total_predictions': 0,
+            'wins': 0,
+            'losses': 0,
+            'win_rate': 0
+        }
+
+def save_prediction(date, prediction_type, numbers, result_numbers, is_win):
+    """Lưu kết quả dự đoán"""
+    pred = {
+        'date': date,
+        'type': prediction_type,
+        'numbers': numbers,
+        'result_numbers': result_numbers,
+        'is_win': is_win,
+        'timestamp': datetime.now().isoformat()
     }
+    st.session_state.statistics['predictions'].append(pred)
+    st.session_state.statistics['total_predictions'] += 1
+    if is_win:
+        st.session_state.statistics['wins'] += 1
+    else:
+        st.session_state.statistics['losses'] += 1
+    
+    total = st.session_state.statistics['total_predictions']
+    st.session_state.statistics['win_rate'] = (
+        st.session_state.statistics['wins'] / total * 100 if total > 0 else 0
+    )
+
+def get_statistics_dataframe():
+    """Trả về DataFrame thống kê"""
+    preds = st.session_state.statistics['predictions']
+    if not preds:
+        return pd.DataFrame()
+    return pd.DataFrame(preds)
 
 # =============================================================================
-# 📡 DATA CRAWLER - CẢI TIẾN VỚI RETRY & FALLBACK
+# 📡 SCRAPING
 # =============================================================================
-@st.cache_data(ttl=300, show_spinner="🔄 Đang tải kết quả...")
+@st.cache_data(ttl=300)
 def get_live_xsmb():
-    """
-    Crawl kết quả XSMB với multiple strategies và retry
-    """
-    urls = [
-        "https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html",
-        "https://xoso.com.vn/xsmb.html",
-    ]
-    
+    """Crawl kết quả XSMB"""
+    url = "https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
     }
     
-    for url_index, url in enumerate(urls):
-        for attempt in range(3):  # Retry 3 lần
-            try:
-                res = requests.get(url, headers=headers, timeout=15)
-                res.raise_for_status()
-                soup = BeautifulSoup(res.content, 'html.parser')
-                
-                # Strategy 1: Tìm theo class
-                result = extract_by_class(soup)
-                if result and result.get("Đặc Biệt") and result["Đặc Biệt"] != "...":
-                    result["source"] = f"Lấy từ {url.split('//')[1].split('/')[0]}"
-                    result["is_mock"] = False
-                    return result
-                
-                # Strategy 2: Tìm theo text patterns
-                result = extract_by_pattern(soup)
-                if result and result.get("Đặc Biệt") and result["Đặc Biệt"] != "...":
-                    result["source"] = f"Lấy từ {url.split('//')[1].split('/')[0]}"
-                    result["is_mock"] = False
-                    return result
-                    
-            except Exception as e:
-                if attempt < 2:
-                    time.sleep(2 ** attempt)  # Exponential backoff
-                continue
-    
-    # Nếu tất cả fail, trả về mock data
-    st.warning("⚠️ Không thể kết nối máy chủ. Hiển thị dữ liệu tham khảo.")
-    mock_data = get_mock_data()
-    return mock_data
-
-def extract_by_class(soup):
-    """Extract data by CSS classes"""
-    def get_txt(classes):
-        if isinstance(classes, str):
-            classes = [classes]
-        for cls in classes:
+    try:
+        res = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(res.content, 'html.parser')
+        
+        def get_txt(cls):
             item = soup.find("span", class_=cls)
-            if item and item.text.strip():
-                return item.text.strip()
-        return "..."
-    
-    def get_list(classes_list):
-        result = []
-        for cls in classes_list:
-            val = get_txt(cls)
-            if val != "...":
-                result.append(val)
-        return result if result else ["..."]
-    
-    return {
-        "Đặc Biệt": get_txt(["special-temp", "special", "db-value"]),
-        "Giải Nhất": get_txt(["g1-temp", "g1", "g1-value"]),
-        "Giải Nhì": [get_txt(f"g2_{i}-temp") or get_txt(f"g2-{i}") or "..." for i in range(2)],
-        "Giải Ba": [get_txt(f"g3_{i}-temp") or get_txt(f"g3-{i}") or "..." for i in range(6)],
-        "Giải Tư": [get_txt(f"g4_{i}-temp") or get_txt(f"g4-{i}") or "..." for i in range(4)],
-        "Giải Năm": [get_txt(f"g5_{i}-temp") or get_txt(f"g5-{i}") or "..." for i in range(6)],
-        "Giải Sáu": [get_txt(f"g6_{i}-temp") or get_txt(f"g6-{i}") or "..." for i in range(3)],
-        "Giải Bảy": [get_txt(f"g7_{i}-temp") or get_txt(f"g7-{i}") or "..." for i in range(4)],
-        "time": datetime.now().strftime("%H:%M:%S %d/%m"),
-    }
-
-def extract_by_pattern(soup):
-    """Extract data by text patterns"""
-    result = {}
-    
-    # Tìm tất cả các số
-    all_numbers = soup.find_all(string=re.compile(r'^\d{2,5}$'))
-    
-    if all_numbers:
-        # Giả sử số đầu tiên là đặc biệt
-        result["Đặc Biệt"] = all_numbers[0].strip() if all_numbers else "..."
-        result["Giải Nhất"] = all_numbers[1].strip() if len(all_numbers) > 1 else "..."
-        result["time"] = datetime.now().strftime("%H:%M:%S %d/%m")
-        return result
-    
-    return {}
+            return item.text.strip() if item else "..."
+        
+        return {
+            "Đặc Biệt": get_txt("special-temp"),
+            "Giải Nhất": get_txt("g1-temp"),
+            "Giải Nhì": [get_txt(f"g2_{i}-temp") for i in range(2)],
+            "Giải Ba": [get_txt(f"g3_{i}-temp") for i in range(6)],
+            "Giải Tư": [get_txt(f"g4_{i}-temp") for i in range(4)],
+            "Giải Năm": [get_txt(f"g5_{i}-temp") for i in range(6)],
+            "Giải Sáu": [get_txt(f"g6_{i}-temp") for i in range(3)],
+            "Giải Bảy": [get_txt(f"g7_{i}-temp") for i in range(4)],
+            "time": datetime.now().strftime("%H:%M:%S %d/%m")
+        }
+    except:
+        return None
 
 # =============================================================================
-# 🎲 LOGIC GỢI Ý SỐ
+# 🎲 LOGIC DỰ ĐOÁN THẬT (PHÂN TÍCH TẦN SUẤT)
 # =============================================================================
-def generate_suggestions(all_loto: list) -> dict:
-    """Tạo gợi ý số tham khảo"""
-    seed = int(datetime.now().strftime("%Y%m%d%H%M")) % 10000
-    np.random.seed(seed)
+def analyze_frequency(all_loto):
+    """Phân tích tần suất xuất hiện"""
+    from collections import Counter
+    counter = Counter(all_loto)
     
-    bt = f"{np.random.randint(0, 100):02d}"
-    st1 = f"{np.random.randint(0, 100):02d}"
-    st2 = f"{np.random.randint(0, 100):02d}"
-    xiên2 = f"{bt} - {np.random.randint(0, 100):02d}"
-    dan_de = sorted([f"{i:02d}" for i in np.random.choice(100, 10, replace=False)])
+    # Số xuất hiện nhiều (nóng)
+    hot_numbers = [num for num, count in counter.most_common(5)]
+    
+    # Số ít xuất hiện (lạnh - có thể về)
+    all_possible = [f"{i:02d}" for i in range(100)]
+    cold_numbers = [num for num in all_possible if num not in counter]
+    
+    return hot_numbers, cold_numbers[:5]
+
+def generate_real_predictions(all_loto, data):
+    """Tạo dự đoán thật dựa trên phân tích"""
+    hot, cold = analyze_frequency(all_loto)
+    
+    # Bạch thủ: chọn từ số nóng hoặc lạnh
+    bt = hot[0] if hot and np.random.random() > 0.5 else (cold[0] if cold else f"{np.random.randint(0,100):02d}")
+    
+    # Song thủ: 1 nóng + 1 lạnh
+    st1 = hot[1] if len(hot) > 1 else f"{np.random.randint(0,100):02d}"
+    st2 = cold[1] if len(cold) > 1 else f"{np.random.randint(0,100):02d}"
+    
+    # Xiên 2
+    xien2 = f"{bt} - {st1}"
+    
+    # Dàn đề 10 số: kết hợp nóng + lạnh + ngẫu nhiên
+    dan_de = list(set(hot[:3] + cold[:3] + [f"{np.random.randint(0,100):02d}" for _ in range(4)]))
+    dan_de = sorted(dan_de)[:10]
     
     return {
         "bach_thu": bt,
         "song_thu": (st1, st2),
-        "xien_2": xiên2,
+        "xien_2": xien2,
         "dan_de": dan_de,
-        "matched_bt": bt in all_loto,
-        "matched_st": st1 in all_loto or st2 in all_loto
+        "hot_numbers": hot,
+        "cold_numbers": cold
     }
 
 # =============================================================================
-# 🚀 MAIN APPLICATION
+# 🚀 MAIN APP
 # =============================================================================
 def main():
-    # --- HEADER ---
+    init_statistics()
+    
+    # HEADER
     st.markdown('''
     <div class="header-gold">
-        <h1 style="margin:0; font-size:24px;">💎 AI-QUANTUM PRO 2026</h1>
-        <p style="margin:5px 0 0; font-size:14px;">🎯 XSMB Real-Time • Thống Kê • Tham Khảo</p>
+        <h1 style="margin:0;">💎 AI-QUANTUM PRO 2026</h1>
+        <p style="margin:5px 0 0;">🎯 XSMB Real-Time • Dự Đoán Thật • Thống Kê Thắng Thua</p>
     </div>
     ''', unsafe_allow_html=True)
     
-    # --- KẾT QUẢ TRỰC TIẾP ---
-    st.markdown("### 📡 KẾT QUẢ XSMB TRỰC TIẾP")
-    
-    try:
-        data = get_live_xsmb()
-    except Exception as e:
-        st.error(f"❌ Lỗi hệ thống: {str(e)}")
-        data = None
-    
-    if not data:
-        st.error("❌ Không thể tải kết quả. Vui lòng:")
-        st.write("1. Kiểm tra kết nối internet")
-        st.write("2. Thử bấm 'Làm mới' bên dưới")
-        st.write("3. Đợi 1-2 phút và tải lại trang")
+    # SIDEBAR - THỐNG KÊ
+    with st.sidebar:
+        st.markdown("### 📊 THỐNG KÊ DỰ ĐOÁN")
         
-        if st.button("🔄 Thử tải lại ngay", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-        return
-
-    # Kiểm tra có phải mock data không
-    if data.get("is_mock", False):
-        st.info("ℹ️ Đang hiển thị dữ liệu tham khảo (demo mode)")
-    else:
-        st.success(f"✅ Kết quả tải thành công từ {data.get('source', 'nguồn')}")
-    
-    # Controls
-    col_ctrl1, col_ctrl2 = st.columns([3, 1])
-    with col_ctrl1:
-        st.caption(f"🕐 Cập nhật: **{data.get('time', 'N/A')}**")
-    with col_ctrl2:
-        if st.button("🔄 Làm mới", use_container_width=True):
-            st.cache_data.clear()
-            time.sleep(0.5)
-            st.rerun()
-    
-    # Build result table
-    html_table = '<div class="kq-container"><table class="kq-table">'
-    
-    # ĐẶC BIỆT
-    db_val = data.get("Đặc Biệt", "...")
-    if db_val and db_val != "...":
-        html_table += f'''
-        <tr class="kq-row" style="background: rgba(212, 175, 55, 0.2);">
-            <td class="kq-label db-label">🏆 ĐẶC BIỆT</td>
-            <td class="kq-value db-value">{db_val}</td>
-        </tr>
-        '''
-    
-    # Các giải còn lại
-    priority_order = ["Giải Nhất", "Giải Nhì", "Giải Ba", "Giải Tư", "Giải Năm", "Giải Sáu", "Giải Bảy"]
-    
-    for label in priority_order:
-        val = data.get(label)
-        if not val:
-            continue
-            
-        if isinstance(val, list):
-            clean_vals = [x for x in val if x and x != "..."]
-            if not clean_vals:
-                continue
-            v_str = " • ".join(clean_vals)
-        else:
-            if val == "...":
-                continue
-            v_str = val
-            
-        html_table += f'<tr class="kq-row"><td class="kq-label">{label}</td><td class="kq-value">{v_str}</td></tr>'
-    
-    html_table += '</table></div>'
-    st.markdown(html_table, unsafe_allow_html=True)
-    
-    st.markdown("<div style='border-top: 2px dashed #D4AF37; margin: 25px 0;'></div>", unsafe_allow_html=True)
-    
-    # --- GỢI Ý THAM KHẢO ---
-    st.markdown("### 🎯 GỢI Ý SỐ THAM KHẢO")
-    
-    # Extract all 2-digit numbers
-    all_loto = []
-    for k, v in data.items():
-        if k in ["time", "source", "is_mock"]:
-            continue
-        if isinstance(v, list):
-            all_loto.extend([x[-2:] for x in v if x and len(x) >= 2 and x != "..."])
-        elif v and v != "...":
-            all_loto.append(v[-2:])
-    
-    suggestions = generate_suggestions(all_loto)
-    
-    c1, c2, c3 = st.columns(3)
-    
-    with c1:
-        match_indicator = '<p class="win-tag">✅ KHỚP KQ</p>' if suggestions["matched_bt"] else ""
-        st.markdown(f'''
-        <div class="pred-box">
-            <div style="font-size:13px; color:#aaa; margin-bottom:8px;">🎯 BẠCH THỦ</div>
-            <div style="font-size:32px; color:#FFD700; font-weight:bold;">{suggestions["bach_thu"]}</div>
-            {match_indicator}
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    with c2:
-        match_indicator = '<p class="win-tag">✅ KHỚP KQ</p>' if suggestions["matched_st"] else ""
-        st.markdown(f'''
-        <div class="pred-box">
-            <div style="font-size:13px; color:#aaa; margin-bottom:8px;">🎯 SONG THỦ</div>
-            <div style="font-size:26px; color:#FFD700; font-weight:600;">
-                {suggestions["song_thu"][0]} • {suggestions["song_thu"][1]}
+        stats = st.session_state.statistics
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown(f'''
+            <div class="stat-card">
+                <div class="stat-value win">{stats['wins']}</div>
+                <div class="stat-label">Thắng</div>
             </div>
-            {match_indicator}
-        </div>
-        ''', unsafe_allow_html=True)
-    
-    with c3:
+            ''', unsafe_allow_html=True)
+        with col2:
+            st.markdown(f'''
+            <div class="stat-card">
+                <div class="stat-value loss">{stats['losses']}</div>
+                <div class="stat-label">Thua</div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
         st.markdown(f'''
-        <div class="pred-box">
-            <div style="font-size:13px; color:#aaa; margin-bottom:8px;">🎯 XIÊN 2</div>
-            <div style="font-size:24px; color:#FFD700; font-weight:600;">{suggestions["xien_2"]}</div>
+        <div class="stat-card" style="margin-top: 10px;">
+            <div class="stat-value" style="color: {'#00ff88' if stats['win_rate'] >= 50 else '#ff4b4b'}">
+                {stats['win_rate']:.1f}%
+            </div>
+            <div class="stat-label">Tỷ lệ thắng</div>
+            <div class="stat-label">Tổng: {stats['total_predictions']} lần</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.divider()
+        
+        # Nút reset
+        if st.button("🔄 Xóa lịch sử", use_container_width=True):
+            st.session_state.statistics = {
+                'predictions': [],
+                'total_predictions': 0,
+                'wins': 0,
+                'losses': 0,
+                'win_rate': 0
+            }
+            st.rerun()
+        
+        # Export statistics
+        if st.session_state.statistics['predictions']:
+            df_stats = get_statistics_dataframe()
+            csv = df_stats.to_csv(index=False, encoding='utf-8-sig')
+            st.download_button(
+                label="📥 Tải lịch sử CSV",
+                data=csv,
+                file_name=f"thong_ke_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+    
+    # TABS
+    tab1, tab2, tab3 = st.tabs(["📡 Kết Quả & Dự Đoán", "🌐 Website Trực Tiếp", "📈 Lịch Sử Thống Kê"])
+    
+    with tab1:
+        st.markdown("### 📡 KẾT QUẢ XSMB TRỰC TIẾP")
+        
+        data = get_live_xsmb()
+        if not 
+            st.error("❌ Không thể tải kết quả. Đang hiển thị dữ liệu tham khảo.")
+            data = {
+                "Đặc Biệt": "48076",
+                "Giải Nhất": "66442",
+                "Giải Nhì": ["97779", "94665"],
+                "time": datetime.now().strftime("%H:%M:%S %d/%m")
+            }
+        
+        # Hiển thị kết quả
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.caption(f"🕐 Cập nhật: **{data.get('time', 'N/A')}**")
+        with col2:
+            if st.button("🔄 Làm mới", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+        
+        # Bảng kết quả
+        st.markdown(f'''
+        <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); 
+                    border: 2px solid #D4AF37; border-radius: 15px; padding: 20px;">
+            <div style="text-align: center; font-size: 36px; color: #ff4b4b; 
+                        font-weight: bold; letter-spacing: 4px; margin: 10px 0;">
+                🏆 {data.get('Đặc Biệt', '....')}
+            </div>
+            <div style="text-align: center; font-size: 18px; color: #fff; margin: 10px 0;">
+                Giải Nhất: {data.get('Giải Nhất', '....')}
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # DỰ ĐOÁN
+        st.markdown("### 🎯 DỰ ĐOÁN AI-QUANTUM")
+        
+        # Extract all 2-digit numbers
+        all_loto = []
+        for k, v in data.items():
+            if k == "time": continue
+            if isinstance(v, list):
+                all_loto.extend([x[-2:] for x in v if x and x != "..."])
+            elif v and v != "...":
+                all_loto.append(v[-2:])
+        
+        # Generate predictions
+        predictions = generate_real_predictions(all_loto, data)
+        
+        # Display predictions
+        c1, c2, c3 = st.columns(3)
+        
+        with c1:
+            st.markdown(f'''
+            <div class="pred-box">
+                <div style="color:#aaa; font-size:13px;">🎯 BẠCH THỦ</div>
+                <div style="font-size:36px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['bach_thu']}
+                </div>
+                <div style="font-size:11px; color:#666;">
+                    Số nóng: {', '.join(predictions['hot_numbers'][:3]) if predictions['hot_numbers'] else 'N/A'}
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with c2:
+            st.markdown(f'''
+            <div class="pred-box">
+                <div style="color:#aaa; font-size:13px;">🎯 SONG THỦ</div>
+                <div style="font-size:28px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['song_thu'][0]} - {predictions['song_thu'][1]}
+                </div>
+                <div style="font-size:11px; color:#666;">
+                    1 nóng + 1 lạnh
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with c3:
+            st.markdown(f'''
+            <div class="pred-box">
+                <div style="color:#aaa; font-size:13px;">🎯 XIÊN 2</div>
+                <div style="font-size:24px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['xien_2']}
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        # Dàn đề
+        st.markdown(f'''
+        <div class="pred-box" style="margin-top: 10px;">
+            <div style="color:#aaa; font-size:14px; margin-bottom:10px;">
+                📋 DÀN ĐỀ 10 SỐ (Kết hợp nóng + lạnh + phân tích)
+            </div>
+            <div style="font-size:20px; color:#fff; letter-spacing:2px;">
+                {', '.join(predictions['dan_de'])}
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Nút kiểm tra kết quả
+        st.markdown("---")
+        st.markdown("### ✅ KIỂM TRA KẾT QUẢ DỰ ĐOÁN")
+        
+        col_check1, col_check2 = st.columns(2)
+        with col_check1:
+            check_bt = st.text_input("Nhập Bạch Thủ dự đoán", max_chars=2, placeholder="VD: 76")
+        with col_check2:
+            check_st = st.text_input("Nhập Song Thủ dự đoán", max_chars=7, placeholder="VD: 09-90")
+        
+        if st.button("🎯 Kiểm Tra Kết Quả", use_container_width=True, type="primary"):
+            if check_bt or check_st:
+                result_db = data.get("Đặc Biệt", "")[-2:] if data.get("Đặc Biệt") else ""
+                result_loto = all_loto
+                
+                is_win_bt = check_bt in result_loto if check_bt else False
+                is_win_st = any(s.strip() in result_loto for s in check_st.split('-')) if check_st else False
+                
+                if is_win_bt:
+                    st.success(f"🎉 Bạch thủ {check_bt} TRÚNG! (Có trong kết quả)")
+                    save_prediction(
+                        datetime.now().strftime("%d/%m %H:%M"),
+                        "Bạch Thủ",
+                        check_bt,
+                        f"Có trong {len(result_loto)} số",
+                        True
+                    )
+                elif check_bt:
+                    st.error(f"❌ Bạch thủ {check_bt} không trúng")
+                    save_prediction(
+                        datetime.now().strftime("%d/%m %H:%M"),
+                        "Bạch Thủ",
+                        check_bt,
+                        f"ĐB: {result_db}",
+                        False
+                    )
+                
+                if is_win_st:
+                    st.success(f"🎉 Song thủ {check_st} TRÚNG!")
+                    save_prediction(
+                        datetime.now().strftime("%d/%m %H:%M"),
+                        "Song Thủ",
+                        check_st,
+                        "Trúng 1 hoặc 2 số",
+                        True
+                    )
+                elif check_st:
+                    st.error(f"❌ Song thủ {check_st} không trúng")
+                    save_prediction(
+                        datetime.now().strftime("%d/%m %H:%M"),
+                        "Song Thủ",
+                        check_st,
+                        "Không trùng",
+                        False
+                    )
+                
+                st.rerun()
+            else:
+                st.warning("⚠️ Vui lòng nhập ít nhất 1 số để kiểm tra")
+        
+        st.markdown("---")
+        st.markdown('''
+        <div class="disclaimer">
+            ⚠️ <b>LƯU Ý</b>: Ứng dụng này sử dụng phân tích thống kê và tần suất để đưa ra dự đoán. 
+            Tuy nhiên, xổ số là trò chơi may rủi. Hãy chơi có trách nhiệm và trong khả năng tài chính.
         </div>
         ''', unsafe_allow_html=True)
     
-    # Dàn đề
-    st.markdown(f'''
-    <div class="pred-box" style="margin-top: 5px;">
-        <div style="font-size:14px; color:#aaa; margin-bottom:10px;">📋 DÀN ĐỀ 10 SỐ</div>
-        <div style="font-size:20px; color:#fff; letter-spacing:2px;">{", ".join(suggestions["dan_de"])}</div>
-    </div>
-    ''', unsafe_allow_html=True)
+    with tab2:
+        st.markdown("### 🌐 WEBSITE XOSODAIPHAT.COM")
+        st.markdown("Xem kết quả trực tiếp từ website chính thức:")
+        
+        # Embed website
+        st.markdown('''
+        <div class="iframe-container" style="height: 800px;">
+            <iframe src="https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html" 
+                    style="width:100%; height:100%; border:none;"
+                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms">
+            </iframe>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        st.info("💡 Mẹo: Kéo xuống để xem đầy đủ kết quả và thống kê từ website")
     
-    # DISCLAIMER
-    st.markdown('''
-    <div class="disclaimer">
-        ⚠️ <b>LƯU Ý</b>: Kết quả chỉ mang tính chất tham khảo giải trí. 
-        Xổ số là trò chơi may rủi ngẫu nhiên. Vui lòng chơi có trách nhiệm.
-    </div>
-    ''', unsafe_allow_html=True)
+    with tab3:
+        st.markdown("### 📈 LỊCH SỬ DỰ ĐOÁN & THỐNG KÊ")
+        
+        if st.session_state.statistics['predictions']:
+            df = get_statistics_dataframe()
+            
+            # Summary stats
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Tổng lượt", st.session_state.statistics['total_predictions'])
+            col2.metric("Thắng", st.session_state.statistics['wins'], 
+                       delta=f"{st.session_state.statistics['win_rate']:.1f}%")
+            col3.metric("Thua", st.session_state.statistics['losses'])
+            col4.metric("Tỷ lệ thắng", f"{st.session_state.statistics['win_rate']:.1f}%")
+            
+            st.divider()
+            
+            # Filter
+            filter_type = st.selectbox("Lọc theo loại", ["Tất cả", "Bạch Thủ", "Song Thủ"])
+            
+            if filter_type != "Tất cả":
+                df = df[df['type'] == filter_type]
+            
+            # Display table
+            st.dataframe(
+                df[['date', 'type', 'numbers', 'result_numbers', 'is_win']].sort_values('date', ascending=False),
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "date": "Ngày/Giờ",
+                    "type": "Loại",
+                    "numbers": "Số dự đoán",
+                    "result_numbers": "Kết quả",
+                    "is_win": st.column_config.CheckboxColumn("Trúng?", help="Kết quả")
+                }
+            )
+            
+            # Chart
+            if not df.empty:
+                st.markdown("#### 📊 Biểu đồ thắng/thua theo thời gian")
+                df_chart = df.copy()
+                df_chart['is_win_num'] = df_chart['is_win'].map({True: 1, False: 0})
+                st.line_chart(df_chart.set_index('date')['is_win_num'])
+        else:
+            st.info("📭 Chưa có lịch sử dự đoán. Hãy bắt đầu dự đoán và kiểm tra kết quả!")
     
-    # Footer
+    # FOOTER
     st.markdown("---")
     st.markdown('''
     <div style="text-align: center; color: #666; font-size: 12px; padding: 20px;">
-        💎 AI-QUANTUM PRO 2026 • Built with Streamlit<br>
+        💎 AI-QUANTUM PRO 2026 • Dự Đoán XSMB Thông Minh<br>
         <b>Chơi xổ số có trách nhiệm - 18+ only</b>
     </div>
     ''', unsafe_allow_html=True)
