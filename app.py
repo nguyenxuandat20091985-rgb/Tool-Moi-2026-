@@ -1,5 +1,5 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - FULL FEATURE EDITION
+# 💎 AI-QUANTUM PRO 2026 - FULL FEATURE EDITION (FINAL)
 # Authentication • VIP Tiers • PayOS • Admin • Analytics • Legal-Safe
 # =============================================================================
 import streamlit as st
@@ -125,15 +125,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 🔐 AUTHENTICATION SYSTEM
+# 🔐 AUTHENTICATION SYSTEM (FIXED)
 # =============================================================================
 def init_auth():
-    """Khởi tạo hệ thống authentication"""
+    """Khởi tạo hệ thống authentication - ĐÃ FIX GUEST USER"""
     if 'users' not in st.session_state:
         st.session_state.users = {
             'admin': {
                 'password_hash': hashlib.sha256('admin123'.encode()).hexdigest(),
                 'role': 'admin',
+                'vip_tier': None,
+                'vip_until': None,
+                'is_active': True,
+                'created_at': datetime.now().isoformat()
+            },
+            'guest': {  # ✅ THÊM GUEST USER ĐỂ TRÁNH LỖI
+                'password_hash': '',
+                'role': 'user',
+                'email': None,
                 'vip_tier': None,
                 'vip_until': None,
                 'is_active': True,
@@ -197,7 +206,7 @@ def check_auth():
     return None
 
 def get_user_info(username=None):
-    """Lấy thông tin user"""
+    """Lấy thông tin user - SAFE CHECK"""
     if username is None:
         username = st.session_state.current_user
     if not username:
@@ -264,18 +273,26 @@ def toggle_user_active(username, active):
     return False
 
 # =============================================================================
-# 📊 ANALYTICS TRACKING
+# 📊 ANALYTICS TRACKING (FIXED IP HASH)
 # =============================================================================
 def track_event(user_id, action, metadata=None):
-    """Ghi log sự kiện người dùng"""
+    """Ghi log sự kiện người dùng - SAFE IP HASH"""
+    # Safe IP hash extraction
+    try:
+        if hasattr(st, 'context') and st.context:
+            ip = st.context.headers.get('X-Forwarded-For', 'unknown')
+        else:
+            ip = 'unknown'
+        ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    except:
+        ip_hash = 'unknown'
+    
     log_entry = {
         'timestamp': datetime.now().isoformat(),
         'user_id': user_id or 'guest',
         'action': action,
         'metadata': metadata or {},
-        'ip_hash': hashlib.sha256(
-            st.context.headers.get('X-Forwarded-For', 'unknown').encode()
-        ).hexdigest()[:16] if hasattr(st, 'context') else 'unknown'
+        'ip_hash': ip_hash
     }
     
     logs = []
@@ -289,7 +306,7 @@ def track_event(user_id, action, metadata=None):
                         continue
     
     logs.append(log_entry)
-    logs = logs[-10000:]  # Keep last 10k logs
+    logs = logs[-10000:]
     
     with open('analytics.jsonl', 'w', encoding='utf-8') as f:
         for log in logs:
@@ -384,13 +401,13 @@ VIP_TIERS = {
 }
 
 # =============================================================================
-# 💳 PAYOS INTEGRATION
+# 💳 PAYOS INTEGRATION (FIXED CHECKSUM)
 # =============================================================================
 def create_payos_payment(order_code, amount, description, return_url, cancel_url):
-    """Tạo link thanh toán PayOS"""
+    """Tạo link thanh toán PayOS - CHECKSUM FORMAT ĐÚNG"""
     
-    # Generate checksum
-    data_to_sign = f"{amount}{order_code}{description}{PAYOS_CHECKSUM_KEY}"
+    # Generate checksum theo format PayOS: amount + orderCode + description + cancelUrl + returnUrl + checksumKey
+    data_to_sign = f"{amount}{order_code}{description}{cancel_url}{return_url}{PAYOS_CHECKSUM_KEY}"
     signature = hmac.new(
         PAYOS_CHECKSUM_KEY.encode(),
         data_to_sign.encode(),
@@ -469,12 +486,18 @@ def display_pricing_table():
                 order_code = f"AIQ_{tier_key}_{uuid.uuid4().hex[:8].upper()}"
                 description = f"Phi dich vu Data {user_id}"
                 
+                # Get current URL for return/cancel
+                try:
+                    current_url = st.context.page_url if hasattr(st, 'context') else ""
+                except:
+                    current_url = ""
+                
                 checkout_url = create_payos_payment(
                     order_code=order_code,
                     amount=tier['price'],
                     description=description,
-                    return_url=st.experimental_get_query_params().get('callback', [''])[0] or st.context.page_url,
-                    cancel_url=st.context.page_url
+                    return_url=current_url + "?payment=success",
+                    cancel_url=current_url + "?payment=cancel"
                 )
                 
                 if checkout_url:
@@ -609,7 +632,7 @@ def admin_panel():
                 st.rerun()
 
 # =============================================================================
-# 💾 STATISTICS (Original)
+# 💾 STATISTICS
 # =============================================================================
 def init_statistics():
     if 'statistics' not in st.session_state:
@@ -912,7 +935,7 @@ def get_historical_data(days=30):
     return historical
 
 # =============================================================================
-# 🚀 MAIN APP
+# 🚀 MAIN APP (FINAL - ALL FIXES APPLIED)
 # =============================================================================
 def main():
     init_auth()
@@ -998,7 +1021,8 @@ def main():
         # User info
         st.markdown(f"### 👤 {current_user}")
         if is_vip():
-            until = get_user_info().get('vip_until', '')
+            user_info = get_user_info()
+            until = user_info.get('vip_until', '') if user_info else ''
             st.markdown(f'<span class="vip-badge">VIP đến: {until[:10] if until else "N/A"}</span>', unsafe_allow_html=True)
         
         if st.button("🚪 Đăng xuất", use_container_width=True):
@@ -1007,13 +1031,18 @@ def main():
         
         st.divider()
         
-        # Navigation
-        page = st.radio("🧭 Menu", ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử", "👑 Admin"] if get_user_info().get('role') == 'admin' else ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử"])
+        # ✅ FIX: Navigation với safe admin check
+        user_info = get_user_info()
+        if user_info and user_info.get('role') == 'admin':
+            menu_options = ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử", "👑 Admin"]
+        else:
+            menu_options = ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử"]
+        page = st.radio("🧭 Menu", menu_options)
         
         st.divider()
         
-        # Analytics (admin only)
-        if get_user_info().get('role') == 'admin':
+        # ✅ FIX: Admin analytics với safe check
+        if user_info and user_info.get('role') == 'admin':
             st.markdown("### 📈 Analytics")
             analytics = get_analytics_summary(7)
             st.write(f"Users (7d): {analytics['total_users']}")
@@ -1180,8 +1209,10 @@ def main():
         else:
             st.info("📭 Chưa có lịch sử")
     
-    elif page == "👑 Admin" and get_user_info().get('role') == 'admin':
-        admin_panel()
+    elif page == "👑 Admin":
+        user_info = get_user_info()
+        if user_info and user_info.get('role') == 'admin':
+            admin_panel()
     
     # FOOTER
     st.markdown("---")
