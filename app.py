@@ -1,5 +1,5 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - AUTO UPDATE & TRACKING
+# 💎 AI-QUANTUM PRO 2026 - AUTO RESULT TRACKING
 # =============================================================================
 import streamlit as st
 import requests
@@ -16,7 +16,7 @@ import time
 # 🔧 CẤU HÌNH
 # =============================================================================
 st.set_page_config(
-    page_title="💎 AI-QUANTUM PRO 2026 | Auto Update",
+    page_title="💎 AI-QUANTUM PRO 2026 | Auto Tracking",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -42,8 +42,8 @@ st.markdown("""
     }
     .stat-value { font-size: 28px; font-weight: bold; color: #FFD700; }
     .stat-label { font-size: 12px; color: #888; margin-top: 5px; }
-    .win { color: #00ff88; }
-    .loss { color: #ff4b4b; }
+    .win { color: #00ff88; font-weight: bold; }
+    .loss { color: #ff4b4b; font-weight: bold; }
     .pred-box {
         border: 2px solid #D4AF37; border-radius: 12px;
         padding: 20px; background: linear-gradient(135deg, #111, #1a1a2e);
@@ -61,48 +61,35 @@ st.markdown("""
         padding: 12px; border-radius: 0 8px 8px 0;
         margin: 15px 0; font-size: 13px;
     }
-    .analysis-box {
-        background: rgba(212, 175, 55, 0.1);
-        border: 1px solid #D4AF37;
-        border-radius: 8px;
-        padding: 12px;
-        margin: 10px 0;
+    .result-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 10px 15px; border-bottom: 1px solid #2a2a4a;
     }
-    .result-win {
-        background: rgba(0, 255, 136, 0.2);
-        border: 2px solid #00ff88;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 5px 0;
+    .result-row:hover { background: rgba(212, 175, 55, 0.1); }
+    .result-label { font-size: 14px; color: #aaa; }
+    .result-value { font-size: 18px; font-weight: bold; color: #fff; }
+    .result-win { color: #00ff88; font-size: 20px; }
+    .result-loss { color: #ff4b4b; font-size: 20px; }
+    .badge {
+        padding: 3px 10px; border-radius: 15px; font-size: 11px;
+        font-weight: bold; text-transform: uppercase;
     }
-    .result-loss {
-        background: rgba(255, 75, 75, 0.2);
-        border: 2px solid #ff4b4b;
-        border-radius: 8px;
-        padding: 10px;
-        margin: 5px 0;
-    }
-    .auto-badge {
-        background: linear-gradient(135deg, #00ff88, #00cc6a);
-        color: #000; padding: 5px 15px; border-radius: 20px;
-        font-size: 12px; font-weight: bold; display: inline-block;
-        margin: 5px 0;
-    }
+    .badge-win { background: rgba(0, 255, 136, 0.2); color: #00ff88; }
+    .badge-loss { background: rgba(255, 75, 75, 0.2); color: #ff4b4b; }
+    .badge-pending { background: rgba(255, 165, 0, 0.2); color: #ffa500; }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 💾 STATISTICS & TRACKING
+# 💾 STATISTICS & RESULTS TRACKING
 # =============================================================================
 def init_statistics():
     if 'statistics' not in st.session_state:
         st.session_state.statistics = {
-            'predictions': [],
-            'daily_stats': {},
-            'total_predictions': 0,
-            'wins': 0,
-            'losses': 0,
-            'last_update': None
+            'predictions': [],  # Lưu dự đoán đã tạo
+            'results': [],       # Lưu kết quả so sánh (đã check)
+            'daily_stats': {},   # Thống kê theo ngày
+            'last_check_date': None  # Ngày đã check kết quả gần nhất
         }
     
     if os.path.exists('statistics.json'):
@@ -119,57 +106,28 @@ def save_statistics():
     except:
         pass
 
-def save_prediction(date_str, pred_type, numbers, predicted_for_date, 
-                   actual_result=None, is_win=None, confidence=0, ai_generated=False):
-    """Lưu dự đoán với thông tin chi tiết"""
-    today = date_str
-    
-    if today not in st.session_state.statistics['daily_stats']:
-        st.session_state.statistics['daily_stats'][today] = {
-            'date': today, 'predictions': 0, 'wins': 0, 'losses': 0
-        }
-    
-    pred = {
-        'date': today,
-        'time': datetime.now().strftime("%H:%M"),
-        'type': pred_type,
-        'numbers': numbers,
-        'predicted_for': predicted_for_date,  # Ngày dự đoán cho
-        'actual_result': actual_result,  # Kết quả thực tế
-        'is_win': is_win,
+def save_prediction(date_str, predictions, confidence=0):
+    """Lưu dự đoán khi tạo"""
+    pred_record = {
+        'date': date_str,
+        'created_time': datetime.now().isoformat(),
+        'predictions': predictions,  # Dict chứa bach_thu, song_thu, xien_2, dan_de
         'confidence': confidence,
-        'ai_generated': ai_generated,
-        'timestamp': datetime.now().isoformat()
+        'checked': False  # Chưa check kết quả
     }
     
-    # Check if prediction already exists
-    exists = False
-    for i, p in enumerate(st.session_state.statistics['predictions']):
-        if (p['type'] == pred_type and 
-            p['predicted_for'] == predicted_for_date and
-            p['date'] == today):
-            st.session_state.statistics['predictions'][i] = pred
-            exists = True
-            break
-    
-    if not exists:
-        st.session_state.statistics['predictions'].append(pred)
-        st.session_state.statistics['total_predictions'] += 1
-        st.session_state.statistics['daily_stats'][today]['predictions'] += 1
-        
-        if is_win is True:
-            st.session_state.statistics['wins'] += 1
-            st.session_state.statistics['daily_stats'][today]['wins'] += 1
-        elif is_win is False:
-            st.session_state.statistics['losses'] += 1
-            st.session_state.statistics['daily_stats'][today]['losses'] += 1
+    # Kiểm tra xem đã có dự đoán cho ngày này chưa
+    existing = [p for p in st.session_state.statistics['predictions'] if p['date'] == date_str]
+    if existing:
+        # Update nếu đã có
+        existing[0].update(pred_record)
+    else:
+        st.session_state.statistics['predictions'].append(pred_record)
     
     save_statistics()
 
-def check_and_update_results(current_data):
-    """Kiểm tra và cập nhật kết quả trúng/trượt cho các dự đoán hôm trước"""
-    if not current_data:
-        return
+def check_results(today_date, current_data):
+    """So sánh dự đoán hôm trước với kết quả hôm nay"""
     
     # Extract all loto numbers from current results
     current_loto = []
@@ -183,56 +141,66 @@ def check_and_update_results(current_data):
         elif v and v != "...":
             current_loto.append(v[-2:])
     
-    today = datetime.now().strftime("%d/%m")
+    db_number = current_data.get("Đặc Biệt", "")
+    db_last2 = db_number[-2:] if db_number and len(db_number) >= 2 else ""
+    
+    results = []
+    
+    # Tìm dự đoán của ngày hôm trước
     yesterday = (datetime.now() - timedelta(days=1)).strftime("%d/%m")
+    yesterday_preds = [p for p in st.session_state.statistics['predictions'] 
+                       if p['date'] == yesterday and not p.get('checked', False)]
     
-    # Update predictions from yesterday
-    updated = False
-    for pred in st.session_state.statistics['predictions']:
-        if pred['predicted_for'] == yesterday and pred['is_win'] is None:
-            # Check if this prediction won
-            if pred['type'] == "Bạch Thủ":
-                is_win = pred['numbers'] in current_loto
-                pred['is_win'] = is_win
-                pred['actual_result'] = "Trúng" if is_win else "Trượt"
-                pred['result_numbers'] = current_loto
-                updated = True
-                
-            elif pred['type'] == "Song Thủ":
-                parts = [s.strip() for s in pred['numbers'].split('-')]
-                is_win = any(p in current_loto for p in parts)
-                pred['is_win'] = is_win
-                pred['actual_result'] = "Trúng" if is_win else "Trượt"
-                pred['result_numbers'] = current_loto
-                updated = True
-            
-            elif pred['type'] == "Xiên 2":
-                parts = [s.strip() for s in pred['numbers'].split('-')]
-                is_win = all(p in current_loto for p in parts)
-                pred['is_win'] = is_win
-                pred['actual_result'] = "Trúng" if is_win else "Trượt"
-                pred['result_numbers'] = current_loto
-                updated = True
-            
-            elif pred['type'] == "Dàn Đề":
-                numbers = [n.strip() for n in pred['numbers'].split(',')]
-                winning_numbers = [n for n in numbers if n in current_loto]
-                is_win = len(winning_numbers) > 0
-                pred['is_win'] = is_win
-                pred['actual_result'] = f"Trúng {len(winning_numbers)} số" if is_win else "Trượt"
-                pred['winning_numbers'] = winning_numbers
-                pred['result_numbers'] = current_loto
-                updated = True
+    for pred in yesterday_preds:
+        preds = pred['predictions']
+        
+        # 1. Bạch Thủ
+        bt = preds.get('bach_thu', '')
+        bt_win = bt in current_loto if bt else False
+        
+        # 2. Song Thủ
+        st_nums = preds.get('song_thu', ('', ''))
+        st_win = any(s in current_loto for s in st_nums if s)
+        
+        # 3. Xiên 2
+        xien = preds.get('xien_2', '')
+        xien_parts = [p.strip() for p in xien.split('-') if p.strip()]
+        xien_win = all(p in current_loto for p in xien_parts) if len(xien_parts) == 2 else False
+        
+        # 4. Dàn Đề 10 số
+        dan_de = preds.get('dan_de', [])
+        de_win = db_last2 in dan_de if db_last2 and dan_de else False
+        
+        result_record = {
+            'check_date': today_date,
+            'pred_date': yesterday,
+            'bach_thu': {'number': bt, 'win': bt_win},
+            'song_thu': {'numbers': st_nums, 'win': st_win},
+            'xien_2': {'pair': xien, 'win': xien_win},
+            'dan_de': {'numbers': dan_de, 'win': de_win, 'matched': db_last2 if de_win else None},
+            'overall_wins': sum([bt_win, st_win, xien_win, de_win]),
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        results.append(result_record)
+        
+        # Mark as checked
+        pred['checked'] = True
+        
+        # Update daily stats
+        if today_date not in st.session_state.statistics['daily_stats']:
+            st.session_state.statistics['daily_stats'][today_date] = {
+                'date': today_date, 'checked': 0, 'total_wins': 0
+            }
+        st.session_state.statistics['daily_stats'][today_date]['checked'] += 1
+        st.session_state.statistics['daily_stats'][today_date]['total_wins'] += result_record['overall_wins']
     
-    if updated:
-        # Recalculate stats
-        st.session_state.statistics['wins'] = sum(
-            1 for p in st.session_state.statistics['predictions'] if p['is_win'] is True
-        )
-        st.session_state.statistics['losses'] = sum(
-            1 for p in st.session_state.statistics['predictions'] if p['is_win'] is False
-        )
-        save_statistics()
+    # Lưu results
+    st.session_state.statistics['results'].extend(results)
+    st.session_state.statistics['last_check_date'] = today_date
+    
+    save_statistics()
+    return results
 
 # =============================================================================
 # 📡 SCRAPING
@@ -280,7 +248,7 @@ def get_historical_data(days=30):
 # =============================================================================
 # 🧠 BẠC NHỚ
 # =============================================================================
-def generate_bac_nho(all_loto, historical_data):
+def generate_bac_nho(historical_data):
     pairs_counter = Counter()
     
     for date, data in historical_data.items():
@@ -310,12 +278,7 @@ def generate_bac_nho(all_loto, historical_data):
             top_pairs.append((pair, 1))
     
     return [
-        {
-            'pair': f"{p[0][0]} - {p[0][1]}",
-            'frequency': p[1],
-            'num1': p[0][0],
-            'num2': p[0][1]
-        }
+        {'pair': f"{p[0][0]} - {p[0][1]}", 'frequency': p[1], 'num1': p[0][0], 'num2': p[0][1]}
         for p in top_pairs
     ]
 
@@ -323,59 +286,47 @@ def generate_bac_nho(all_loto, historical_data):
 # 🤖 GEMINI AI
 # =============================================================================
 def query_gemini_ai(hot_nums, cold_nums, gan_nums):
-    prompt = f"""Bạn là chuyên gia xổ số miền Bắc. Hãy dự đoán XSMB.
+    prompt = f"""Chuyên gia xổ số MB, dự đoán kết quả hôm nay.
 
 DỮ LIỆU:
 - Số NÓNG: {', '.join(hot_nums[:5]) if hot_nums else '67, 07, 60, 14, 02'}
 - Số LẠNH: {', '.join(cold_nums[:5]) if cold_nums else '33, 44, 55, 66, 77'}
-- Số GAN: {', '.join([f"{num}({days} ngày)" for num, days in (gan_nums[:5] if gan_nums else [('33', 15)])])}
+- Số GAN: {', '.join([f"{num}({days} ngày)" for num, days in (gan_nums[:5] if gan_nums else [('33',15),('44',12),('55',10),('66',8),('77',7)])])}
 
 TRẢ LỜI JSON:
 {{
     "analysis": "Phân tích ngắn",
     "bach_thu": "67",
     "song_thu": ["07", "60"],
-    "dan_de": ["00", "01", "02", "07", "10", "13", "14", "60", "67", "93"],
+    "dan_de": ["00","01","02","07","10","13","14","60","67","93"],
     "confidence": 75
 }}"""
-
+    
     try:
         url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
-        
-        headers = {"Content-Type": "application/json"}
-        
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.8,
-                "maxOutputTokens": 512
-            }
+            "generationConfig": {"temperature": 0.8, "maxOutputTokens": 512}
         }
         
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        response = requests.post(url, json=payload, timeout=30)
         
-        if response.status_code != 200:
-            return None
-        
-        result = response.json()
-        
-        if 'candidates' in result and len(result['candidates']) > 0:
-            import re
-            text = result['candidates'][0]['content']['parts'][0]['text']
-            json_match = re.search(r'\{[\s\S]*\}', text)
-            
-            if json_match:
-                return json.loads(json_match.group())
-        
+        if response.status_code == 200:
+            result = response.json()
+            if 'candidates' in result and len(result['candidates']) > 0:
+                text = result['candidates'][0]['content']['parts'][0]['text']
+                import re
+                json_match = re.search(r'\{[\s\S]*\}', text)
+                if json_match:
+                    return json.loads(json_match.group())
         return None
-        
     except:
         return None
 
 # =============================================================================
 # 🎲 PREDICTION
 # =============================================================================
-def generate_predictions(historical_data, auto_mode=False):
+def generate_predictions(historical_data):
     all_loto = []
     for date, data in historical_data.items():
         for key, val in data.items():
@@ -388,7 +339,6 @@ def generate_predictions(historical_data, auto_mode=False):
     
     counter = Counter(all_loto)
     hot_nums = [num for num, _ in counter.most_common(10)]
-    
     all_possible = [f"{i:02d}" for i in range(100)]
     cold_nums = [num for num in all_possible if num not in counter][:10]
     
@@ -410,10 +360,7 @@ def generate_predictions(historical_data, auto_mode=False):
             days += 1
         gan_nums.append((num, days))
     
-    if auto_mode:
-        gemini_result = query_gemini_ai(hot_nums, cold_nums, gan_nums)
-    else:
-        gemini_result = None
+    gemini_result = query_gemini_ai(hot_nums, cold_nums, gan_nums)
     
     if gemini_result:
         bt = gemini_result.get('bach_thu', hot_nums[0] if hot_nums else "00")
@@ -427,14 +374,12 @@ def generate_predictions(historical_data, auto_mode=False):
         bt = hot_nums[0] if hot_nums else f"{np.random.randint(0,100):02d}"
         st1 = hot_nums[1] if len(hot_nums) > 1 else f"{np.random.randint(0,100):02d}"
         st2 = cold_nums[0] if cold_nums else f"{np.random.randint(0,100):02d}"
-        
         dan_de = list(set(hot_nums[:4] + cold_nums[:3]))
         while len(dan_de) < 10:
             dan_de.append(f"{np.random.randint(0,100):02d}")
         dan_de = sorted(dan_de)[:10]
-        
         confidence = 65
-        analysis = "Phân tích tần suất và số gan"
+        analysis = "Phân tích tần suất (AI không khả dụng)"
         using_ai = False
     
     return {
@@ -455,12 +400,13 @@ def generate_predictions(historical_data, auto_mode=False):
 # =============================================================================
 def main():
     init_statistics()
+    today = datetime.now().strftime("%d/%m")
     
     # HEADER
     st.markdown('''
     <div class="header-gold">
         <h1 style="margin:0;">💎 AI-QUANTUM PRO 2026</h1>
-        <p style="margin:5px 0 0;">🤖 Auto Update • Gemini AI • Tracking</p>
+        <p style="margin:5px 0 0;">🎯 Auto Tracking • Dự Đoán • Thống Kê Chi Tiết</p>
     </div>
     ''', unsafe_allow_html=True)
     
@@ -475,16 +421,15 @@ def main():
             
             for date in sorted_dates:
                 stats = daily_stats[date]
-                total = stats['predictions']
-                wins = stats['wins']
-                rate = (wins / total * 100) if total > 0 else 0
+                checked = stats.get('checked', 0)
+                wins = stats.get('total_wins', 0)
+                rate = (wins / (checked * 4) * 100) if checked > 0 else 0  # 4 loại dự đoán
                 
                 st.markdown(f'''
                 <div class="stat-card" style="margin: 5px 0;">
                     <div style="font-size: 14px; font-weight: bold; color: #fff;">📅 {date}</div>
                     <div style="display: flex; justify-content: space-around; margin-top: 8px;">
-                        <span class="win">✅ {wins}</span>
-                        <span class="loss">❌ {total - wins}</span>
+                        <span class="win">✅ {wins}/4</span>
                         <span style="color: {'#00ff88' if rate >= 50 else '#ff4b4b'}">{rate:.0f}%</span>
                     </div>
                 </div>
@@ -495,22 +440,23 @@ def main():
         st.divider()
         
         st.markdown("### 📈 TỔNG QUAN")
-        total = st.session_state.statistics['total_predictions']
-        wins = st.session_state.statistics['wins']
-        losses = st.session_state.statistics['losses']
-        win_rate = (wins / total * 100) if total > 0 else 0
+        results = st.session_state.statistics.get('results', [])
+        total_checks = len(results)
+        total_wins = sum(r['overall_wins'] for r in results)
+        max_wins = total_checks * 4
+        win_rate = (total_wins / max_wins * 100) if max_wins > 0 else 0
         
         col1, col2 = st.columns(2)
         col1.markdown(f'''
         <div class="stat-card">
-            <div class="stat-value win">{wins}</div>
-            <div class="stat-label">Thắng</div>
+            <div class="stat-value win">{total_wins}</div>
+            <div class="stat-label">Trúng</div>
         </div>
         ''', unsafe_allow_html=True)
         col2.markdown(f'''
         <div class="stat-card">
-            <div class="stat-value loss">{losses}</div>
-            <div class="stat-label">Thua</div>
+            <div class="stat-value loss">{max_wins - total_wins}</div>
+            <div class="stat-label">Trượt</div>
         </div>
         ''', unsafe_allow_html=True)
         
@@ -519,37 +465,48 @@ def main():
             <div class="stat-value" style="color: {'#00ff88' if win_rate >= 50 else '#ff4b4b'}">
                 {win_rate:.1f}%
             </div>
-            <div class="stat-label">Tỷ lệ thắng</div>
-            <div class="stat-label">Tổng: {total}</div>
+            <div class="stat-label">Tỷ lệ trúng tổng</div>
+            <div class="stat-label">{total_checks} lần check</div>
         </div>
         ''', unsafe_allow_html=True)
         
         st.divider()
         
-        if st.button("🔄 Xóa lịch sử", use_container_width=True):
+        if st.button("🔄 Reset toàn bộ", use_container_width=True):
             st.session_state.statistics = {
-                'predictions': [], 'daily_stats': {},
-                'total_predictions': 0, 'wins': 0, 'losses': 0
+                'predictions': [], 'results': [], 'daily_stats': {},
+                'last_check_date': None
             }
             save_statistics()
             st.rerun()
         
-        if st.session_state.statistics['predictions']:
-            df_stats = pd.DataFrame(st.session_state.statistics['predictions'])
-            csv = df_stats.to_csv(index=False, encoding='utf-8-sig')
+        if results:
+            df_export = pd.DataFrame([
+                {
+                    'Ngày dự đoán': r['pred_date'],
+                    'Ngày check': r['check_date'],
+                    'Bạch thủ': f"{r['bach_thu']['number']} {'✅' if r['bach_thu']['win'] else '❌'}",
+                    'Song thủ': f"{'-'.join(r['song_thu']['numbers'])} {'✅' if r['song_thu']['win'] else '❌'}",
+                    'Xiên 2': f"{r['xien_2']['pair']} {'✅' if r['xien_2']['win'] else '❌'}",
+                    'Đề 10 số': f"{'✅' if r['dan_de']['win'] else '❌'}",
+                    'Tổng trúng': f"{r['overall_wins']}/4"
+                }
+                for r in results
+            ])
+            csv = df_export.to_csv(index=False, encoding='utf-8-sig')
             st.download_button(
-                label="📥 Tải CSV",
+                label="📥 Tải lịch sử CSV",
                 data=csv,
-                file_name=f"xsmb_stats_{datetime.now().strftime('%Y%m%d')}.csv",
+                file_name=f"xsmb_tracking_{datetime.now().strftime('%Y%m%d')}.csv",
                 mime="text/csv",
                 use_container_width=True
             )
     
     # TABS
-    tab1, tab2, tab3 = st.tabs(["🎯 Dự Đoán & Bạc Nhớ", "🌐 Website XS", "📜 Lịch Sử"])
+    tab1, tab2, tab3 = st.tabs(["🎯 Dự Đoán & Kết Quả", "🌐 Website XS", "📜 Lịch Sử Chi Tiết"])
     
     with tab1:
-        st.markdown("### 📡 KẾT QUẢ XSMB MỚI NHẤT")
+        st.markdown("### 📡 KẾT QUẢ XSMB HÔM NAY")
         
         data = get_live_xsmb()
         historical = get_historical_data(30)
@@ -570,9 +527,6 @@ def main():
                 st.cache_data.clear()
                 st.rerun()
         
-        # Auto-update results
-        check_and_update_results(data)
-        
         # Display result
         db = data.get("Đặc Biệt", "....")
         st.markdown(f'''
@@ -585,133 +539,125 @@ def main():
         </div>
         ''', unsafe_allow_html=True)
         
-        # Auto-save predictions for today
-        today = datetime.now().strftime("%d/%m")
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d/%m")
+        # AUTO CHECK RESULTS
+        st.markdown("---")
+        st.markdown("### ✅ KIỂM TRA KẾT QUẢ DỰ ĐOÁN HÔM QUA")
+        
+        if st.button(f"🔍 Check kết quả cho ngày {today}", use_container_width=True, type="primary"):
+            results = check_results(today, data)
+            
+            if results:
+                st.success(f"✅ Đã check {len(results)} dự đoán!")
+                
+                for r in results:
+                    st.markdown(f'''
+                    <div style="background: rgba(212, 175, 55, 0.1); 
+                                border-left: 4px solid #D4AF37;
+                                padding: 15px; border-radius: 0 8px 8px 0;
+                                margin: 10px 0;">
+                        <b>📅 Dự đoán ngày {r['pred_date']} → Check ngày {r['check_date']}</b>
+                        <div style="margin-top: 10px;">
+                            <div class="result-row">
+                                <span class="result-label">🎯 Bạch thủ: {r['bach_thu']['number']}</span>
+                                <span class="{'result-win' if r['bach_thu']['win'] else 'result-loss'}">
+                                    {'✅ TRÚNG' if r['bach_thu']['win'] else '❌ Trượt'}
+                                </span>
+                            </div>
+                            <div class="result-row">
+                                <span class="result-label">🎯 Song thủ: {' - '.join(r['song_thu']['numbers'])}</span>
+                                <span class="{'result-win' if r['song_thu']['win'] else 'result-loss'}">
+                                    {'✅ TRÚNG' if r['song_thu']['win'] else '❌ Trượt'}
+                                </span>
+                            </div>
+                            <div class="result-row">
+                                <span class="result-label">🎯 Xiên 2: {r['xien_2']['pair']}</span>
+                                <span class="{'result-win' if r['xien_2']['win'] else 'result-loss'}">
+                                    {'✅ TRÚNG' if r['xien_2']['win'] else '❌ Trượt'}
+                                </span>
+                            </div>
+                            <div class="result-row">
+                                <span class="result-label">📋 Đề 10 số: {r['dan_de']['matched'] if r['dan_de']['win'] else 'Không trúng'}</span>
+                                <span class="{'result-win' if r['dan_de']['win'] else 'result-loss'}">
+                                    {'✅ TRÚNG ĐỀ' if r['dan_de']['win'] else '❌ Trượt'}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px; text-align: right;">
+                            <span class="badge badge-{'win' if r['overall_wins'] >= 2 else 'loss'}">
+                                Tổng: {r['overall_wins']}/4 trúng
+                            </span>
+                        </div>
+                    </div>
+                    ''', unsafe_allow_html=True)
+            else:
+                st.info("ℹ️ Chưa có dự đoán nào của ngày hôm qua để check")
         
         st.markdown("---")
-        st.markdown(f"### 🎯 DỰ ĐOÁN CHO NGÀY {tomorrow}")
+        st.markdown("### 🎯 DỰ ĐOÁN CHO NGÀY MAI")
         
-        # Check if already predicted for tomorrow
-        existing_preds = [p for p in st.session_state.statistics['predictions'] 
-                         if p['predicted_for'] == tomorrow and p['date'] == today]
+        predictions = generate_predictions(historical)
         
-        if existing_preds:
-            st.markdown('<span class="auto-badge">✅ ĐÃ TỰ ĐỘNG DỰ ĐOÁN</span>', unsafe_allow_html=True)
-            st.info(f"Đã có dự đoán cho ngày {tomoraow} lúc {existing_preds[0]['time']}")
-            
-            # Display existing predictions
-            bt_pred = next((p for p in existing_preds if p['type'] == "Bạch Thủ"), None)
-            st_pred = next((p for p in existing_preds if p['type'] == "Song Thủ"), None)
-            dd_pred = next((p for p in existing_preds if p['type'] == "Dàn Đề"), None)
-            
-            c1, c2, c3 = st.columns(3)
-            
-            if bt_pred:
-                with c1:
-                    st.markdown(f'''
-                    <div class="pred-box">
-                        <div style="color:#aaa; font-size:13px;">🎯 BẠCH THỦ</div>
-                        <div style="font-size:42px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                            {bt_pred['numbers']}
-                        </div>
-                        <div style="font-size:11px; color:#888;">Confidence: {bt_pred['confidence']}%</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            
-            if st_pred:
-                with c2:
-                    st.markdown(f'''
-                    <div class="pred-box">
-                        <div style="color:#aaa; font-size:13px;">🎯 SONG THỦ</div>
-                        <div style="font-size:26px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                            {st_pred['numbers']}
-                        </div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            
-            if dd_pred:
-                st.markdown(f'''
-                <div class="pred-box">
-                    <div style="color:#aaa; font-size:14px; margin-bottom:10px;">📋 DÀN ĐỀ 10 SỐ</div>
-                    <div style="font-size:18px; color:#fff;">{dd_pred['numbers']}</div>
-                </div>
-                ''', unsafe_allow_html=True)
-        else:
-            # Generate new predictions
-            predictions = generate_predictions(historical, auto_mode=True)
-            
-            if predictions['using_ai']:
-                st.markdown('<span class="auto-badge">🤖 GEMINI AI</span>', unsafe_allow_html=True)
-            else:
-                st.warning("⚠️ AI không khả dụng")
-            
-            st.markdown(f'''
-            <div class="analysis-box">
-                <b>🧠 PHÂN TÍCH:</b><br>
-                {predictions['ai_analysis']}<br>
-                <b>ĐỘ TIN CẬY:</b> <span style="color: {'#00ff88' if predictions['confidence'] >= 70 else '#ffa500'}">
-                    {predictions['confidence']}%
-                </span>
-            </div>
-            ''', unsafe_allow_html=True)
-            
-            # Save predictions
-            save_prediction(today, "Bạch Thủ", predictions['bach_thu'], tomorrow,
-                           confidence=predictions['confidence'], ai_generated=predictions['using_ai'])
-            save_prediction(today, "Song Thủ", f"{predictions['song_thu'][0]} - {predictions['song_thu'][1]}",
-                           tomorrow, confidence=predictions['confidence'], ai_generated=predictions['using_ai'])
-            save_prediction(today, "Dàn Đề", ", ".join(predictions['dan_de']), tomorrow,
-                           confidence=predictions['confidence'], ai_generated=predictions['using_ai'])
-            
-            c1, c2, c3 = st.columns(3)
-            
-            with c1:
-                st.markdown(f'''
-                <div class="pred-box">
-                    <div style="color:#aaa; font-size:13px;">🎯 BẠCH THỦ</div>
-                    <div style="font-size:42px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                        {predictions['bach_thu']}
-                    </div>
-                    <div style="font-size:11px; color:#888;">Confidence: {predictions['confidence']}%</div>
-                </div>
-                ''', unsafe_allow_html=True)
-            
-            with c2:
-                st.markdown(f'''
-                <div class="pred-box">
-                    <div style="color:#aaa; font-size:13px;">🎯 SONG THỦ</div>
-                    <div style="font-size:26px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                        {predictions['song_thu'][0]} - {predictions['song_thu'][1]}
-                    </div>
-                </div>
-                ''', unsafe_allow_html=True)
-            
-            with c3:
-                st.markdown(f'''
-                <div class="pred-box">
-                    <div style="color:#aaa; font-size:13px;">🎯 XIÊN 2</div>
-                    <div style="font-size:22px; color:#FFD700; font-weight:bold; margin:10px 0;">
-                        {predictions['xien_2']}
-                    </div>
-                </div>
-                ''', unsafe_allow_html=True)
-            
+        if predictions['using_ai']:
+            st.markdown('<span style="background: linear-gradient(135deg, #4285F4, #34A853); color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold;">✅ GEMINI AI</span>', unsafe_allow_html=True)
+        
+        st.markdown(f'''
+        <div class="analysis-box">
+            <b>🧠 PHÂN TÍCH:</b><br>
+            {predictions['ai_analysis']}<br>
+            <b>ĐỘ TIN CẬY:</b> <span style="color: {'#00ff88' if predictions['confidence'] >= 70 else '#ffa500'}">
+                {predictions['confidence']}%
+            </span>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Save prediction for tomorrow
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%d/%m")
+        save_prediction(tomorrow, predictions, predictions['confidence'])
+        st.caption(f"💾 Đã lưu dự đoán cho ngày {tomorrow}")
+        
+        c1, c2, c3 = st.columns(3)
+        
+        with c1:
             st.markdown(f'''
             <div class="pred-box">
-                <div style="color:#aaa; font-size:14px; margin-bottom:10px;">📋 DÀN ĐỀ 10 SỐ</div>
-                <div style="font-size:18px; color:#fff;">{', '.join(predictions['dan_de'])}</div>
+                <div style="color:#aaa; font-size:13px;">🎯 BẠCH THỦ</div>
+                <div style="font-size:42px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['bach_thu']}
+                </div>
             </div>
             ''', unsafe_allow_html=True)
         
+        with c2:
+            st.markdown(f'''
+            <div class="pred-box">
+                <div style="color:#aaa; font-size:13px;">🎯 SONG THỦ</div>
+                <div style="font-size:26px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['song_thu'][0]} - {predictions['song_thu'][1]}
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        with c3:
+            st.markdown(f'''
+            <div class="pred-box">
+                <div style="color:#aaa; font-size:13px;">🎯 XIÊN 2</div>
+                <div style="font-size:22px; color:#FFD700; font-weight:bold; margin:10px 0;">
+                    {predictions['xien_2']}
+                </div>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        st.markdown(f'''
+        <div class="pred-box">
+            <div style="color:#aaa; font-size:14px; margin-bottom:10px;">📋 DÀN ĐỀ 10 SỐ</div>
+            <div style="font-size:18px; color:#fff;">{', '.join(predictions['dan_de'])}</div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
         st.markdown("---")
-        st.markdown("### 🎲 BẠC NHỚ - 3 CẶP XIÊN ĐẸP NHẤT")
+        st.markdown("### 🎲 BẠC NHỚ - 3 CẶP XIÊN ĐẸP")
         
-        bac_nho = generate_bac_nho([], historical)
-        
-        st.markdown('<div style="text-align: center; margin-bottom: 20px; color: #D4AF37; font-size: 16px;">'
-                    '🔮 Dựa trên phân tích tần suất các cặp số hay về cùng nhau</div>',
-                    unsafe_allow_html=True)
+        bac_nho = generate_bac_nho(historical)
         
         for i, xien in enumerate(bac_nho, 1):
             st.markdown(f'''
@@ -719,12 +665,8 @@ def main():
                 <div style="font-size: 14px; color: #aaa; margin-bottom: 10px;">
                     💎 CẶP XIÊN {i} - Tần suất: {xien['frequency']} lần
                 </div>
-                <div style="font-size: 48px; color: #FFD700; font-weight: bold; 
-                            letter-spacing: 4px; text-shadow: 0 0 20px rgba(255,215,0,0.5);">
+                <div style="font-size: 48px; color: #FFD700; font-weight: bold; letter-spacing: 4px;">
                     {xien['pair']}
-                </div>
-                <div style="font-size: 12px; color: #888; margin-top: 10px;">
-                    Số {xien['num1']} và {xien['num2']} thường xuất hiện cùng nhau
                 </div>
             </div>
             ''', unsafe_allow_html=True)
@@ -732,15 +674,13 @@ def main():
         st.markdown("---")
         st.markdown('''
         <div class="disclaimer">
-            ⚠️ <b>LƯU Ý</b>: Hệ thống tự động cập nhật kết quả và lưu trữ lịch sử. 
-            Xổ số là may rủi. Chơi có trách nhiệm!
+            ⚠️ <b>LƯU Ý</b>: Ứng dụng phân tích thống kê, xổ số là may rủi. 
+            Chơi có trách nhiệm!
         </div>
         ''', unsafe_allow_html=True)
     
     with tab2:
         st.markdown("### 🌐 WEBSITE XOSODAIPHAT.COM")
-        st.markdown("Xem kết quả trực tiếp và thống kê chi tiết:")
-        
         st.markdown('''
         <div style="border: 2px solid #D4AF37; border-radius: 15px; 
                     overflow: hidden; height: 900px;">
@@ -750,76 +690,77 @@ def main():
             </iframe>
         </div>
         ''', unsafe_allow_html=True)
-        
-        st.info("💡 Mẹo: Kéo xuống để xem đầy đủ kết quả và thống kê từ website")
     
     with tab3:
         st.markdown("### 📜 LỊCH SỬ DỰ ĐOÁN & KẾT QUẢ")
         
-        if st.session_state.statistics['predictions']:
-            df = pd.DataFrame(st.session_state.statistics['predictions'])
+        results = st.session_state.statistics.get('results', [])
+        
+        if results:
+            # Filter by date
+            dates = sorted(set(r['pred_date'] for r in results), reverse=True)
+            selected_date = st.selectbox("Chọn ngày dự đoán", dates)
             
-            dates = sorted(df['predicted_for'].unique(), reverse=True)
-            selected_date = st.selectbox("Chọn ngày dự đoán cho", dates)
+            filtered = [r for r in results if r['pred_date'] == selected_date]
             
-            df_filtered = df[df['predicted_for'] == selected_date]
-            
-            st.markdown(f"#### Kết quả dự đoán cho ngày {selected_date}")
-            
-            # Display with win/loss indicators
-            for idx, row in df_filtered.iterrows():
-                is_win = row.get('is_win')
-                
-                if is_win is True:
-                    st.markdown(f'''
-                    <div class="result-win">
-                        <b>✅ {row['type']}</b> - {row['numbers']}<br>
-                        <small>Kết quả: {row.get('actual_result', 'N/A')} | 
-                               Độ tin cậy: {row.get('confidence', 0)}% |
-                               AI: {'✅' if row.get('ai_generated') else '❌'}</small>
+            for r in filtered:
+                st.markdown(f'''
+                <div style="background: rgba(212, 175, 55, 0.1); 
+                            border: 1px solid #D4AF37; border-radius: 10px;
+                            padding: 15px; margin: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <b>📅 {r['pred_date']} → {r['check_date']}</b>
+                        <span class="badge badge-{'win' if r['overall_wins'] >= 2 else 'loss'}">
+                            {r['overall_wins']}/4 trúng
+                        </span>
                     </div>
-                    ''', unsafe_allow_html=True)
-                elif is_win is False:
-                    st.markdown(f'''
-                    <div class="result-loss">
-                        <b>❌ {row['type']}</b> - {row['numbers']}<br>
-                        <small>Kết quả: {row.get('actual_result', 'N/A')} | 
-                               Độ tin cậy: {row.get('confidence', 0)}% |
-                               AI: {'✅' if row.get('ai_generated') else '❌'}</small>
-                    </div>
-                    ''', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'''
-                    <div style="background: rgba(212, 175, 55, 0.1); border: 2px solid #D4AF37; 
-                                border-radius: 8px; padding: 10px; margin: 5px 0;">
-                        <b>⏳ {row['type']}</b> - {row['numbers']}<br>
-                        <small>Chờ kết quả | Độ tin cậy: {row.get('confidence', 0)}% |
-                               AI: {'✅' if row.get('ai_generated') else '❌'}</small>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            
-            st.divider()
-            
-            # Summary for selected date
-            total_preds = len(df_filtered)
-            wins = sum(1 for r in df_filtered['is_win'] if r is True)
-            losses = sum(1 for r in df_filtered['is_win'] if r is False)
-            pending = total_preds - wins - losses
-            
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric("Tổng", total_preds)
-            col2.metric("Trúng", wins, delta=f"{(wins/total_preds*100) if total_preds > 0 else 0:.0f}%")
-            col3.metric("Trượt", losses)
-            col4.metric("Chờ", pending)
-            
+                    <table style="width: 100%; font-size: 14px;">
+                        <tr>
+                            <td style="padding: 5px;">🎯 Bạch thủ</td>
+                            <td style="padding: 5px; text-align: right;">
+                                <b>{r['bach_thu']['number']}</b> 
+                                <span class="{'win' if r['bach_thu']['win'] else 'loss'}">
+                                    {'✅' if r['bach_thu']['win'] else '❌'}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px;">🎯 Song thủ</td>
+                            <td style="padding: 5px; text-align: right;">
+                                <b>{' - '.join(r['song_thu']['numbers'])}</b>
+                                <span class="{'win' if r['song_thu']['win'] else 'loss'}">
+                                    {'✅' if r['song_thu']['win'] else '❌'}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px;">🎯 Xiên 2</td>
+                            <td style="padding: 5px; text-align: right;">
+                                <b>{r['xien_2']['pair']}</b>
+                                <span class="{'win' if r['xien_2']['win'] else 'loss'}">
+                                    {'✅' if r['xien_2']['win'] else '❌'}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 5px;">📋 Đề 10 số</td>
+                            <td style="padding: 5px; text-align: right;">
+                                <span class="{'win' if r['dan_de']['win'] else 'loss'}">
+                                    {'✅ Trúng: ' + r['dan_de']['matched'] if r['dan_de']['win'] else '❌ Trượt'}
+                                </span>
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                ''', unsafe_allow_html=True)
         else:
-            st.info("📭 Chưa có lịch sử dự đoán")
+            st.info("📭 Chưa có lịch sử check kết quả")
     
     # FOOTER
     st.markdown("---")
     st.markdown('''
     <div style="text-align: center; color: #666; padding: 20px;">
-        💎 AI-QUANTUM PRO 2026 • Auto Update & Tracking<br>
+        💎 AI-QUANTUM PRO 2026 • Auto Result Tracking<br>
         Chơi xổ số có trách nhiệm - 18+ only
     </div>
     ''', unsafe_allow_html=True)
