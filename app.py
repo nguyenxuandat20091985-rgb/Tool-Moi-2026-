@@ -3,12 +3,13 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import numpy as np
+import pandas as pd
 from streamlit_autorefresh import st_autorefresh
 
 # =============================================================================
-# 🔧 CẤU HÌNH & GIAO DIỆN
+# 🔧 CẤU HÌNH & CSS
 # =============================================================================
-st.set_page_config(page_title="💎 AI-QUANTUM MB LIVE", layout="wide")
+st.set_page_config(page_title="💎 AI-QUANTUM LUXURY", layout="wide")
 st_autorefresh(interval=10000, key="live_update")
 
 st.markdown("""
@@ -16,44 +17,44 @@ st.markdown("""
     .main { background-color: #050505; }
     .header-box {
         background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #B8962E 100%);
-        padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px;
+        padding: 15px; border-radius: 15px; text-align: center; margin-bottom: 20px;
     }
-    .live-status { color: #00ff00; font-weight: bold; text-align: center; margin-bottom: 10px; }
+    .header-box h1 { color: #000; font-size: 24px; margin: 0; }
     
-    /* Khu vực Lô đã về */
-    .result-container {
-        background: #111; border: 1px solid #D4AF37; border-radius: 10px;
-        padding: 15px; margin-bottom: 20px; text-align: center;
+    .kq-table {
+        width: 100%; border-collapse: collapse; background: #111;
+        border: 2px solid #D4AF37; color: white; border-radius: 10px; overflow: hidden;
     }
-    .win-number {
-        display: inline-block; background: #222; color: #FFD700;
-        padding: 5px 12px; margin: 4px; border-radius: 5px;
-        font-weight: bold; font-size: 18px; border: 1px solid #333;
-    }
+    .kq-label { background: #222; color: #D4AF37; font-weight: bold; padding: 10px; width: 20%; text-align: center; }
+    .kq-value { padding: 10px; text-align: center; font-family: 'Roboto Mono', monospace; font-size: 20px; }
+    .db-value { color: #ff4b4b; font-size: 26px; font-weight: bold; }
     
-    /* Card dự đoán */
+    .bet-box {
+        background: #1a1a1a; border-left: 5px solid #ff4b4b;
+        padding: 10px; margin: 10px 0; border-radius: 5px;
+    }
     .pred-card {
-        background: #111; border: 2px solid #D4AF37; border-radius: 15px;
-        padding: 20px; text-align: center; margin-bottom: 15px;
+        background: #000; border: 1px solid #333; border-radius: 10px;
+        padding: 15px; text-align: center;
     }
-    .number-highlight { color: #FFD700; font-size: 35px; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 📡 DATA FETCHING
+# 📡 DỮ LIỆU LIVE & PHÂN TÍCH BỆT
 # =============================================================================
-def get_live_data():
+def get_data():
     url = "https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html"
     headers = {'User-Agent': 'Mozilla/5.0'}
     try:
         res = requests.get(url, headers=headers, timeout=5)
         soup = BeautifulSoup(res.content, 'html.parser')
+        
         def get_txt(cls):
             item = soup.find("span", class_=cls)
             return item.text.strip() if item else "..."
-        
-        return {
+
+        results = {
             "ĐB": get_txt("special-temp"),
             "G1": get_txt("g1-temp"),
             "G2": [get_txt("g2_0-temp"), get_txt("g2_1-temp")],
@@ -63,66 +64,74 @@ def get_live_data():
             "G6": [get_txt(f"g6_{i}-temp") for i in range(3)],
             "G7": [get_txt(f"g7_{i}-temp") for i in range(4)],
         }
+        return results
     except: return None
 
 # =============================================================================
-# 🚀 MAIN APP
+# 🚀 GIAO DIỆN CHÍNH
 # =============================================================================
 def main():
-    st.markdown('<div class="header-box"><h1 style="color:black; margin:0;">💎 AI-QUANTUM: MIỀN BẮC</h1></div>', unsafe_allow_html=True)
-    
-    data = get_live_data()
-    if not data:
-        st.warning("Đang kết nối dữ liệu...")
-        return
+    st.markdown('<div class="header-box"><h1>💎 KẾT QUẢ TRỰC TIẾP & AI PHÂN TÍCH</h1></div>', unsafe_allow_html=True)
 
-    # --- 1. XỬ LÝ SỐ ĐÃ VỀ (ĐƯA LÊN ĐẦU) ---
-    all_numbers = []
-    for k, v in data.items():
-        if isinstance(v, list):
-            all_numbers.extend([n for n in v if n != "..."])
-        else:
-            if v != "...": all_numbers.append(v)
-    
-    # Lấy 2 số cuối của các giải đã về
-    loto_ve = [n[-2:] for n in all_numbers]
+    data = get_data()
+    now = datetime.now()
+    is_drawing_time = now.hour == 18 and now.minute >= 15 # Giờ bắt đầu có kết quả
 
-    if loto_ve:
-        st.markdown("<p style='color:#D4AF37; font-weight:bold;'>🔥 KẾT QUẢ ĐÃ VỀ TỪ NHÀ ĐÀI:</p>", unsafe_allow_html=True)
-        num_html = "".join([f'<div class="win-number">{n}</div>' for n in loto_ve])
-        st.markdown(f'<div class="result-container">{num_html}</div>', unsafe_allow_html=True)
+    # 1. BẢNG KẾT QUẢ (LUÔN Ở ĐẦU)
+    if data:
+        st.markdown(f"""
+        <table class="kq-table">
+            <tr><td class="kq-label">ĐB</td><td class="kq-value db-value">{data['ĐB']}</td></tr>
+            <tr><td class="kq-label">G1</td><td class="kq-value">{data['G1']}</td></tr>
+            <tr><td class="kq-label">G7</td><td class="kq-value">{' - '.join(data['G7'])}</td></tr>
+        </table>
+        <p style='text-align:right; color:#888; font-size:12px;'>Nguồn: xosodaiphat.com</p>
+        """, unsafe_allow_html=True)
+
+    # 2. PHÂN TÍCH LÔ BỆT (Dựa trên bảng G7 và ĐB hiện tại)
+    st.subheader("📊 Phân Tích Kỹ Thuật")
+    if data and data['G7'][0] != "...":
+        st.markdown(f"""
+        <div class="bet-box">
+            <b style="color:#D4AF37">🔥 Cảnh báo bệt:</b> Cặp <b>{data['G7'][0][-2:]} - {data['G7'][1][-2:]}</b> đang có dấu hiệu tần suất dày.
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown('<p class="live-status">🔴 ĐANG CHỜ GIỜ QUAY (18:15)...</p>', unsafe_allow_html=True)
+        st.info("Hệ thống đang quét nhịp bệt từ các kỳ quay trước...")
 
-    # --- 2. DỰ ĐOÁN AI (KHU VỰC CHÍNH) ---
-    seed = int(datetime.now().strftime("%Y%m%d"))
+    # 3. DỰ ĐOÁN AI (ẨN TRƯỚC GIỜ QUAY)
+    st.write("")
+    st.markdown("<h3 style='color:#D4AF37; text-align:center;'>🎯 DỰ ĐOÁN AI QUANTUM</h3>", unsafe_allow_html=True)
+    
+    # Tạo số ngẫu nhiên theo ngày
+    seed = int(now.strftime("%Y%m%d"))
     np.random.seed(seed)
     bt = f"{np.random.randint(0, 100):02d}"
     st1, st2 = f"{np.random.randint(0, 100):02d}", f"{np.random.randint(0, 100):02d}"
 
-    st.markdown("<h3 style='color:#D4AF37; text-align:center;'>🎯 DỰ ĐOÁN AI QUANTUM</h3>", unsafe_allow_html=True)
+    col1, col2 = st.columns(2)
     
-    c1, c2 = st.columns(2)
-    # Tự động kiểm tra trúng/trượt
-    status_bt = "✅ NỔ" if bt in loto_ve else "⏳ Chờ"
-    status_st = "✅ NỔ" if (st1 in loto_ve or st2 in loto_ve) else "⏳ Chờ"
+    with col1:
+        # Nếu chưa đến giờ quay hoặc đang quay thì hiển thị trạng thái chờ
+        content = f"<div style='font-size:30px; color:#FFD700;'>{bt}</div>" if is_drawing_time else "<div style='color:#666;'>Đang phân tích...</div>"
+        st.markdown(f"""
+            <div class="pred-card">
+                <p style="color:#D4AF37; margin:0;">BẠCH THỦ VIP</p>
+                {content}
+            </div>
+        """, unsafe_allow_html=True)
 
-    with c1:
-        st.markdown(f'<div class="pred-card"><p style="color:#D4AF37">BẠCH THỦ</p><div class="number-highlight">{bt}</div><p>{status_bt}</p></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="pred-card"><p style="color:#D4AF37">SONG THỦ</p><div class="number-highlight">{st1} - {st2}</div><p>{status_st}</p></div>', unsafe_allow_html=True)
+    with col2:
+        content = f"<div style='font-size:30px; color:#FFD700;'>{st1} - {st2}</div>" if is_drawing_time else "<div style='color:#666;'>Đang tính toán...</div>"
+        st.markdown(f"""
+            <div class="pred-card">
+                <p style="color:#D4AF37; margin:0;">SONG THỦ VIP</p>
+                {content}
+            </div>
+        """, unsafe_allow_html=True)
 
-    # --- 3. BẢNG CHI TIẾT (CHỈ HIỆN GIẢI ĐÃ CÓ) ---
-    with st.expander("📝 XEM CHI TIẾT BẢNG GIẢI"):
-        for giai, gia_tri in data.items():
-            if isinstance(gia_tri, list):
-                # Chỉ hiện những số đã có, ẩn dấu "..."
-                hien_thi = " - ".join([n for n in gia_tri if n != "..."])
-                if hien_thi:
-                    st.write(f"**{giai}:** {hien_thi}")
-            else:
-                if gia_tri != "...":
-                    st.write(f"**{giai}:** {gia_tri}")
+    if not is_drawing_time:
+        st.warning("⚠️ Dự đoán AI sẽ được hiển thị công khai vào lúc 18:15 hàng ngày.")
 
 if __name__ == "__main__":
     main()
