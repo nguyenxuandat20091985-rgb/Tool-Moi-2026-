@@ -1,5 +1,5 @@
-streamlit
-pandas
-requests
-beautifulsoup4
-streamlit-autorefresh
+streamlit==1.31.0
+requests==2.31.0
+beautifulsoup4==4.12.2
+numpy==1.24.3
+pandas==2.0.3
