@@ -1,5 +1,5 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - AUTO DAILY PREDICTIONS (FIXED)
+# 💎 AI-QUANTUM PRO 2026 - NO EXTERNAL DEPENDENCIES
 # =============================================================================
 import streamlit as st
 import requests
@@ -11,7 +11,7 @@ from collections import Counter
 import json
 import os
 import time
-from streamlit_autorefresh import st_autorefresh
+import re
 
 # =============================================================================
 # 🔧 CẤU HÌNH
@@ -23,13 +23,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Auto-refresh every 120 seconds (2 minutes)
-st_autorefresh(interval=120000, key="auto_refresh", limit=None)
-
 GEMINI_API_KEY = "AIzaSyARQk3lpoHnK51LQ62OR4vciH0XMFFIZjg"
 
 # =============================================================================
-# 🎨 CSS
+# 🎨 CSS + AUTO REFRESH META TAG
 # =============================================================================
 st.markdown("""
 <style>
@@ -73,6 +70,9 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Auto-refresh using meta tag (120 seconds)
+st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
 
 # =============================================================================
 # 💾 STATISTICS
@@ -194,7 +194,7 @@ def save_result_check(today_date, current_data):
     return None
 
 # =============================================================================
-# 📡 SCRAPING - IMPROVED
+# 📡 SCRAPING
 # =============================================================================
 @st.cache_data(ttl=120)
 def get_live_xsmb():
@@ -208,7 +208,6 @@ def get_live_xsmb():
         res.raise_for_status()
         soup = BeautifulSoup(res.content, 'html.parser')
         
-        # Try multiple strategies
         result = extract_data_v1(soup)
         if result["Đặc Biệt"] in ["...", ""]:
             result = extract_data_v2(soup)
@@ -217,11 +216,9 @@ def get_live_xsmb():
         return result
         
     except Exception as e:
-        st.error(f"❌ Lỗi crawl: {str(e)[:100]}")
         return get_mock_data()
 
 def extract_data_v1(soup):
-    """Strategy 1: Class-based selectors"""
     def get_txt(classes):
         if isinstance(classes, str):
             classes = [classes]
@@ -229,8 +226,6 @@ def extract_data_v1(soup):
             item = soup.find("span", class_=cls)
             if item and item.text.strip():
                 text = item.text.strip()
-                # Extract numbers only
-                import re
                 match = re.search(r'(\d+)', text)
                 if match:
                     return match.group(1)
@@ -248,11 +243,7 @@ def extract_data_v1(soup):
     }
 
 def extract_data_v2(soup):
-    """Strategy 2: Pattern matching"""
-    import re
     text = soup.get_text()
-    
-    # Find 5-digit numbers
     numbers = re.findall(r'\b\d{5}\b', text)
     
     return {
@@ -267,7 +258,6 @@ def extract_data_v2(soup):
     }
 
 def get_mock_data():
-    """Fallback data"""
     return {
         "Đặc Biệt": "36948",
         "Giải Nhất": "96041",
@@ -322,7 +312,6 @@ def query_gemini_ai(hot_nums, cold_nums, gan_nums, retry_count=3):
 DỮ LIỆU:
 - Số NÓNG: {', '.join(hot_nums[:5]) if hot_nums else '67, 07, 60, 14, 02'}
 - Số LẠNH: {', '.join(cold_nums[:5]) if cold_nums else '33, 44, 55, 66, 77'}
-- Số GAN: {', '.join([f"{num}({days} ngày)" for num, days in (gan_nums[:5] if gan_nums else [('33',15),('44',12)])])}
 
 TRẢ LỜI JSON:
 {{
@@ -347,7 +336,6 @@ TRẢ LỜI JSON:
                 result = response.json()
                 if 'candidates' in result and len(result['candidates']) > 0:
                     text = result['candidates'][0]['content']['parts'][0]['text']
-                    import re
                     json_match = re.search(r'\{[\s\S]*\}', text)
                     if json_match:
                         ai_result = json.loads(json_match.group())
@@ -456,7 +444,6 @@ def main():
     init_statistics()
     today = datetime.now().strftime("%d/%m")
     
-    # AUTO-CHECK predictions
     today_pred, new_predictions = ensure_predictions_for_today()
     
     # HEADER
@@ -561,7 +548,6 @@ def main():
                 st.cache_data.clear()
                 st.rerun()
         
-        # Display result
         db = data.get("Đặc Biệt", "....")
         st.markdown(f'''
         <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); 
@@ -573,7 +559,6 @@ def main():
         </div>
         ''', unsafe_allow_html=True)
         
-        # CHECK RESULTS
         st.markdown("---")
         st.markdown("### ✅ KIỂM TRA DỰ ĐOÁN HÔM QUA")
         
