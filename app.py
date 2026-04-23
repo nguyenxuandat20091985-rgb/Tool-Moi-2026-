@@ -396,17 +396,20 @@ VIP_TIERS = {
 }
 
 # =============================================================================
-# 💳 PAYMENT - STATIC QR CODE (NO API DEPENDENCY)
+# 💳 PAYMENT - STATIC QR CODE (FIXED - DÙNG st.image)
 # =============================================================================
 def display_pricing_table():
-    """Hiển thị bảng giá với QR Code tĩnh - KHÔNG LỖI"""
+    """Hiển thị bảng giá với QR Code - ĐÃ SỬA LỖI HTML"""
     
-    # 📌 ANH THAY THÔNG TIN TÀI KHOẢN CỦA ANH VÀO ĐÂY
+    # 📌 ANH CẦN UPLOAD QR CODE LÊN IMGUR VÀ THAY LINK VÀO ĐÂY
+    # Hướng dẫn: Vào https://imgur.com/upload → Upload ảnh QR → Copy link
+    QR_CODE_URL = "https://i.imgur.com/PLACEHOLDER.png"  # ← Thay link QR của anh vào đây
+    
+    # Thông tin tài khoản ngân hàng
     BANK_INFO = {
-        'account_name': 'NGUYEN XUAN DAT',           # Tên chủ tài khoản
-        'account_number': '4430269669',              # Số tài khoản
-        'bank': 'BIDV - PGD Quảng Yên',              # Ngân hàng
-        'qr_image_url': 'https://i.imgur.com/PLACEHOLDER.png'  # Link ảnh QR code (anh upload lên imgur.com)
+        'account_name': 'NGUYEN XUAN DAT',
+        'account_number': '4430269669',
+        'bank': 'BIDV - PGD Quảng Yên'
     }
     
     st.markdown('''
@@ -446,48 +449,45 @@ def display_pricing_table():
                 
                 st.success(f"✅ Thông tin chuyển khoản gói **{tier['name']}**")
                 
+                # Hiển thị QR Code bằng st.image (an toàn hơn HTML)
+                st.markdown("### 📱 Quét QR Code để chuyển khoản")
+                
+                col_qr1, col_qr2, col_qr3 = st.columns([1,2,1])
+                with col_qr2:
+                    try:
+                        st.image(QR_CODE_URL, 
+                                caption="📷 Quét bằng app ngân hàng bất kỳ", 
+                                use_column_width=True,
+                                clamp=True)
+                    except:
+                        st.error("❌ Không tải được QR Code. Vui lòng kiểm tra link ảnh.")
+                        st.info("💡 Admin cần upload QR code lên https://imgur.com/upload và cập nhật link")
+                
+                # Thông tin chuyển khoản
                 st.markdown(f'''
-                <div class="payment-details">
-                    <h4 style="color: #58a6ff; margin-top: 0; text-align: center;">📱 Quét QR Code để chuyển khoản</h4>
-                    
-                    <div style="text-align: center; margin: 20px 0;">
-                        <div class="qr-display">
-                            <img src="{BANK_INFO['qr_image_url']}" 
-                                 alt="QR Code thanh toán" 
-                                 style="max-width: 280px; border-radius: 8px;">
-                        </div>
-                        <p style="color: #8b949e; font-size: 13px; margin-top: 10px;">
-                            📷 Quét bằng app ngân hàng bất kỳ
-                        </p>
-                    </div>
-                    
-                    <div style="background: #0d1117; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                        <p style="margin: 8px 0;"><b>👤 Tên tài khoản:</b> <span style="color: #FFD700;">{BANK_INFO['account_name']}</span></p>
-                        <p style="margin: 8px 0;"><b>🔢 Số tài khoản:</b> <span style="color: #FFD700; font-size: 22px; font-weight: bold; letter-spacing: 2px;">{BANK_INFO['account_number']}</span></p>
-                        <p style="margin: 8px 0;"><b>🏦 Ngân hàng:</b> {BANK_INFO['bank']}</p>
-                        <p style="margin: 8px 0;"><b>💰 Số tiền:</b> <span style="color: #3fb950; font-size: 20px; font-weight: bold;">{tier['price']:,} VNĐ</span></p>
-                        <p style="margin: 8px 0;"><b>📝 Nội dung CK:</b> <span style="color: #ffa500; font-weight: 600;">{user_id} ung ho AI Quantum {tier_key}</span></p>
-                    </div>
-                    
-                    <div style="background: rgba(63, 185, 80, 0.15); 
-                                border-left: 4px solid #3fb950; 
-                                padding: 15px; 
-                                border-radius: 6px; 
-                                margin-top: 15px;">
-                        <p style="margin: 0; color: #e6edf3; font-size: 14px;">
-                            <b>✅ Hướng dẫn chi tiết:</b><br><br>
-                            1️⃣ Mở app ngân hàng của bạn (BIDV, Vietcombank, Techcombank...)<br>
-                            2️⃣ Chọn "Quét QR" hoặc "Chuyển khoản"<br>
-                            3️⃣ Quét mã QR trên hoặc nhập số tài khoản: <b>{BANK_INFO['account_number']}</b><br>
-                            4️⃣ Nhập số tiền: <b>{tier['price']:,} VNĐ</b><br>
-                            5️⃣ Nội dung: <b>"{user_id} ung ho AI Quantum {tier_key}"</b> (quan trọng!)<br>
-                            6️⃣ Xác nhận chuyển khoản<br><br>
-                            🎁 VIP sẽ được kích hoạt tự động trong <b>5-10 phút</b> sau khi nhận được CK<br>
-                            📞 Liên hệ admin nếu có vấn đề
-                        </p>
-                    </div>
+                <div style="background: #0d1117; padding: 20px; border-radius: 12px; margin: 20px 0; border: 2px solid #58a6ff;">
+                    <p style="margin: 10px 0; font-size: 16px;"><b>👤 Tên tài khoản:</b> <span style="color: #FFD700;">{BANK_INFO['account_name']}</span></p>
+                    <p style="margin: 10px 0; font-size: 16px;"><b>🔢 Số tài khoản:</b> <span style="color: #FFD700; font-size: 24px; font-weight: bold; letter-spacing: 2px;">{BANK_INFO['account_number']}</span></p>
+                    <p style="margin: 10px 0; font-size: 16px;"><b>🏦 Ngân hàng:</b> {BANK_INFO['bank']}</p>
+                    <p style="margin: 10px 0; font-size: 16px;"><b>💰 Số tiền:</b> <span style="color: #3fb950; font-size: 22px; font-weight: bold;">{tier['price']:,} VNĐ</span></p>
+                    <p style="margin: 10px 0; font-size: 16px;"><b>📝 Nội dung CK:</b> <span style="color: #ffa500; font-weight: 600; background: rgba(255,165,0,0.1); padding: 5px 10px; border-radius: 5px;">{user_id} ung ho AI Quantum {tier_key}</span></p>
                 </div>
                 ''', unsafe_allow_html=True)
+                
+                # Hướng dẫn
+                st.info(f"""
+                **✅ Hướng dẫn chi tiết:**
+                
+                1️⃣ Mở app ngân hàng (BIDV, Vietcombank, Techcombank...)  
+                2️⃣ Chọn "Quét QR" hoặc "Chuyển khoản"  
+                3️⃣ Quét mã QR trên hoặc nhập số TK: **{BANK_INFO['account_number']}**  
+                4️⃣ Nhập số tiền: **{tier['price']:,} VNĐ**  
+                5️⃣ Nội dung: **"{user_id} ung ho AI Quantum {tier_key}"** (quan trọng!)  
+                6️⃣ Xác nhận chuyển khoản  
+                
+                🎁 VIP sẽ được kích hoạt trong **5-10 phút** sau khi nhận được CK  
+                📞 Liên hệ admin nếu có vấn đề
+                """)
             
             st.markdown("</div>", unsafe_allow_html=True)
     
