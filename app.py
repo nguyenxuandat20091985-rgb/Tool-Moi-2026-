@@ -1,6 +1,6 @@
 # =============================================================================
 # 💎 AI-QUANTUM PRO 2026 - FINAL STABLE VERSION
-# Features: Login/Register • VIP PayOS • Auto-Update • Gemini AI • xosodaiphat iframe
+# Features: Login/Register • Static QR Payment • Auto-Update • Gemini AI • xosodaiphat iframe
 # =============================================================================
 import streamlit as st
 import requests
@@ -24,11 +24,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# PayOS Config - CHECKSUM KEY ĐÃ SỬA (xóa 'ao' ở đầu)
-PAYOS_CLIENT_ID = "37ef3e3b-1cff-45bd-b9b6-70f38dcf3244"
-PAYOS_API_KEY = "0c0171bd-9d93-4999-b440-547931e3f65c"
-PAYOS_CHECKSUM_KEY = "bc31bd7d110480ab81d7927dffba4fc7e5cc250b3af716574ac21fe65b946641"
 
 GEMINI_API_KEY = "AIzaSyARQk3lpoHnK51LQ62OR4vciH0XMFFIZjg"
 
@@ -206,21 +201,19 @@ st.markdown("""
         background-color: #2ea043;
     }
     
-    .qr-placeholder {
-        background: #161b22;
-        border: 2px dashed #D4AF37;
-        border-radius: 10px;
-        padding: 30px;
-        text-align: center;
+    .qr-display {
+        background: #fff;
+        padding: 20px;
+        border-radius: 12px;
+        display: inline-block;
         margin: 15px 0;
-        color: #8b949e;
     }
     
-    .payment-info {
+    .payment-details {
         background: rgba(56, 139, 253, 0.1);
-        border: 1px solid #58a6ff;
-        border-radius: 8px;
-        padding: 15px;
+        border: 2px solid #58a6ff;
+        border-radius: 12px;
+        padding: 20px;
         margin: 15px 0;
     }
     
@@ -403,89 +396,19 @@ VIP_TIERS = {
 }
 
 # =============================================================================
-# 💳 PAYOS INTEGRATION - OFFICIAL LIBRARY
+# 💳 PAYMENT - STATIC QR CODE (NO API DEPENDENCY)
 # =============================================================================
-def create_payos_payment(order_code, amount, description):
-    """Tạo link thanh toán PayOS với thư viện chính thức"""
-    try:
-        from payos import PayOS, PaymentData, ItemData
-        
-        # Khởi tạo client
-        payos = PayOS(
-            client_id=PAYOS_CLIENT_ID,
-            api_key=PAYOS_API_KEY,
-            checksum_key=PAYOS_CHECKSUM_KEY
-        )
-        
-        # Tạo order code số nguyên duy nhất
-        numeric_code = int(''.join(filter(str.isdigit, str(order_code))) or str(int(time.time())))
-        
-        # Tạo item và payment data
-        item = ItemData(name=description, quantity=1, price=amount)
-        payment_data = PaymentData(
-            orderCode=numeric_code,
-            amount=amount,
-            description=description,
-            items=[item],
-            cancelUrl="https://google.com",
-            returnUrl="https://google.com"
-        )
-        
-        # Tạo payment link
-        result = payos.createPaymentLink(paymentData=payment_data)
-        
-        return {
-            'checkoutUrl': result.checkoutUrl,
-            'qrCode': result.qrCode
-        }
-        
-    except ImportError:
-        # Fallback nếu chưa cài thư viện payos
-        import hmac
-        data_to_sign = f"{amount}{order_code}{description}https://google.comhttps://google.com{PAYOS_CHECKSUM_KEY}"
-        signature = hmac.new(
-            PAYOS_CHECKSUM_KEY.encode(),
-            data_to_sign.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        payload = {
-            "orderCode": int(''.join(filter(str.isdigit, str(order_code))) or int(time.time())),
-            "amount": amount,
-            "description": description,
-            "signature": signature,
-            "cancelUrl": "https://google.com",
-            "returnUrl": "https://google.com",
-            "items": [{"name": description, "quantity": 1, "price": amount}]
-        }
-        
-        headers = {
-            "x-client-id": PAYOS_CLIENT_ID,
-            "x-api-key": PAYOS_API_KEY,
-            "Content-Type": "application/json"
-        }
-        
-        response = requests.post(
-            "https://api-merchant.payos.vn/v2/payment-requests",
-            json=payload,
-            headers=headers,
-            timeout=30
-        )
-        
-        if response.status_code == 200:
-            result = response.json()
-            data = result.get('data', {})
-            return {
-                'checkoutUrl': data.get('checkoutUrl'),
-                'qrCode': data.get('qrCode')
-            }
-        return None
-        
-    except Exception as e:
-        st.error(f"Lỗi PayOS: {str(e)}")
-        return None
-
 def display_pricing_table():
+    """Hiển thị bảng giá với QR Code tĩnh - KHÔNG LỖI"""
+    
+    # 📌 ANH THAY THÔNG TIN TÀI KHOẢN CỦA ANH VÀO ĐÂY
+    BANK_INFO = {
+        'account_name': 'NGUYEN XUAN DAT',           # Tên chủ tài khoản
+        'account_number': '4430269669',              # Số tài khoản
+        'bank': 'BIDV - PGD Quảng Yên',              # Ngân hàng
+        'qr_image_url': 'https://i.imgur.com/PLACEHOLDER.png'  # Link ảnh QR code (anh upload lên imgur.com)
+    }
+    
     st.markdown('''
     <div style="text-align: center; margin: 30px 0;">
         <h3>🤝 ỦNG HỘ DUY TRÌ DỰ ÁN AI QUANTUM</h3>
@@ -520,45 +443,55 @@ def display_pricing_table():
             
             if st.button(f"🎁 Ủng hộ ngay", key=f"pay_{tier_key}", use_container_width=True):
                 user_id = st.session_state.current_user or 'guest'
-                order_code = f"AIQ_{tier_key}_{int(time.time())}"
-                description = f"Phi dich vu Data {user_id}"
                 
-                with st.spinner("Đang tạo link thanh toán..."):
-                    payment_info = create_payos_payment(order_code, tier['price'], description)
+                st.success(f"✅ Thông tin chuyển khoản gói **{tier['name']}**")
+                
+                st.markdown(f'''
+                <div class="payment-details">
+                    <h4 style="color: #58a6ff; margin-top: 0; text-align: center;">📱 Quét QR Code để chuyển khoản</h4>
                     
-                    if payment_info:
-                        checkout_url = payment_info.get('checkoutUrl')
-                        qr_code_url = payment_info.get('qrCode')
-                        
-                        if checkout_url:
-                            st.success("✅ Quét mã QR hoặc click link để thanh toán")
-                            
-                            if qr_code_url:
-                                st.image(qr_code_url, caption="Quét QR để thanh toán", use_column_width=True)
-                            else:
-                                st.markdown('<div class="qr-placeholder">📱 Quét mã QR từ link thanh toán</div>', unsafe_allow_html=True)
-                            
-                            st.markdown(f'''
-                            <div class="payment-info">
-                                <p style="margin: 0 0 10px 0; font-size: 14px; color: #58a6ff;">🔗 Thanh toán qua link:</p>
-                                <a href="{checkout_url}" target="_blank" 
-                                   style="background: #238636; color: white; padding: 12px 24px; 
-                                          border-radius: 8px; text-decoration: none; font-weight: bold;
-                                          display: inline-block;">
-                                   Thanh toán ngay →
-                                </a>
-                                <p style="margin: 10px 0 0 0; font-size: 13px; color: #8b949e;">
-                                    ⏳ VIP kích hoạt trong 5-10 phút sau thanh toán
-                                </p>
-                            </div>
-                            ''', unsafe_allow_html=True)
-                        else:
-                            st.error("❌ Không nhận được link thanh toán")
-                    else:
-                        st.error("❌ Không thể tạo link thanh toán. Vui lòng thử lại.")
+                    <div style="text-align: center; margin: 20px 0;">
+                        <div class="qr-display">
+                            <img src="{BANK_INFO['qr_image_url']}" 
+                                 alt="QR Code thanh toán" 
+                                 style="max-width: 280px; border-radius: 8px;">
+                        </div>
+                        <p style="color: #8b949e; font-size: 13px; margin-top: 10px;">
+                            📷 Quét bằng app ngân hàng bất kỳ
+                        </p>
+                    </div>
+                    
+                    <div style="background: #0d1117; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <p style="margin: 8px 0;"><b>👤 Tên tài khoản:</b> <span style="color: #FFD700;">{BANK_INFO['account_name']}</span></p>
+                        <p style="margin: 8px 0;"><b>🔢 Số tài khoản:</b> <span style="color: #FFD700; font-size: 22px; font-weight: bold; letter-spacing: 2px;">{BANK_INFO['account_number']}</span></p>
+                        <p style="margin: 8px 0;"><b>🏦 Ngân hàng:</b> {BANK_INFO['bank']}</p>
+                        <p style="margin: 8px 0;"><b>💰 Số tiền:</b> <span style="color: #3fb950; font-size: 20px; font-weight: bold;">{tier['price']:,} VNĐ</span></p>
+                        <p style="margin: 8px 0;"><b>📝 Nội dung CK:</b> <span style="color: #ffa500; font-weight: 600;">{user_id} ung ho AI Quantum {tier_key}</span></p>
+                    </div>
+                    
+                    <div style="background: rgba(63, 185, 80, 0.15); 
+                                border-left: 4px solid #3fb950; 
+                                padding: 15px; 
+                                border-radius: 6px; 
+                                margin-top: 15px;">
+                        <p style="margin: 0; color: #e6edf3; font-size: 14px;">
+                            <b>✅ Hướng dẫn chi tiết:</b><br><br>
+                            1️⃣ Mở app ngân hàng của bạn (BIDV, Vietcombank, Techcombank...)<br>
+                            2️⃣ Chọn "Quét QR" hoặc "Chuyển khoản"<br>
+                            3️⃣ Quét mã QR trên hoặc nhập số tài khoản: <b>{BANK_INFO['account_number']}</b><br>
+                            4️⃣ Nhập số tiền: <b>{tier['price']:,} VNĐ</b><br>
+                            5️⃣ Nội dung: <b>"{user_id} ung ho AI Quantum {tier_key}"</b> (quan trọng!)<br>
+                            6️⃣ Xác nhận chuyển khoản<br><br>
+                            🎁 VIP sẽ được kích hoạt tự động trong <b>5-10 phút</b> sau khi nhận được CK<br>
+                            📞 Liên hệ admin nếu có vấn đề
+                        </p>
+                    </div>
+                </div>
+                ''', unsafe_allow_html=True)
             
             st.markdown("</div>", unsafe_allow_html=True)
     
+    # Legal disclaimer
     st.markdown('''
     <div style="background: rgba(248, 81, 73, 0.1); border-left: 4px solid #f85149;
                 padding: 15px; border-radius: 0 8px 8px 0; margin: 25px 0; font-size: 14px;">
@@ -566,7 +499,7 @@ def display_pricing_table():
         • Khoản thanh toán là phí dịch vụ cung cấp dữ liệu thống kê và công cụ phân tích AI.<br>
         • Ứng dụng không cung cấp dịch vụ cá cược, không tổ chức đánh bạc.<br>
         • Người dùng tự chịu trách nhiệm với hành vi sử dụng dữ liệu.<br>
-        • Mọi giao dịch được ghi nhận minh bạch qua PayOS.
+        • Mọi giao dịch chuyển khoản được ghi nhận minh bạch.
     </div>
     ''', unsafe_allow_html=True)
 
