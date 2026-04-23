@@ -1,6 +1,6 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - FULL FEATURE EDITION (FINAL)
-# Authentication • VIP Tiers • PayOS • Admin • Analytics • Legal-Safe
+# 💎 AI-QUANTUM PRO 2026 - STABLE EDITION
+# Fixed: Auto-logout, QR Code, Text Clarity, Stability
 # =============================================================================
 import streamlit as st
 import requests
@@ -17,9 +17,12 @@ import hashlib
 import secrets
 import uuid
 import hmac
+import qrcode
+from PIL import Image
+import io
 
 # =============================================================================
-# 🔧 CẤU HÌNH
+# 🔧 CẤU HÌNH - KHÔNG AUTO REFRESH META TAG
 # =============================================================================
 st.set_page_config(
     page_title="💎 AI-QUANTUM PRO 2026 | Data Analytics",
@@ -28,10 +31,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Auto-refresh meta tag (120 seconds)
-st.markdown('<meta http-equiv="refresh" content="120">', unsafe_allow_html=True)
-
-# PayOS Config - Load từ secrets nếu có, fallback cho dev
+# PayOS Config
 try:
     PAYOS_CLIENT_ID = st.secrets.get("PAYOS_CLIENT_ID", "37ef3e3b-1cff-45bd-b9b6-70f38dcf3244")
     PAYOS_API_KEY = st.secrets.get("PAYOS_API_KEY", "0c0171bd-9d93-4999-b440-547931e3f65c")
@@ -44,91 +44,186 @@ except:
 GEMINI_API_KEY = "AIzaSyARQk3lpoHnK51LQ62OR4vciH0XMFFIZjg"
 
 # =============================================================================
-# 🎨 CSS STYLING
+# 🎨 CSS - TEXT RÕ RÀNG HƠN
 # =============================================================================
 st.markdown("""
 <style>
-    .main { background-color: #0a0a0f; color: #ffffff; }
-    .stApp { background-color: #0a0a0f; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    * { font-family: 'Inter', sans-serif; }
+    
+    .main { 
+        background-color: #0a0a0f; 
+        color: #ffffff; 
+        font-size: 16px;
+    }
+    .stApp { 
+        background-color: #0a0a0f; 
+    }
     
     .header-gold {
         background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #B8962E 100%);
-        padding: 20px; border-radius: 15px; text-align: center; 
-        color: #000; font-weight: bold; margin-bottom: 20px;
+        padding: 25px; 
+        border-radius: 15px; 
+        text-align: center; 
+        color: #000; 
+        font-weight: bold; 
+        margin-bottom: 25px;
         box-shadow: 0 4px 20px rgba(212, 175, 55, 0.5);
     }
     
     .stat-card {
         background: linear-gradient(135deg, #1a1a2e, #16213e);
-        border: 2px solid #D4AF37; border-radius: 12px;
-        padding: 15px; text-align: center; margin: 5px;
+        border: 2px solid #D4AF37; 
+        border-radius: 12px;
+        padding: 15px; 
+        text-align: center; 
+        margin: 5px;
     }
-    .stat-value { font-size: 28px; font-weight: bold; color: #FFD700; }
-    .stat-label { font-size: 12px; color: #888; margin-top: 5px; }
+    .stat-value { 
+        font-size: 32px; 
+        font-weight: bold; 
+        color: #FFD700; 
+    }
+    .stat-label { 
+        font-size: 14px; 
+        color: #ccc; 
+        margin-top: 5px; 
+    }
     .win { color: #00ff88; font-weight: bold; }
     .loss { color: #ff4b4b; font-weight: bold; }
     
     .pred-box {
-        border: 2px solid #D4AF37; border-radius: 12px;
-        padding: 20px; background: linear-gradient(135deg, #111, #1a1a2e);
-        text-align: center; margin: 8px 0;
+        border: 2px solid #D4AF37; 
+        border-radius: 12px;
+        padding: 25px; 
+        background: linear-gradient(135deg, #111, #1a1a2e);
+        text-align: center; 
+        margin: 10px 0;
     }
     .xien-box {
-        border: 3px solid #FFD700; border-radius: 15px;
-        padding: 25px; background: linear-gradient(135deg, #1a1a2e, #2d2d44);
-        text-align: center; margin: 10px 0;
+        border: 3px solid #FFD700; 
+        border-radius: 15px;
+        padding: 30px; 
+        background: linear-gradient(135deg, #1a1a2e, #2d2d44);
+        text-align: center; 
+        margin: 15px 0;
         box-shadow: 0 8px 32px rgba(212, 175, 55, 0.4);
     }
     
     .disclaimer {
-        background: rgba(255, 107, 107, 0.15);
+        background: rgba(255, 107, 107, 0.2);
         border-left: 4px solid #ff6b6b;
-        padding: 12px; border-radius: 0 8px 8px 0;
-        margin: 15px 0; font-size: 13px;
+        padding: 15px; 
+        border-radius: 0 8px 8px 0;
+        margin: 20px 0; 
+        font-size: 14px;
     }
     .info-banner {
         background: linear-gradient(135deg, rgba(66, 133, 244, 0.2), rgba(52, 168, 83, 0.2));
-        border: 2px solid #4285F4; border-radius: 10px;
-        padding: 15px; margin: 10px 0; text-align: center;
+        border: 2px solid #4285F4; 
+        border-radius: 10px;
+        padding: 20px; 
+        margin: 15px 0; 
+        text-align: center;
+        font-size: 16px;
     }
     
     .vip-badge {
         background: linear-gradient(135deg, #FFD700, #FFA500);
-        color: #000; padding: 3px 12px; border-radius: 15px;
-        font-size: 11px; font-weight: bold; display: inline-block;
+        color: #000; 
+        padding: 5px 15px; 
+        border-radius: 20px;
+        font-size: 12px; 
+        font-weight: bold; 
+        display: inline-block;
     }
     .free-badge {
-        background: #444; color: #aaa; padding: 3px 12px; 
-        border-radius: 15px; font-size: 11px; display: inline-block;
+        background: #555; 
+        color: #fff; 
+        padding: 5px 15px; 
+        border-radius: 20px; 
+        font-size: 12px; 
+        font-weight: bold;
+        display: inline-block;
     }
     
     .pricing-card {
-        border: 2px solid #D4AF37; border-radius: 15px;
-        padding: 20px; background: linear-gradient(135deg, #1a1a2e, #16213e);
-        text-align: center; margin: 10px 0;
+        border: 2px solid #D4AF37; 
+        border-radius: 15px;
+        padding: 25px; 
+        background: linear-gradient(135deg, #1a1a2e, #16213e);
+        text-align: center; 
+        margin: 15px 0;
     }
     .pricing-card.premium {
         border-color: #FFD700;
         box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
     }
     
-    .feature-list { text-align: left; font-size: 13px; margin: 10px 0; }
-    .feature-list div { margin: 5px 0; color: #ccc; }
-    .feature-list .check { color: #00ff88; }
+    .feature-list { 
+        text-align: left; 
+        font-size: 15px; 
+        margin: 15px 0; 
+    }
+    .feature-list div { 
+        margin: 8px 0; 
+        color: #ddd; 
+        font-size: 15px;
+    }
+    .feature-list .check { 
+        color: #00ff88; 
+        font-weight: bold;
+    }
     
     .login-box {
         background: linear-gradient(135deg, #1a1a2e, #16213e);
-        border: 2px solid #D4AF37; border-radius: 15px;
-        padding: 30px; max-width: 400px; margin: 50px auto;
+        border: 2px solid #D4AF37; 
+        border-radius: 15px;
+        padding: 35px; 
+        max-width: 450px; 
+        margin: 50px auto;
+    }
+    
+    .result-number {
+        font-size: 48px; 
+        font-weight: bold; 
+        color: #ff4b4b; 
+        letter-spacing: 8px;
+        text-shadow: 0 0 20px rgba(255, 75, 75, 0.6);
+    }
+    
+    .qr-code-container {
+        background: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        display: inline-block;
+        margin: 15px 0;
+    }
+    
+    h1, h2, h3, h4 {
+        font-weight: 700;
+        color: #fff;
+    }
+    
+    .stTextInput > div > div > input {
+        font-size: 16px;
+        color: #000;
+    }
+    
+    .stButton > button {
+        font-size: 16px;
+        font-weight: 600;
+        padding: 10px 24px;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 🔐 AUTHENTICATION SYSTEM (FIXED)
+# 🔐 AUTHENTICATION SYSTEM - FIXED SESSION
 # =============================================================================
 def init_auth():
-    """Khởi tạo hệ thống authentication - ĐÃ FIX GUEST USER"""
+    """Khởi tạo authentication với session persistent"""
     if 'users' not in st.session_state:
         st.session_state.users = {
             'admin': {
@@ -139,7 +234,7 @@ def init_auth():
                 'is_active': True,
                 'created_at': datetime.now().isoformat()
             },
-            'guest': {  # ✅ THÊM GUEST USER ĐỂ TRÁNH LỖI
+            'guest': {
                 'password_hash': '',
                 'role': 'user',
                 'email': None,
@@ -153,8 +248,8 @@ def init_auth():
     if 'current_user' not in st.session_state:
         st.session_state.current_user = None
     
-    if 'sessions' not in st.session_state:
-        st.session_state.sessions = {}
+    if 'login_time' not in st.session_state:
+        st.session_state.login_time = None
     
     # Load users from file
     if os.path.exists('users.json'):
@@ -168,45 +263,37 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def login(username, password):
-    """Đăng nhập người dùng"""
+    """Đăng nhập - Lưu session"""
     users = st.session_state.get('users', {})
     user = users.get(username)
     
     if user and user.get('is_active', True) and user['password_hash'] == hash_password(password):
-        token = secrets.token_urlsafe(32)
-        st.session_state.sessions[token] = {
-            'username': username,
-            'role': user['role'],
-            'vip_tier': user.get('vip_tier'),
-            'vip_until': user.get('vip_until'),
-            'expires_at': (datetime.now() + timedelta(hours=24)).isoformat()
-        }
         st.session_state.current_user = username
+        st.session_state.login_time = datetime.now()
         track_event(username, 'login')
-        return token
-    return None
+        return True
+    return False
 
 def logout():
     """Đăng xuất"""
     if st.session_state.current_user:
         track_event(st.session_state.current_user, 'logout')
     st.session_state.current_user = None
-    st.session_state.sessions = {}
+    st.session_state.login_time = None
 
-def check_auth():
-    """Kiểm tra session hiện tại"""
-    if not st.session_state.current_user:
-        return None
+def check_session_valid():
+    """Kiểm tra session còn valid không (24 hours)"""
+    if not st.session_state.current_user or not st.session_state.login_time:
+        return False
     
-    sessions = st.session_state.get('sessions', {})
-    for token, session in sessions.items():
-        if session['username'] == st.session_state.current_user:
-            if datetime.fromisoformat(session['expires_at']) > datetime.now():
-                return session
-    return None
+    # Session valid trong 24 hours
+    if datetime.now() - st.session_state.login_time > timedelta(hours=24):
+        logout()
+        return False
+    return True
 
 def get_user_info(username=None):
-    """Lấy thông tin user - SAFE CHECK"""
+    """Lấy thông tin user"""
     if username is None:
         username = st.session_state.current_user
     if not username:
@@ -273,17 +360,14 @@ def toggle_user_active(username, active):
     return False
 
 # =============================================================================
-# 📊 ANALYTICS TRACKING (FIXED IP HASH)
+# 📊 ANALYTICS TRACKING
 # =============================================================================
 def track_event(user_id, action, metadata=None):
-    """Ghi log sự kiện người dùng - SAFE IP HASH"""
-    # Safe IP hash extraction
+    """Ghi log sự kiện người dùng"""
     try:
-        if hasattr(st, 'context') and st.context:
-            ip = st.context.headers.get('X-Forwarded-For', 'unknown')
-        else:
-            ip = 'unknown'
-        ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+        ip_hash = hashlib.sha256(
+            str(st.context.headers.get('X-Forwarded-For', 'unknown')).encode()
+        ).hexdigest()[:16] if hasattr(st, 'context') else 'unknown'
     except:
         ip_hash = 'unknown'
     
@@ -297,20 +381,26 @@ def track_event(user_id, action, metadata=None):
     
     logs = []
     if os.path.exists('analytics.jsonl'):
-        with open('analytics.jsonl', 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        logs.append(json.loads(line))
-                    except:
-                        continue
+        try:
+            with open('analytics.jsonl', 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            logs.append(json.loads(line))
+                        except:
+                            continue
+        except:
+            pass
     
     logs.append(log_entry)
     logs = logs[-10000:]
     
-    with open('analytics.jsonl', 'w', encoding='utf-8') as f:
-        for log in logs:
-            f.write(json.dumps(log, ensure_ascii=False) + '\n')
+    try:
+        with open('analytics.jsonl', 'w', encoding='utf-8') as f:
+            for log in logs:
+                f.write(json.dumps(log, ensure_ascii=False) + '\n')
+    except:
+        pass
 
 def get_analytics_summary(days=7):
     """Thống kê đơn giản"""
@@ -320,20 +410,23 @@ def get_analytics_summary(days=7):
     cutoff = datetime.now() - timedelta(days=days)
     stats = {'total_users': set(), 'actions': Counter(), 'vip_signups': 0}
     
-    with open('analytics.jsonl', 'r', encoding='utf-8') as f:
-        for line in f:
-            if not line.strip():
-                continue
-            try:
-                log = json.loads(line)
-                log_time = datetime.fromisoformat(log['timestamp'])
-                if log_time >= cutoff:
-                    stats['total_users'].add(log['user_id'])
-                    stats['actions'][log['action']] += 1
-                    if log['action'] == 'vip_signup':
-                        stats['vip_signups'] += 1
-            except:
-                continue
+    try:
+        with open('analytics.jsonl', 'r', encoding='utf-8') as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    log = json.loads(line)
+                    log_time = datetime.fromisoformat(log['timestamp'])
+                    if log_time >= cutoff:
+                        stats['total_users'].add(log['user_id'])
+                        stats['actions'][log['action']] += 1
+                        if log['action'] == 'vip_signup':
+                            stats['vip_signups'] += 1
+                except:
+                    continue
+    except:
+        pass
     
     stats['total_users'] = len(stats['total_users'])
     return stats
@@ -350,7 +443,6 @@ VIP_TIERS = {
             "Dự đoán cơ bản",
             "Kết quả real-time",
             "Thống kê 7 ngày",
-            "Có quảng cáo"
         ],
         "ai_priority": "normal",
         "data_depth": 7
@@ -401,13 +493,13 @@ VIP_TIERS = {
 }
 
 # =============================================================================
-# 💳 PAYOS INTEGRATION (FIXED CHECKSUM)
+# 💳 PAYOS INTEGRATION WITH QR CODE
 # =============================================================================
-def create_payos_payment(order_code, amount, description, return_url, cancel_url):
-    """Tạo link thanh toán PayOS - CHECKSUM FORMAT ĐÚNG"""
+def create_payos_payment(order_code, amount, description):
+    """Tạo link thanh toán PayOS và QR code"""
     
-    # Generate checksum theo format PayOS: amount + orderCode + description + cancelUrl + returnUrl + checksumKey
-    data_to_sign = f"{amount}{order_code}{description}{cancel_url}{return_url}{PAYOS_CHECKSUM_KEY}"
+    # Generate checksum
+    data_to_sign = f"{amount}{order_code}{description}{PAYOS_CHECKSUM_KEY}"
     signature = hmac.new(
         PAYOS_CHECKSUM_KEY.encode(),
         data_to_sign.encode(),
@@ -418,8 +510,6 @@ def create_payos_payment(order_code, amount, description, return_url, cancel_url
         "orderCode": order_code,
         "amount": amount,
         "description": description,
-        "returnUrl": return_url,
-        "cancelUrl": cancel_url,
         "signature": signature,
         "items": [{"name": description, "quantity": 1, "price": amount}]
     }
@@ -440,19 +530,40 @@ def create_payos_payment(order_code, amount, description, return_url, cancel_url
         
         if response.status_code == 200:
             result = response.json()
-            return result.get('data', {}).get('checkoutUrl')
-        
+            data = result.get('data', {})
+            return {
+                'checkoutUrl': data.get('checkoutUrl'),
+                'qrCode': data.get('qrCode')
+            }
         return None
+    except Exception as e:
+        st.error(f"Lỗi thanh toán: {str(e)}")
+        return None
+
+def generate_qr_code(url):
+    """Tạo QR code từ URL"""
+    try:
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(url)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        return img
     except:
         return None
 
 def display_pricing_table():
-    """Hiển thị bảng giá VIP"""
+    """Hiển thị bảng giá VIP với QR Code"""
     
     st.markdown('''
     <div style="text-align: center; margin: 30px 0;">
         <h3>🤝 ỦNG HỘ DUY TRÌ DỰ ÁN AI QUANTUM</h3>
-        <p style="color: #888; font-size: 14px;">
+        <p style="color: #aaa; font-size: 15px;">
             Mọi khoản đóng góp sẽ được sử dụng để duy trì máy chủ và nâng cấp thuật toán AI.<br>
             <b>Ứng dụng cung cấp dữ liệu thống kê khoa học, không phải dịch vụ cá cược.</b>
         </p>
@@ -469,9 +580,9 @@ def display_pricing_table():
         with cols[idx]:
             st.markdown(f'''
             <div class="pricing-card{' premium' if is_premium else ''}">
-                <h4 style="color: #FFD700; margin: 0;">{tier['name']}</h4>
-                <h2 style="color: #fff; margin: 10px 0;">{tier['price']:,} VNĐ</h2>
-                <p style="color: #888; font-size: 12px;">
+                <h4 style="color: #FFD700; margin: 0; font-size: 20px;">{tier['name']}</h4>
+                <h2 style="color: #fff; margin: 15px 0; font-size: 32px;">{tier['price']:,} VNĐ</h2>
+                <p style="color: #888; font-size: 14px;">
                     /{'tháng' if tier['duration_days']==30 else 'quý' if tier['duration_days']==90 else 'năm'}
                 </p>
             ''', unsafe_allow_html=True)
@@ -486,38 +597,42 @@ def display_pricing_table():
                 order_code = f"AIQ_{tier_key}_{uuid.uuid4().hex[:8].upper()}"
                 description = f"Phi dich vu Data {user_id}"
                 
-                # Get current URL for return/cancel
-                try:
-                    current_url = st.context.page_url if hasattr(st, 'context') else ""
-                except:
-                    current_url = ""
-                
-                checkout_url = create_payos_payment(
-                    order_code=order_code,
-                    amount=tier['price'],
-                    description=description,
-                    return_url=current_url + "?payment=success",
-                    cancel_url=current_url + "?payment=cancel"
-                )
-                
-                if checkout_url:
-                    st.markdown(f'''
-                    <div style="margin-top: 10px;">
-                        <a href="{checkout_url}" target="_blank" 
-                           style="background: #00ff88; color: #000; padding: 10px 20px; 
-                                  border-radius: 8px; text-decoration: none; font-weight: bold;
-                                  display: block;">
-                           🔗 Thanh toán qua PayOS
-                        </a>
-                    </div>
-                    ''', unsafe_allow_html=True)
+                with st.spinner("Đang tạo QR code..."):
+                    payment_info = create_payos_payment(order_code, tier['price'], description)
+                    
+                    if payment_info and payment_info.get('qrCode'):
+                        st.success("✅ Quét mã QR để thanh toán")
+                        
+                        # Hiển thị QR code
+                        qr_img = generate_qr_code(payment_info['qrCode'])
+                        if qr_img:
+                            st.image(qr_img, caption="Quét QR để thanh toán", use_column_width=True)
+                        
+                        st.markdown(f'''
+                        <div style="margin-top: 15px; padding: 15px; background: rgba(0,255,136,0.1); 
+                                    border-radius: 8px; text-align: center;">
+                            <p style="margin: 0; font-size: 14px; color: #00ff88;">
+                                🔗 Hoặc click vào link bên dưới:
+                            </p>
+                            <a href="{payment_info['checkoutUrl']}" target="_blank" 
+                               style="background: #00ff88; color: #000; padding: 12px 24px; 
+                                      border-radius: 8px; text-decoration: none; font-weight: bold;
+                                      display: inline-block; margin-top: 10px;">
+                               Thanh toán ngay
+                            </a>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                        
+                        st.info("⏳ Sau khi thanh toán, hệ thống sẽ tự động kích hoạt VIP trong 5-10 phút")
+                    else:
+                        st.error("❌ Không thể tạo mã QR. Vui lòng thử lại.")
             
             st.markdown("</div>", unsafe_allow_html=True)
     
     # Legal disclaimer
     st.markdown('''
-    <div style="background: rgba(255, 107, 107, 0.1); border-left: 4px solid #ff6b6b;
-                padding: 15px; border-radius: 0 8px 8px 0; margin: 20px 0; font-size: 12px;">
+    <div style="background: rgba(255, 107, 107, 0.2); border-left: 4px solid #ff6b6b;
+                padding: 15px; border-radius: 0 8px 8px 0; margin: 25px 0; font-size: 14px;">
         <b>⚖️ LƯU Ý PHÁP LÝ:</b><br>
         • Khoản thanh toán là phí dịch vụ cung cấp dữ liệu thống kê và công cụ phân tích AI.<br>
         • Ứng dụng không cung cấp dịch vụ cá cược, không tổ chức đánh bạc.<br>
@@ -603,13 +718,11 @@ def admin_panel():
                 status = "✅ Active" if info.get('is_active', True) else "❌ Locked"
                 st.write(f"**Status:** {status}")
                 
-                # Toggle active
                 new_status = not info.get('is_active', True)
                 if st.button("🔒 Khóa" if info.get('is_active', True) else "🔓 Mở", key=f"toggle_{username}"):
                     toggle_user_active(username, new_status)
                     st.rerun()
     
-    # Create new user
     with st.expander("➕ Tạo tài khoản mới"):
         new_user = st.text_input("Username")
         new_pass = st.text_input("Password", type="password")
@@ -801,7 +914,7 @@ def get_mock_data():
     }
 
 # =============================================================================
-# 🧠 BẠC NHỚ & PREDICTION
+# 🧠 PREDICTION ENGINE
 # =============================================================================
 def generate_bac_nho(historical_data):
     pairs_counter = Counter()
@@ -935,15 +1048,17 @@ def get_historical_data(days=30):
     return historical
 
 # =============================================================================
-# 🚀 MAIN APP (FINAL - ALL FIXES APPLIED)
+# 🚀 MAIN APP
 # =============================================================================
 def main():
     init_auth()
     init_statistics()
-    today = datetime.now().strftime("%d/%m")
     
-    # Check auth
-    user_session = check_auth()
+    # Check session validity
+    if not check_session_valid():
+        st.session_state.current_user = None
+    
+    today = datetime.now().strftime("%d/%m")
     current_user = st.session_state.current_user
     user_tier = get_vip_tier()
     
@@ -951,8 +1066,8 @@ def main():
     if not current_user:
         st.markdown(f'''
         <div class="header-gold">
-            <h1 style="margin:0;">💎 AI-QUANTUM PRO 2026</h1>
-            <p style="margin:5px 0 0;">📊 Data Analytics Platform</p>
+            <h1 style="margin:0; font-size: 36px;">💎 AI-QUANTUM PRO 2026</h1>
+            <p style="margin:10px 0 0; font-size: 18px;">📊 Data Analytics Platform</p>
         </div>
         ''', unsafe_allow_html=True)
         
@@ -964,8 +1079,7 @@ def main():
             password = st.text_input("Password", type="password", key="login_pass")
             
             if st.button("Đăng nhập", use_container_width=True, type="primary"):
-                token = login(username, password)
-                if token:
+                if login(username, password):
                     st.success("✅ Đăng nhập thành công!")
                     time.sleep(1)
                     st.rerun()
@@ -986,39 +1100,42 @@ def main():
         
         st.markdown('</div>', unsafe_allow_html=True)
         
-        # Public preview
         st.markdown("### 👥 Dùng thử miễn phí")
         st.info("🔓 Bạn có thể dùng thử các tính năng cơ bản mà không cần đăng nhập.")
         
         if st.button("➡️ Tiếp tục với tài khoản Free", use_container_width=True):
             st.session_state.current_user = "guest"
+            st.session_state.login_time = datetime.now()
             st.rerun()
         
         display_terms()
         return
     
     # AUTHENTICATED APP
-    today_pred, new_predictions = ensure_predictions_for_today()
+    try:
+        today_pred, new_predictions = ensure_predictions_for_today()
+    except Exception as e:
+        st.error(f"Lỗi tải dự đoán: {str(e)}")
+        st.stop()
     
     # HEADER
     st.markdown(f'''
     <div class="header-gold">
-        <h1 style="margin:0; display:flex; justify-content:space-between; align-items:center;">
+        <h1 style="margin:0; display:flex; justify-content:space-between; align-items:center; font-size: 32px;">
             <span>💎 AI-QUANTUM PRO 2026</span>
-            <span style="font-size:14px;">
+            <span style="font-size:16px;">
                 👤 {current_user} 
                 <span class="{'vip-badge' if is_vip() else 'free-badge'}">
                     {VIP_TIERS[user_tier]['name'] if is_vip() else 'Free'}
                 </span>
             </span>
         </h1>
-        <p style="margin:5px 0 0;">📊 Data Analytics Platform • Auto Refresh 120s</p>
+        <p style="margin:10px 0 0; font-size: 16px;">📊 Data Analytics Platform</p>
     </div>
     ''', unsafe_allow_html=True)
     
     # SIDEBAR
     with st.sidebar:
-        # User info
         st.markdown(f"### 👤 {current_user}")
         if is_vip():
             user_info = get_user_info()
@@ -1031,193 +1148,235 @@ def main():
         
         st.divider()
         
-        # ✅ FIX: Navigation với safe admin check
         user_info = get_user_info()
         if user_info and user_info.get('role') == 'admin':
-            menu_options = ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử", "👑 Admin"]
+            menu_options = ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử", "🌐 Website XS", "👑 Admin"]
         else:
-            menu_options = ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử"]
+            menu_options = ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử", "🌐 Website XS"]
+        
         page = st.radio("🧭 Menu", menu_options)
         
         st.divider()
         
-        # ✅ FIX: Admin analytics với safe check
         if user_info and user_info.get('role') == 'admin':
             st.markdown("### 📈 Analytics")
-            analytics = get_analytics_summary(7)
-            st.write(f"Users (7d): {analytics['total_users']}")
-            st.write(f"VIP signups: {analytics['vip_signups']}")
+            try:
+                analytics = get_analytics_summary(7)
+                st.write(f"Users (7d): {analytics['total_users']}")
+                st.write(f"VIP signups: {analytics['vip_signups']}")
+            except:
+                st.write("Không có dữ liệu")
         
         display_terms()
     
     # MAIN CONTENT
-    if page == "🎯 Dự đoán":
-        st.markdown(f'''
-        <div class="info-banner">
-            <b>📅 DỰ LIỆU PHÂN TÍCH NGÀY {today}</b><br>
-            <small>Auto-refresh mỗi 120 giây • Dữ liệu tham khảo</small>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown("### 📡 KẾT QUẢ THAM KHẢO")
-        
-        data = get_live_xsmb()
-        historical = get_historical_data(30 if user_tier == 'free' else VIP_TIERS[user_tier]['data_depth'])
-        
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.caption(f"🕐 Cập nhật: **{data.get('time', 'N/A')}**")
-        with col2:
-            if st.button("🔄 Làm mới", use_container_width=True):
-                st.cache_data.clear()
-                st.rerun()
-        
-        db = data.get("Đặc Biệt", "....")
-        st.markdown(f'''
-        <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); 
-                    border: 2px solid #D4AF37; border-radius: 15px; 
-                    padding: 20px; text-align: center; margin: 10px 0;">
-            <div style="font-size: 18px; color: #aaa; margin-bottom: 10px;">📊 DỮ LIỆU THAM KHẢO</div>
-            <div style="font-size: 42px; color: #ff4b4b; font-weight: bold; letter-spacing: 6px;">{db}</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("### ✅ KIỂM TRA DỮ LIỆU NGÀY TRƯỚC")
-        
-        if st.button(f"🔍 Check dữ liệu ngày {today}", use_container_width=True, type="primary"):
-            result = save_result_check(today, data)
-            if result:
-                st.success(f"✅ Đã cập nhật kết quả!")
+    try:
+        if page == "🎯 Dự đoán":
+            st.markdown(f'''
+            <div class="info-banner">
+                <b>📅 DỰ LIỆU PHÂN TÍCH NGÀY {today}</b><br>
+                <small>Dữ liệu tham khảo</small>
+            </div>
+            ''', unsafe_allow_html=True)
+            
+            st.markdown("### 📡 KẾT QUẢ THAM KHẢO")
+            
+            try:
+                data = get_live_xsmb()
+            except:
+                data = get_mock_data()
+            
+            historical = get_historical_data(30 if user_tier == 'free' else VIP_TIERS[user_tier]['data_depth'])
+            
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.caption(f"🕐 Cập nhật: **{data.get('time', 'N/A')}**")
+            with col2:
+                if st.button("🔄 Làm mới", use_container_width=True):
+                    st.cache_data.clear()
+                    st.rerun()
+            
+            db = data.get("Đặc Biệt", "....")
+            st.markdown(f'''
+            <div style="background: linear-gradient(135deg, #1a1a2e, #16213e); 
+                        border: 2px solid #D4AF37; border-radius: 15px; 
+                        padding: 30px; text-align: center; margin: 15px 0;">
+                <div style="font-size: 20px; color: #aaa; margin-bottom: 15px;">📊 DỮ LIỆU THAM KHẢO</div>
+                <div class="result-number">{db}</div>
+            </div>
+            ''', unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.markdown("### ✅ KIỂM TRA DỮ LIỆU NGÀY TRƯỚC")
+            
+            if st.button(f"🔍 Check dữ liệu ngày {today}", use_container_width=True, type="primary"):
+                try:
+                    result = save_result_check(today, data)
+                    if result:
+                        st.success(f"✅ Đã cập nhật kết quả!")
+                        st.markdown(f'''
+                        <div style="background: rgba(212, 175, 55, 0.2); 
+                                    border-left: 4px solid #D4AF37; padding: 20px; border-radius: 0 8px 8px 0; margin: 15px 0;">
+                            <b style="font-size: 16px;">📅 {result['pred_date']} → {result['check_date']}</b>
+                            <div style="margin-top: 15px;">
+                                <div style="padding: 12px; border-bottom: 1px solid #2a2a4a; display: flex; justify-content: space-between; font-size: 15px;">
+                                    <span>📊 Data 1: <b>{result['bach_thu']['number']}</b></span>
+                                    <span class="{'win' if result['bach_thu']['win'] else 'loss'}">{'✅' if result['bach_thu']['win'] else '❌'}</span>
+                                </div>
+                                <div style="padding: 12px; border-bottom: 1px solid #2a2a4a; display: flex; justify-content: space-between; font-size: 15px;">
+                                    <span>📊 Data 2: <b>{'-'.join(result['song_thu']['numbers'])}</b></span>
+                                    <span class="{'win' if result['song_thu']['win'] else 'loss'}">{'✅' if result['song_thu']['win'] else '❌'}</span>
+                                </div>
+                                <div style="padding: 12px; border-bottom: 1px solid #2a2a4a; display: flex; justify-content: space-between; font-size: 15px;">
+                                    <span>📊 Data 3: <b>{result['xien_2']['pair']}</b></span>
+                                    <span class="{'win' if result['xien_2']['win'] else 'loss'}">{'✅' if result['xien_2']['win'] else '❌'}</span>
+                                </div>
+                                <div style="padding: 12px; display: flex; justify-content: space-between; font-size: 15px;">
+                                    <span>📊 Data 4</span>
+                                    <span class="{'win' if result['dan_de']['win'] else 'loss'}">{'✅' if result['dan_de']['win'] else '❌'}</span>
+                                </div>
+                            </div>
+                            <div style="margin-top: 15px; text-align: right; font-size: 16px;">
+                                <b>Tổng: {result['overall_wins']}/4</b>
+                            </div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                        st.rerun()
+                    else:
+                        st.info("ℹ️ Chưa có dữ liệu ngày trước để check")
+                except Exception as e:
+                    st.error(f"Lỗi check kết quả: {str(e)}")
+            
+            st.markdown("---")
+            st.markdown(f"### 🎯 PHÂN TÍCH AI NGÀY {today}")
+            
+            if new_predictions:
+                predictions = new_predictions
+            else:
+                try:
+                    predictions = generate_predictions(historical)
+                    for p in st.session_state.statistics['predictions']:
+                        if p['date'] == today:
+                            p['predictions'] = {'bach_thu': predictions['bach_thu'], 'song_thu': predictions['song_thu'], 'xien_2': predictions['xien_2'], 'dan_de': predictions['dan_de']}
+                            p['confidence'] = predictions['confidence']
+                            p['ai_analysis'] = predictions['ai_analysis']
+                            p['using_ai'] = predictions['using_ai']
+                            break
+                    save_statistics()
+                except Exception as e:
+                    st.error(f"Lỗi tạo dự đoán: {str(e)}")
+                    predictions = None
+            
+            if predictions:
+                if predictions['using_ai']:
+                    st.success("✅ Gemini AI Active")
+                else:
+                    st.warning("⚠️ Standard Analysis Mode")
+                
                 st.markdown(f'''
-                <div style="background: rgba(212, 175, 55, 0.1); 
-                            border-left: 4px solid #D4AF37; padding: 15px; border-radius: 0 8px 8px 0; margin: 10px 0;">
-                    <b>📅 {result['pred_date']} → {result['check_date']}</b>
-                    <div style="margin-top: 10px;">
-                        <div style="padding: 8px; display: flex; justify-content: space-between;">
-                            <span>📊 Data 1: <b>{result['bach_thu']['number']}</b></span>
-                            <span class="{'win' if result['bach_thu']['win'] else 'loss'}">{'✅' if result['bach_thu']['win'] else '❌'}</span>
-                        </div>
-                        <div style="padding: 8px; display: flex; justify-content: space-between;">
-                            <span>📊 Data 2: <b>{'-'.join(result['song_thu']['numbers'])}</b></span>
-                            <span class="{'win' if result['song_thu']['win'] else 'loss'}">{'✅' if result['song_thu']['win'] else '❌'}</span>
-                        </div>
-                        <div style="padding: 8px; display: flex; justify-content: space-between;">
-                            <span>📊 Data 3: <b>{result['xien_2']['pair']}</b></span>
-                            <span class="{'win' if result['xien_2']['win'] else 'loss'}">{'✅' if result['xien_2']['win'] else '❌'}</span>
-                        </div>
-                        <div style="padding: 8px; display: flex; justify-content: space-between;">
-                            <span>📊 Data 4</span>
-                            <span class="{'win' if result['dan_de']['win'] else 'loss'}">{'✅' if result['dan_de']['win'] else '❌'}</span>
-                        </div>
-                    </div>
-                    <div style="margin-top: 10px; text-align: right;"><b>Tổng: {result['overall_wins']}/4</b></div>
+                <div style="background: rgba(212, 175, 55, 0.2); border: 1px solid #D4AF37; border-radius: 8px; padding: 15px; margin: 15px 0;">
+                    <b style="font-size: 16px;">🧠 PHÂN TÍCH:</b><br>{predictions['ai_analysis']}<br>
+                    <b style="font-size: 16px;">ĐỘ TIN CẬY:</b> {predictions['confidence']}%
                 </div>
                 ''', unsafe_allow_html=True)
-                st.rerun()
-            else:
-                st.info("ℹ️ Chưa có dữ liệu ngày trước để check")
-        
-        st.markdown("---")
-        st.markdown(f"### 🎯 PHÂN TÍCH AI NGÀY {today}")
-        
-        if new_predictions:
-            predictions = new_predictions
-        else:
-            predictions = generate_predictions(historical)
-            for p in st.session_state.statistics['predictions']:
-                if p['date'] == today:
-                    p['predictions'] = {'bach_thu': predictions['bach_thu'], 'song_thu': predictions['song_thu'], 'xien_2': predictions['xien_2'], 'dan_de': predictions['dan_de']}
-                    p['confidence'] = predictions['confidence']
-                    p['ai_analysis'] = predictions['ai_analysis']
-                    p['using_ai'] = predictions['using_ai']
-                    break
-            save_statistics()
-        
-        if predictions['using_ai']:
-            st.success("✅ Gemini AI Active")
-        else:
-            st.warning("⚠️ Standard Analysis Mode")
-        
-        st.markdown(f'''
-        <div style="background: rgba(212, 175, 55, 0.1); border: 1px solid #D4AF37; border-radius: 8px; padding: 12px; margin: 10px 0;">
-            <b>🧠 PHÂN TÍCH:</b><br>{predictions['ai_analysis']}<br>
-            <b>ĐỘ TIN CẬY:</b> {predictions['confidence']}%
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:13px;">📊 DATA 1</div><div style="font-size:42px; color:#FFD700; font-weight:bold; margin:10px 0;">{predictions['bach_thu']}</div></div>''', unsafe_allow_html=True)
-        with c2:
-            st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:13px;">📊 DATA 2</div><div style="font-size:26px; color:#FFD700; font-weight:bold; margin:10px 0;">{predictions['song_thu'][0]} - {predictions['song_thu'][1]}</div></div>''', unsafe_allow_html=True)
-        with c3:
-            st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:13px;">📊 DATA 3</div><div style="font-size:22px; color:#FFD700; font-weight:bold; margin:10px 0;">{predictions['xien_2']}</div></div>''', unsafe_allow_html=True)
-        
-        st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:14px; margin-bottom:10px;">📊 DATA 4 (10 values)</div><div style="font-size:18px; color:#fff;">{', '.join(predictions['dan_de'])}</div></div>''', unsafe_allow_html=True)
-        
-        # VIP feature: Bac nho
-        if is_vip():
+                
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:15px;">📊 DATA 1</div><div style="font-size:48px; color:#FFD700; font-weight:bold; margin:15px 0;">{predictions['bach_thu']}</div></div>''', unsafe_allow_html=True)
+                with c2:
+                    st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:15px;">📊 DATA 2</div><div style="font-size:28px; color:#FFD700; font-weight:bold; margin:15px 0;">{predictions['song_thu'][0]} - {predictions['song_thu'][1]}</div></div>''', unsafe_allow_html=True)
+                with c3:
+                    st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:15px;">📊 DATA 3</div><div style="font-size:24px; color:#FFD700; font-weight:bold; margin:15px 0;">{predictions['xien_2']}</div></div>''', unsafe_allow_html=True)
+                
+                st.markdown(f'''<div class="pred-box"><div style="color:#aaa; font-size:16px; margin-bottom:15px;">📊 DATA 4 (10 values)</div><div style="font-size:20px; color:#fff;">{', '.join(predictions['dan_de'])}</div></div>''', unsafe_allow_html=True)
+                
+                if is_vip():
+                    st.markdown("---")
+                    st.markdown("### 🎲 PHÂN TÍCH CẶP SỐ (VIP)")
+                    try:
+                        bac_nho = generate_bac_nho(historical)
+                        for i, xien in enumerate(bac_nho, 1):
+                            st.markdown(f'''<div class="xien-box"><div style="font-size: 16px; color: #aaa;">💎 Cặp {i} - {xien['frequency']} lần</div><div style="font-size: 52px; color: #FFD700; font-weight: bold;">{xien['pair']}</div></div>''', unsafe_allow_html=True)
+                    except:
+                        st.error("Lỗi tải bạc nhớ")
+            
             st.markdown("---")
-            st.markdown("### 🎲 PHÂN TÍCH CẶP SỐ (VIP)")
-            bac_nho = generate_bac_nho(historical)
-            for i, xien in enumerate(bac_nho, 1):
-                st.markdown(f'''<div class="xien-box"><div style="font-size: 14px; color: #aaa;">💎 Cặp {i} - {xien['frequency']} lần</div><div style="font-size: 48px; color: #FFD700; font-weight: bold;">{xien['pair']}</div></div>''', unsafe_allow_html=True)
+            st.markdown('<div class="disclaimer">⚠️ Dữ liệu phân tích chỉ mang tính chất tham khảo. Người dùng tự chịu trách nhiệm với hành vi sử dụng.</div>', unsafe_allow_html=True)
         
-        st.markdown("---")
-        st.markdown('<div class="disclaimer">⚠️ Dữ liệu phân tích chỉ mang tính chất tham khảo. Người dùng tự chịu trách nhiệm với hành vi sử dụng.</div>', unsafe_allow_html=True)
-    
-    elif page == "💎 Gói VIP":
-        st.markdown("### 🤝 ỦNG HỘ DỰ ÁN")
-        display_pricing_table()
-    
-    elif page == "📊 Thống kê":
-        st.markdown("### 📈 THỐNG KÊ NGÀY")
-        daily_stats = st.session_state.statistics.get('daily_stats', {})
-        if daily_stats:
-            for date in sorted(daily_stats.keys(), reverse=True)[:7]:
-                stats = daily_stats[date]
-                checked = stats.get('checked', 0)
-                wins = stats.get('total_wins', 0)
-                rate = (wins / (checked * 4) * 100) if checked > 0 else 0
-                st.markdown(f'''<div class="stat-card" style="margin: 5px 0;"><div style="font-size: 14px; font-weight: bold; color: #fff;">📅 {date}</div><div style="display: flex; justify-content: space-around; margin-top: 8px;"><span class="win">✅ {wins}/4</span><span style="color: {'#00ff88' if rate >= 50 else '#ff4b4b'}">{rate:.0f}%</span></div></div>''', unsafe_allow_html=True)
-        else:
-            st.info("📭 Chưa có dữ liệu")
+        elif page == "💎 Gói VIP":
+            try:
+                display_pricing_table()
+            except Exception as e:
+                st.error(f"Lỗi hiển thị gói VIP: {str(e)}")
         
-        st.divider()
-        st.markdown("### 📈 TỔNG QUAN")
-        results = st.session_state.statistics.get('results', [])
-        total_checks = len(results)
-        total_wins = sum(r['overall_wins'] for r in results)
-        max_wins = total_checks * 4
-        win_rate = (total_wins / max_wins * 100) if max_wins > 0 else 0
+        elif page == "📊 Thống kê":
+            st.markdown("### 📈 THỐNG KÊ NGÀY")
+            daily_stats = st.session_state.statistics.get('daily_stats', {})
+            if daily_stats:
+                for date in sorted(daily_stats.keys(), reverse=True)[:7]:
+                    stats = daily_stats[date]
+                    checked = stats.get('checked', 0)
+                    wins = stats.get('total_wins', 0)
+                    rate = (wins / (checked * 4) * 100) if checked > 0 else 0
+                    st.markdown(f'''<div class="stat-card" style="margin: 8px 0;"><div style="font-size: 16px; font-weight: bold; color: #fff;">📅 {date}</div><div style="display: flex; justify-content: space-around; margin-top: 10px;"><span class="win">✅ {wins}/4</span><span style="color: {'#00ff88' if rate >= 50 else '#ff4b4b'}; font-size: 16px;">{rate:.0f}%</span></div></div>''', unsafe_allow_html=True)
+            else:
+                st.info("📭 Chưa có dữ liệu")
+            
+            st.divider()
+            st.markdown("### 📈 TỔNG QUAN")
+            results = st.session_state.statistics.get('results', [])
+            total_checks = len(results)
+            total_wins = sum(r['overall_wins'] for r in results)
+            max_wins = total_checks * 4
+            win_rate = (total_wins / max_wins * 100) if max_wins > 0 else 0
+            
+            col1, col2 = st.columns(2)
+            col1.markdown(f'''<div class="stat-card"><div class="stat-value win">{total_wins}</div><div class="stat-label">Trúng</div></div>''', unsafe_allow_html=True)
+            col2.markdown(f'''<div class="stat-card"><div class="stat-value loss">{max_wins - total_wins}</div><div class="stat-label">Trượt</div></div>''', unsafe_allow_html=True)
+            st.markdown(f'''<div class="stat-card" style="margin-top: 15px;"><div class="stat-value" style="color: {'#00ff88' if win_rate >= 50 else '#ff4b4b'}; font-size: 36px;">{win_rate:.1f}%</div><div class="stat-label">Tỷ lệ trúng</div><div class="stat-label">{total_checks} lần check</div></div>''', unsafe_allow_html=True)
         
-        col1, col2 = st.columns(2)
-        col1.markdown(f'''<div class="stat-card"><div class="stat-value win">{total_wins}</div><div class="stat-label">Trúng</div></div>''', unsafe_allow_html=True)
-        col2.markdown(f'''<div class="stat-card"><div class="stat-value loss">{max_wins - total_wins}</div><div class="stat-label">Trượt</div></div>''', unsafe_allow_html=True)
-        st.markdown(f'''<div class="stat-card" style="margin-top: 10px;"><div class="stat-value" style="color: {'#00ff88' if win_rate >= 50 else '#ff4b4b'}">{win_rate:.1f}%</div><div class="stat-label">Tỷ lệ trúng</div><div class="stat-label">{total_checks} lần check</div></div>''', unsafe_allow_html=True)
+        elif page == "📜 Lịch sử":
+            st.markdown("### 📜 LỊCH SỬ PHÂN TÍCH")
+            results = st.session_state.statistics.get('results', [])
+            if results:
+                dates = sorted(set(r['pred_date'] for r in results), reverse=True)
+                selected_date = st.selectbox("Chọn ngày", dates)
+                filtered = [r for r in results if r['pred_date'] == selected_date]
+                for r in filtered:
+                    st.markdown(f'''<div style="background: rgba(212, 175, 55, 0.2); border: 1px solid #D4AF37; border-radius: 10px; padding: 20px; margin: 15px 0;"><b style="font-size: 16px;">📅 {r['pred_date']} → {r['check_date']}</b><div style="margin-top: 10px; font-size: 15px;">Data 1: {r['bach_thu']['number']} {'✅' if r['bach_thu']['win'] else '❌'}</div><div style="font-size: 15px;">Data 2: {'-'.join(r['song_thu']['numbers'])} {'✅' if r['song_thu']['win'] else '❌'}</div><div style="font-size: 15px;">Data 3: {r['xien_2']['pair']} {'✅' if r['xien_2']['win'] else '❌'}</div><div style="font-size: 15px;">Data 4: {'✅' if r['dan_de']['win'] else '❌'}</div><div style="margin-top: 10px;"><b>Tổng: {r['overall_wins']}/4</b></div></div>''', unsafe_allow_html=True)
+            else:
+                st.info("📭 Chưa có lịch sử")
+        
+        elif page == "🌐 Website XS":
+            st.markdown("### 🌐 XOSODAIPHAT.COM")
+            st.markdown("Xem kết quả trực tiếp từ website:")
+            
+            st.markdown('''
+            <div style="border: 2px solid #D4AF37; border-radius: 15px; 
+                        overflow: hidden; height: 800px;">
+                <iframe src="https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html" 
+                        style="width:100%; height:100%; border:none;"
+                        sandbox="allow-same-origin allow-scripts allow-forms">
+                </iframe>
+            </div>
+            ''', unsafe_allow_html=True)
+        
+        elif page == "👑 Admin":
+            user_info = get_user_info()
+            if user_info and user_info.get('role') == 'admin':
+                try:
+                    admin_panel()
+                except Exception as e:
+                    st.error(f"Lỗi admin panel: {str(e)}")
     
-    elif page == "📜 Lịch sử":
-        st.markdown("### 📜 LỊCH SỬ PHÂN TÍCH")
-        results = st.session_state.statistics.get('results', [])
-        if results:
-            dates = sorted(set(r['pred_date'] for r in results), reverse=True)
-            selected_date = st.selectbox("Chọn ngày", dates)
-            filtered = [r for r in results if r['pred_date'] == selected_date]
-            for r in filtered:
-                st.markdown(f'''<div style="background: rgba(212, 175, 55, 0.1); border: 1px solid #D4AF37; border-radius: 10px; padding: 15px; margin: 10px 0;"><b>📅 {r['pred_date']} → {r['check_date']}</b><div>Data 1: {r['bach_thu']['number']} {'✅' if r['bach_thu']['win'] else '❌'}</div><div>Data 2: {'-'.join(r['song_thu']['numbers'])} {'✅' if r['song_thu']['win'] else '❌'}</div><div>Data 3: {r['xien_2']['pair']} {'✅' if r['xien_2']['win'] else '❌'}</div><div>Data 4: {'✅' if r['dan_de']['win'] else '❌'}</div><div><b>Tổng: {r['overall_wins']}/4</b></div></div>''', unsafe_allow_html=True)
-        else:
-            st.info("📭 Chưa có lịch sử")
-    
-    elif page == "👑 Admin":
-        user_info = get_user_info()
-        if user_info and user_info.get('role') == 'admin':
-            admin_panel()
+    except Exception as e:
+        st.error(f"Lỗi hệ thống: {str(e)}")
+        st.error("Vui lòng refresh trang hoặc đăng nhập lại")
     
     # FOOTER
     st.markdown("---")
     st.markdown('''
-    <div style="text-align: center; color: #666; padding: 20px; font-size: 12px;">
+    <div style="text-align: center; color: #888; padding: 25px; font-size: 14px;">
         💎 AI-QUANTUM PRO 2026 • Data Analytics Platform<br>
         Dữ liệu thống kê tham khảo • Không tổ chức cá cược<br>
         18+ only • Chơi có trách nhiệm
