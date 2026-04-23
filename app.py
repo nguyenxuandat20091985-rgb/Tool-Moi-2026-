@@ -1,6 +1,6 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - ENHANCED VERSION
-# Improvements: Better Scraping • Auto-Update • Win/Loss Tracking • Stable Login
+# 💎 AI-QUANTUM PRO 2026 - UPGRADED VERSION
+# Features: Stable Login • Auto-Update • Smart Statistics • Enhanced AI
 # =============================================================================
 import streamlit as st
 import requests
@@ -29,7 +29,7 @@ st.set_page_config(
 GEMINI_API_KEY = "AIzaSyARQk3lpoHnK51LQ62OR4vciH0XMFFIZjg"
 
 # =============================================================================
-# 🎨 CSS - ENHANCED
+# 🎨 CSS
 # =============================================================================
 st.markdown("""
 <style>
@@ -37,200 +37,138 @@ st.markdown("""
     
     * { font-family: 'Inter', sans-serif; }
     
-    .main { 
-        background-color: #0d1117; 
-        color: #e6edf3;
-        font-size: 16px;
-    }
+    .main { background-color: #0d1117; color: #e6edf3; font-size: 16px; }
     .stApp { background-color: #0d1117; }
     
     .header-gold {
         background: linear-gradient(135deg, #D4AF37 0%, #FFD700 50%, #B8962E 100%);
-        padding: 25px; 
-        border-radius: 15px; 
-        text-align: center; 
-        color: #000; 
-        font-weight: bold; 
-        margin-bottom: 25px;
+        padding: 25px; border-radius: 15px; text-align: center; 
+        color: #000; font-weight: bold; margin-bottom: 25px;
         box-shadow: 0 4px 20px rgba(212, 175, 55, 0.4);
     }
     
     .stat-card {
         background: linear-gradient(135deg, #161b22, #1f2937);
-        border: 2px solid #D4AF37; 
-        border-radius: 12px;
-        padding: 15px; 
-        text-align: center; 
-        margin: 5px;
+        border: 2px solid #D4AF37; border-radius: 12px;
+        padding: 15px; text-align: center; margin: 5px;
     }
-    .stat-value { 
-        font-size: 32px; 
-        font-weight: bold; 
-        color: #FFD700; 
-    }
-    .stat-label { 
-        font-size: 14px; 
-        color: #8b949e; 
-        margin-top: 5px; 
-    }
+    .stat-value { font-size: 32px; font-weight: bold; color: #FFD700; }
+    .stat-label { font-size: 14px; color: #8b949e; margin-top: 5px; }
     .win { color: #3fb950; font-weight: bold; }
     .loss { color: #f85149; font-weight: bold; }
     
     .pred-box {
-        border: 2px solid #D4AF37; 
-        border-radius: 12px;
-        padding: 25px; 
-        background: linear-gradient(135deg, #161b22, #1f2937);
-        text-align: center; 
-        margin: 10px 0;
+        border: 2px solid #D4AF37; border-radius: 12px;
+        padding: 25px; background: linear-gradient(135deg, #161b22, #1f2937);
+        text-align: center; margin: 10px 0;
     }
     .xien-box {
-        border: 3px solid #FFD700; 
-        border-radius: 15px;
-        padding: 30px; 
-        background: linear-gradient(135deg, #161b22, #1f2937);
-        text-align: center; 
-        margin: 15px 0;
+        border: 3px solid #FFD700; border-radius: 15px;
+        padding: 30px; background: linear-gradient(135deg, #161b22, #1f2937);
+        text-align: center; margin: 15px 0;
         box-shadow: 0 8px 32px rgba(212, 175, 55, 0.3);
+    }
+    
+    .result-item {
+        background: rgba(212, 175, 55, 0.1);
+        border-left: 4px solid #D4AF37;
+        padding: 12px; margin: 8px 0; border-radius: 0 8px 8px 0;
     }
     
     .disclaimer {
         background: rgba(248, 81, 73, 0.15);
         border-left: 4px solid #f85149;
-        padding: 15px; 
-        border-radius: 0 8px 8px 0;
-        margin: 20px 0; 
-        font-size: 14px;
-        color: #e6edf3;
+        padding: 15px; border-radius: 0 8px 8px 0;
+        margin: 20px 0; font-size: 14px; color: #e6edf3;
     }
     .info-banner {
         background: linear-gradient(135deg, rgba(56, 139, 253, 0.15), rgba(88, 166, 255, 0.15));
-        border: 2px solid #58a6ff; 
-        border-radius: 10px;
-        padding: 20px; 
-        margin: 15px 0; 
-        text-align: center;
-        font-size: 16px;
-        color: #e6edf3;
+        border: 2px solid #58a6ff; border-radius: 10px;
+        padding: 20px; margin: 15px 0; text-align: center;
+        font-size: 16px; color: #e6edf3;
     }
     
     .vip-badge {
         background: linear-gradient(135deg, #FFD700, #FFA500);
-        color: #000; 
-        padding: 5px 15px; 
-        border-radius: 20px;
-        font-size: 12px; 
-        font-weight: bold; 
-        display: inline-block;
+        color: #000; padding: 5px 15px; border-radius: 20px;
+        font-size: 12px; font-weight: bold; display: inline-block;
     }
     .free-badge {
-        background: #30363d; 
-        color: #8b949e; 
-        padding: 5px 15px; 
-        border-radius: 20px; 
-        font-size: 12px; 
-        font-weight: bold;
-        display: inline-block;
+        background: #30363d; color: #8b949e;
+        padding: 5px 15px; border-radius: 20px;
+        font-size: 12px; font-weight: bold; display: inline-block;
     }
     
     .pricing-card {
-        border: 2px solid #D4AF37; 
-        border-radius: 15px;
-        padding: 25px; 
-        background: linear-gradient(135deg, #161b22, #1f2937);
-        text-align: center; 
-        margin: 15px 0;
+        border: 2px solid #D4AF37; border-radius: 15px;
+        padding: 25px; background: linear-gradient(135deg, #161b22, #1f2937);
+        text-align: center; margin: 15px 0;
     }
     .pricing-card.premium {
         border-color: #FFD700;
         box-shadow: 0 0 30px rgba(255, 215, 0, 0.25);
     }
     
-    .feature-list { 
-        text-align: left; 
-        font-size: 15px; 
-        margin: 15px 0; 
-    }
-    .feature-list div { 
-        margin: 8px 0; 
-        color: #e6edf3; 
-        font-size: 15px;
-    }
-    .feature-list .check { 
-        color: #3fb950; 
-        font-weight: bold;
-    }
+    .feature-list { text-align: left; font-size: 15px; margin: 15px 0; }
+    .feature-list div { margin: 8px 0; color: #e6edf3; font-size: 15px; }
+    .feature-list .check { color: #3fb950; font-weight: bold; }
     
     .login-box {
         background: linear-gradient(135deg, #161b22, #1f2937);
-        border: 2px solid #D4AF37; 
-        border-radius: 15px;
-        padding: 35px; 
-        max-width: 450px; 
-        margin: 50px auto;
+        border: 2px solid #D4AF37; border-radius: 15px;
+        padding: 35px; max-width: 450px; margin: 50px auto;
     }
     
     .result-number {
-        font-size: 48px; 
-        font-weight: bold; 
-        color: #f85149; 
-        letter-spacing: 8px;
-        text-shadow: 0 0 20px rgba(248, 81, 73, 0.5);
+        font-size: 48px; font-weight: bold; color: #f85149;
+        letter-spacing: 8px; text-shadow: 0 0 20px rgba(248, 81, 73, 0.5);
     }
     
-    h1, h2, h3, h4 {
-        font-weight: 700;
-        color: #e6edf3;
-    }
+    h1, h2, h3, h4 { font-weight: 700; color: #e6edf3; }
     
     .stTextInput > div > div > input {
-        font-size: 16px;
-        color: #e6edf3;
-        background-color: #0d1117;
+        font-size: 16px; color: #e6edf3; background-color: #0d1117;
     }
     
     .stButton > button {
-        font-size: 16px;
-        font-weight: 600;
-        padding: 10px 24px;
-        background-color: #238636;
-        color: white;
-        border: none;
-        border-radius: 8px;
+        font-size: 16px; font-weight: 600; padding: 10px 24px;
+        background-color: #238636; color: white; border: none; border-radius: 8px;
     }
-    .stButton > button:hover {
-        background-color: #2ea043;
-    }
+    .stButton > button:hover { background-color: #2ea043; }
     
     .iframe-container {
-        border: 2px solid #D4AF37;
-        border-radius: 15px;
-        overflow: hidden;
-        height: 800px;
+        border: 2px solid #D4AF37; border-radius: 15px;
+        overflow: hidden; height: 800px;
     }
     
-    .today-result {
-        background: linear-gradient(135deg, #1a2e1a, #0f1f0f);
-        border: 3px solid #3fb950;
-        border-radius: 15px;
-        padding: 25px;
-        text-align: center;
-        margin: 15px 0;
+    .win-loss-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0;
+    }
+    .win-item {
+        background: rgba(63, 185, 80, 0.15);
+        border: 1px solid #3fb950; border-radius: 8px;
+        padding: 10px; text-align: center;
+    }
+    .loss-item {
+        background: rgba(248, 81, 73, 0.15);
+        border: 1px solid #f85149; border-radius: 8px;
+        padding: 10px; text-align: center;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # =============================================================================
-# 🔐 AUTHENTICATION SYSTEM - ENHANCED
+# 🔐 AUTHENTICATION SYSTEM - IMPROVED
 # =============================================================================
 def init_auth():
+    """Khởi tạo authentication với session ổn định"""
     if 'users' not in st.session_state:
         st.session_state.users = {
             'admin': {
                 'password_hash': hashlib.sha256('admin123'.encode()).hexdigest(),
                 'role': 'admin',
-                'vip_tier': 'cong_hien',
-                'vip_until': (datetime.now() + timedelta(days=365)).isoformat(),
+                'vip_tier': None,
+                'vip_until': None,
                 'is_active': True,
                 'created_at': datetime.now().isoformat()
             },
@@ -250,58 +188,57 @@ def init_auth():
     if 'login_time' not in st.session_state:
         st.session_state.login_time = None
     
-    # Always reload from file
+    # Luôn load từ file để đảm bảo dữ liệu
     if os.path.exists('users.json'):
         try:
             with open('users.json', 'r', encoding='utf-8') as f:
                 loaded_users = json.load(f)
-                # Merge with defaults
+                # Merge với users mặc định
                 for key, value in loaded_users.items():
-                    st.session_state.users[key] = value
+                    if key not in st.session_state.users:
+                        st.session_state.users[key] = value
         except Exception as e:
-            st.error(f"Lỗi load users: {str(e)}")
+            st.error(f"Lỗi load users: {e}")
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 def login(username, password):
-    """Login with better error handling"""
-    try:
-        # Reload users from file
-        if os.path.exists('users.json'):
-            with open('users.json', 'r', encoding='utf-8') as f:
-                st.session_state.users = json.load(f)
-        
-        users = st.session_state.get('users', {})
-        user = users.get(username)
-        
-        if not user:
-            return False
-        
-        if not user.get('is_active', True):
-            return False
-        
-        if user['password_hash'] != hash_password(password):
-            return False
-        
-        # Success
-        st.session_state.current_user = username
-        st.session_state.login_time = datetime.now()
-        
-        return True
-    except Exception as e:
-        st.error(f"Lỗi đăng nhập: {str(e)}")
+    """Đăng nhập với validation chặt chẽ"""
+    users = st.session_state.get('users', {})
+    user = users.get(username)
+    
+    if not user:
         return False
+    
+    if not user.get('is_active', True):
+        return False
+    
+    if user['password_hash'] != hash_password(password):
+        return False
+    
+    # Set session
+    st.session_state.current_user = username
+    st.session_state.login_time = datetime.now()
+    
+    # Force rerun
+    st.rerun()
+    return True
 
 def logout():
     st.session_state.current_user = None
     st.session_state.login_time = None
+    st.rerun()
 
 def check_session_valid():
-    if not st.session_state.current_user or not st.session_state.login_time:
+    """Check session với timeout 24h"""
+    if not st.session_state.current_user:
         return False
     
-    # Session valid for 24 hours
+    if not st.session_state.login_time:
+        return False
+    
+    # Check timeout
     if datetime.now() - st.session_state.login_time > timedelta(hours=24):
         logout()
         return False
@@ -316,14 +253,25 @@ def get_user_info(username=None):
     return st.session_state.users.get(username)
 
 def is_vip(username=None):
+    """Check VIP status - LUÔN check từ file"""
+    # Reload từ file để có data mới nhất
+    if os.path.exists('users.json'):
+        try:
+            with open('users.json', 'r', encoding='utf-8') as f:
+                users_file = json.load(f)
+                user = users_file.get(username or st.session_state.current_user)
+                if user:
+                    # Update session state
+                    st.session_state.users[username or st.session_state.current_user] = user
+        except:
+            pass
+    
     user = get_user_info(username)
     if not user or not user.get('vip_tier'):
         return False
+    
     if user.get('vip_until'):
-        try:
-            return datetime.fromisoformat(user['vip_until']) > datetime.now()
-        except:
-            return False
+        return datetime.fromisoformat(user['vip_until']) > datetime.now()
     return True
 
 def get_vip_tier(username=None):
@@ -335,7 +283,7 @@ def save_users():
         with open('users.json', 'w', encoding='utf-8') as f:
             json.dump(st.session_state.users, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        st.error(f"Lỗi save users: {str(e)}")
+        st.error(f"Lỗi save users: {e}")
 
 def register_user(username, password):
     if username in st.session_state.users:
@@ -355,6 +303,7 @@ def register_user(username, password):
 def update_vip_status(username, tier, duration_days):
     if username not in st.session_state.users:
         return False
+    
     st.session_state.users[username]['vip_tier'] = tier
     st.session_state.users[username]['vip_until'] = (
         datetime.now() + timedelta(days=duration_days)
@@ -420,7 +369,7 @@ VIP_TIERS = {
 }
 
 # =============================================================================
-# 💳 PAYMENT - DYNAMIC VIETQR CODE
+# 💳 PAYMENT - VIETQR
 # =============================================================================
 def generate_vietqr_url(account_number, amount, message, bank_id="BIDV"):
     encoded_message = urllib.parse.quote(message, safe='')
@@ -486,17 +435,14 @@ def display_pricing_table():
                 col_qr1, col_qr2, col_qr3 = st.columns([1,2,1])
                 with col_qr2:
                     try:
-                        st.image(qr_url, 
-                                caption="📷 Quét bằng app ngân hàng bất kỳ", 
-                                use_column_width=True,
-                                clamp=True)
+                        st.image(qr_url, caption="📷 Quét bằng app ngân hàng", use_column_width=True, clamp=True)
                     except Exception as e:
                         st.error(f"❌ Lỗi tải QR: {str(e)}")
                 
                 st.markdown(f'''
                 <div style="background: #0d1117; padding: 20px; border-radius: 12px; margin: 20px 0; border: 2px solid #58a6ff;">
                     <p style="margin: 10px 0; font-size: 16px;"><b>💰 Số tiền:</b> <span style="color: #3fb950; font-size: 24px; font-weight: bold;">{tier['price']:,} VNĐ</span></p>
-                    <p style="margin: 10px 0; font-size: 16px;"><b>📝 Nội dung CK:</b> <span style="color: #ffa500; font-weight: 600; background: rgba(255,165,0,0.1); padding: 5px 10px; border-radius: 5px;">{transfer_message}</span></p>
+                    <p style="margin: 10px 0; font-size: 16px;"><b>📝 Nội dung CK:</b> <span style="color: #ffa500; font-weight: 600;">{transfer_message}</span></p>
                 </div>
                 ''', unsafe_allow_html=True)
                 
@@ -510,16 +456,9 @@ def display_pricing_table():
                 """)
             
             st.markdown("</div>", unsafe_allow_html=True)
-    
-    st.markdown('''
-    <div style="background: rgba(248, 81, 73, 0.1); border-left: 4px solid #f85149;
-                padding: 15px; border-radius: 0 8px 8px 0; margin: 25px 0; font-size: 14px;">
-        <b>⚖️ LƯU Ý:</b> Phí dịch vụ dữ liệu thống kê • Không tổ chức cá cược
-    </div>
-    ''', unsafe_allow_html=True)
 
 # =============================================================================
-# 💾 STATISTICS - ENHANCED
+# 💾 STATISTICS - IMPROVED
 # =============================================================================
 def init_statistics():
     if 'statistics' not in st.session_state:
@@ -544,13 +483,14 @@ def save_statistics():
         with open('statistics.json', 'w', encoding='utf-8') as f:
             json.dump(st.session_state.statistics, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        st.error(f"Lỗi save statistics: {str(e)}")
+        st.error(f"Lỗi save statistics: {e}")
 
 def get_prediction_for_date(date_str):
     preds = [p for p in st.session_state.statistics['predictions'] if p['date'] == date_str]
     return preds[0] if preds else None
 
 def ensure_predictions_for_today():
+    """Tạo prediction cho hôm nay nếu chưa có"""
     today = datetime.now().strftime("%d/%m")
     existing_pred = get_prediction_for_date(today)
     
@@ -578,18 +518,27 @@ def ensure_predictions_for_today():
         return pred_record, predictions
     return existing_pred, None
 
+def auto_check_results(current_data):
+    """Tự động check kết quả khi có data mới"""
+    today_date = datetime.now().strftime("%d/%m")
+    
+    # Check nếu hôm nay chưa check
+    if st.session_state.statistics['last_check_date'] != today_date:
+        result = save_result_check(today_date, current_data)
+        if result:
+            st.session_state.statistics['last_check_date'] = today_date
+            save_statistics()
+            return result
+    return None
+
 def save_result_check(today_date, current_data):
-    """Save and check results with better tracking"""
     current_loto = []
     for k, v in current_data.items():
-        if k == "time":
-            continue
+        if k == "time": continue
         if isinstance(v, list):
             for x in v:
-                if x and x != "...":
-                    current_loto.append(x[-2:])
-        elif v and v != "...":
-            current_loto.append(v[-2:])
+                if x and x != "...": current_loto.append(x[-2:])
+        elif v and v != "...": current_loto.append(v[-2:])
     
     db_number = current_data.get("Đặc Biệt", "")
     db_last2 = db_number[-2:] if db_number and len(db_number) >= 2 else ""
@@ -636,63 +585,135 @@ def save_result_check(today_date, current_data):
         
         save_statistics()
         return result_record
-    
     return None
 
+def display_today_statistics():
+    """Hiển thị thống kê trúng/trượt hôm nay"""
+    st.markdown("### 📊 THỐNG KÊ HÔM NAY")
+    
+    today = datetime.now().strftime("%d/%m")
+    results = st.session_state.statistics.get('results', [])
+    
+    # Lọc kết quả hôm nay
+    today_results = [r for r in results if r['check_date'] == today]
+    
+    if today_results:
+        latest_result = today_results[-1]
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            status = "✅ TRÚNG" if latest_result['bach_thu']['win'] else "❌ TRƯỢT"
+            color = "#3fb950" if latest_result['bach_thu']['win'] else "#f85149"
+            st.markdown(f"""
+            <div style="background: rgba(212, 175, 55, 0.1); border: 2px solid {color}; 
+                        border-radius: 10px; padding: 15px; text-align: center;">
+                <div style="font-size: 14px; color: #8b949e;">Bạch Thủ</div>
+                <div style="font-size: 24px; color: {color}; font-weight: bold;">
+                    {latest_result['bach_thu']['number']}
+                </div>
+                <div style="font-size: 18px; color: {color};">{status}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            status = "✅ TRÚNG" if latest_result['song_thu']['win'] else "❌ TRƯỢT"
+            color = "#3fb950" if latest_result['song_thu']['win'] else "#f85149"
+            st.markdown(f"""
+            <div style="background: rgba(212, 175, 55, 0.1); border: 2px solid {color}; 
+                        border-radius: 10px; padding: 15px; text-align: center;">
+                <div style="font-size: 14px; color: #8b949e;">Song Thủ</div>
+                <div style="font-size: 18px; color: {color}; font-weight: bold;">
+                    {'-'.join(latest_result['song_thu']['numbers'])}
+                </div>
+                <div style="font-size: 18px; color: {color};">{status}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            status = "✅ TRÚNG" if latest_result['xien_2']['win'] else "❌ TRƯỢT"
+            color = "#3fb950" if latest_result['xien_2']['win'] else "#f85149"
+            st.markdown(f"""
+            <div style="background: rgba(212, 175, 55, 0.1); border: 2px solid {color}; 
+                        border-radius: 10px; padding: 15px; text-align: center;">
+                <div style="font-size: 14px; color: #8b949e;">Xiên 2</div>
+                <div style="font-size: 18px; color: {color}; font-weight: bold;">
+                    {latest_result['xien_2']['pair']}
+                </div>
+                <div style="font-size: 18px; color: {color};">{status}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col4:
+            status = "✅ TRÚNG" if latest_result['dan_de']['win'] else "❌ TRƯỢT"
+            color = "#3fb950" if latest_result['dan_de']['win'] else "#f85149"
+            matched = latest_result['dan_de'].get('matched', '')
+            st.markdown(f"""
+            <div style="background: rgba(212, 175, 55, 0.1); border: 2px solid {color}; 
+                        border-radius: 10px; padding: 15px; text-align: center;">
+                <div style="font-size: 14px; color: #8b949e;">Đề</div>
+                <div style="font-size: 24px; color: {color}; font-weight: bold;">
+                    {matched if matched else '-'}
+                </div>
+                <div style="font-size: 18px; color: {color};">{status}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Tổng kết
+        total_wins = latest_result['overall_wins']
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(212, 175, 55, 0.2), rgba(255, 215, 0, 0.2));
+                    border: 2px solid #FFD700; border-radius: 12px; padding: 20px; 
+                    text-align: center; margin: 20px 0;">
+            <div style="font-size: 20px; font-weight: bold; color: #FFD700;">
+                🎯 TỔNG: {total_wins}/4 TRÚNG
+            </div>
+            <div style="font-size: 32px; color: {'#3fb950' if total_wins >= 2 else '#f85149'}; 
+                        font-weight: bold; margin-top: 10px;">
+                {'🎉 XUẤT SẮC!' if total_wins >= 3 else '👍 TỐT' if total_wins >= 2 else '💪 CỐ GẮNG LÊN!'}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.info("📭 Chưa có kết quả check hôm nay. Kết quả sẽ tự động cập nhật khi có data mới.")
+
 # =============================================================================
-# 📡 SCRAPING - ENHANCED
+# 📡 SCRAPING
 # =============================================================================
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=60)  # Cache 60s thay vì 120s
 def get_live_xsmb():
-    """Improved scraping with better error handling"""
     url = "https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'vi-VN,vi;q=0.9,en;q=0.8'
-    }
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     
     try:
         res = requests.get(url, headers=headers, timeout=15)
         res.raise_for_status()
         soup = BeautifulSoup(res.content, 'html.parser')
         
-        # Try multiple extraction methods
         result = extract_data_v1(soup)
-        
-        # If special prize is empty or invalid, try alternative method
-        if not result["Đặc Biệt"] or result["Đặc Biệt"] in ["...", ""]:
+        if result["Đặc Biệt"] in ["...", ""]:
             result = extract_data_v2(soup)
-        
-        # If still empty, use mock data with warning
-        if not result["Đặc Biệt"] or result["Đặc Biệt"] in ["...", ""]:
-            st.warning("⚠️ Không lấy được kết quả từ website. Sử dụng dữ liệu tạm.")
-            result = get_mock_data()
         
         result["time"] = datetime.now().strftime("%H:%M:%S %d/%m")
         return result
-        
     except Exception as e:
-        st.error(f"Lỗi scraping: {str(e)}")
+        st.error(f"Lỗi scraping: {e}")
         return get_mock_data()
 
 def extract_data_v1(soup):
-    """Extract data using class names"""
     def get_txt(classes):
-        if isinstance(classes, str):
-            classes = [classes]
+        if isinstance(classes, str): classes = [classes]
         for cls in classes:
             item = soup.find("span", class_=cls)
             if item and item.text.strip():
                 text = item.text.strip()
                 match = re.search(r'(\d+)', text)
-                if match:
-                    return match.group(1)
+                if match: return match.group(1)
         return "..."
     
     return {
-        "Đặc Biệt": get_txt(["special-temp", "special", "db-value", "result-special"]),
-        "Giải Nhất": get_txt(["g1-temp", "g1", "result-1"]),
+        "Đặc Biệt": get_txt(["special-temp", "special", "db-value"]),
+        "Giải Nhất": get_txt(["g1-temp", "g1"]),
         "Giải Nhì": [get_txt(f"g2_{i}-temp") for i in range(2)],
         "Giải Ba": [get_txt(f"g3_{i}-temp") for i in range(6)],
         "Giải Tư": [get_txt(f"g4_{i}-temp") for i in range(4)],
@@ -702,32 +723,25 @@ def extract_data_v1(soup):
     }
 
 def extract_data_v2(soup):
-    """Alternative extraction using text parsing"""
     text = soup.get_text()
     numbers = re.findall(r'\b\d{5}\b', text)
-    
     return {
         "Đặc Biệt": numbers[0] if numbers else "...",
         "Giải Nhất": numbers[1] if len(numbers) > 1 else "...",
-        "Giải Nhì": ["..."] * 2,
-        "Giải Ba": ["..."] * 6,
-        "Giải Tư": ["..."] * 4,
-        "Giải Năm": ["..."] * 6,
-        "Giải Sáu": ["..."] * 3,
-        "Giải Bảy": ["..."] * 4,
+        "Giải Nhì": ["..."] * 2, "Giải Ba": ["..."] * 6,
+        "Giải Tư": ["..."] * 4, "Giải Năm": ["..."] * 6,
+        "Giải Sáu": ["..."] * 3, "Giải Bảy": ["..."] * 4,
     }
 
 def get_mock_data():
     return {
-        "Đặc Biệt": "36948",
-        "Giải Nhất": "96041",
+        "Đặc Biệt": "36948", "Giải Nhất": "96041",
         "Giải Nhì": ["09028", "27803"],
-        "time": datetime.now().strftime("%H:%M:%S %d/%m"),
-        "source": "Mock"
+        "time": datetime.now().strftime("%H:%M:%S %d/%m"), "source": "Mock"
     }
 
 # =============================================================================
-# 🧠 BẠC NHỚ
+# 🧠 ENHANCED PREDICTION ALGORITHM
 # =============================================================================
 def generate_bac_nho(historical_data):
     pairs_counter = Counter()
@@ -736,10 +750,8 @@ def generate_bac_nho(historical_data):
         for key, val in data.items():
             if isinstance(val, list):
                 for v in val:
-                    if v and len(v) >= 2:
-                        loto_day.append(v[-2:])
-            elif val and len(val) >= 2:
-                loto_day.append(val[-2:])
+                    if v and len(v) >= 2: loto_day.append(v[-2:])
+            elif val and len(val) >= 2: loto_day.append(val[-2:])
         
         for i in range(len(loto_day)):
             for j in range(i+1, len(loto_day)):
@@ -748,39 +760,81 @@ def generate_bac_nho(historical_data):
     
     top_pairs = pairs_counter.most_common(3)
     while len(top_pairs) < 3:
-        num1 = f"{np.random.randint(0,100):02d}"
-        num2 = f"{np.random.randint(0,100):02d}"
-        while num1 == num2:
-            num2 = f"{np.random.randint(0,100):02d}"
+        num1, num2 = f"{np.random.randint(0,100):02d}", f"{np.random.randint(0,100):02d}"
+        while num1 == num2: num2 = f"{np.random.randint(0,100):02d}"
         pair = tuple(sorted([num1, num2]))
-        if pair not in [p[0] for p in top_pairs]:
-            top_pairs.append((pair, 1))
+        if pair not in [p[0] for p in top_pairs]: top_pairs.append((pair, 1))
     
     return [{'pair': f"{p[0][0]} - {p[0][1]}", 'frequency': p[1], 'num1': p[0][0], 'num2': p[0][1]} for p in top_pairs]
 
-# =============================================================================
-# 🤖 GEMINI AI - ENHANCED
-# =============================================================================
-def query_gemini_ai(hot_nums, cold_nums, gan_nums, retry_count=3):
-    prompt = f"""Chuyên gia xổ số MB với 10 năm kinh nghiệm. Phân tích XSMB dựa trên:
+def analyze_patterns(historical_data):
+    """Phân tích pattern nâng cao"""
+    patterns = {
+        'hot_numbers': [],
+        'cold_numbers': [],
+        'frequent_pairs': [],
+        'last_7_days': [],
+        'last_30_days': []
+    }
+    
+    all_loto = []
+    last_7 = []
+    last_30 = []
+    
+    dates = sorted(historical_data.keys(), reverse=True)
+    
+    for i, (date, data) in enumerate(historical_data.items()):
+        for key, val in data.items():
+            if isinstance(val, list):
+                for v in val:
+                    if v and len(v) >= 2:
+                        num = v[-2:]
+                        all_loto.append(num)
+                        if i < 7: last_7.append(num)
+                        if i < 30: last_30.append(num)
+            elif val and len(val) >= 2:
+                num = val[-2:]
+                all_loto.append(num)
+                if i < 7: last_7.append(num)
+                if i < 30: last_30.append(num)
+    
+    # Hot numbers (xuất hiện nhiều)
+    counter = Counter(all_loto)
+    patterns['hot_numbers'] = [num for num, _ in counter.most_common(10)]
+    
+    # Cold numbers (ít xuất hiện)
+    all_possible = [f"{i:02d}" for i in range(100)]
+    patterns['cold_numbers'] = [num for num in all_possible if num not in counter][:10]
+    
+    # Frequent pairs
+    pairs_counter = Counter()
+    for i in range(len(all_loto)-1):
+        pair = tuple(sorted([all_loto[i], all_loto[i+1]]))
+        pairs_counter[pair] += 1
+    patterns['frequent_pairs'] = [f"{p[0]}-{p[1]}" for p, _ in pairs_counter.most_common(5)]
+    
+    patterns['last_7_days'] = list(set(last_7))
+    patterns['last_30_days'] = list(set(last_30))
+    
+    return patterns
 
-DỮ LIỆU THỐNG KÊ:
-- Số NÓNG (ra nhiều): {', '.join(hot_nums[:5]) if hot_nums else '67, 07, 60, 14, 02'}
-- Số LẠNH (ít ra): {', '.join(cold_nums[:5]) if cold_nums else '33, 44, 55, 66, 77'}
-- Số GAN (lâu chưa ra): {', '.join([f"{x[0]}({x[1]}n)" for x in gan_nums[:5]]) if gan_nums else '33(15n), 44(12n)'}
+def query_gemini_ai(patterns, retry_count=3):
+    prompt = f"""Chuyên gia xổ số MB với AI. Phân tích và dự đoán XSMB.
 
-YÊU CẦU:
-1. Phân tích xu hướng 1-2 câu ngắn gọn
-2. Dự đoán bach_thu (1 số 2 chữ số)
-3. Dự đoán song_thu (2 số 2 chữ số)
-4. Dàn đề 10 số (10 số 2 chữ số)
-5. Độ tin cậy 0-100
+PHÂN TÍCH THỐNG KÊ:
+- Số NÓNG (xuất hiện nhiều): {', '.join(patterns['hot_numbers'][:5])}
+- Số LẠNH (ít xuất hiện): {', '.join(patterns['cold_numbers'][:5])}
+- Cặp số hay về: {', '.join(patterns['frequent_pairs'][:3])}
+- 7 ngày gần: {', '.join(patterns['last_7_days'][:10])}
+
+YÊU CẦU DỰ ĐOÁN:
+Phân tích xu hướng và đưa ra dự đoán chính xác.
 
 TRẢ LỜI THEO FORMAT JSON:
 {{
-    "analysis": "Phân tích ngắn gọn",
-    "bach_thu": "67",
-    "song_thu": ["07", "60"],
+    "analysis": "Phân tích chi tiết 2-3 câu về xu hướng, cầu lotto, pattern",
+    "bach_thu": "XX",
+    "song_thu": ["XX", "YY"],
     "dan_de": ["00","01","02","07","10","13","14","60","67","93"],
     "confidence": 75
 }}"""
@@ -790,13 +844,8 @@ TRẢ LỜI THEO FORMAT JSON:
             url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={GEMINI_API_KEY}"
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "maxOutputTokens": 512,
-                    "topP": 0.9
-                }
+                "generationConfig": {"temperature": 0.7, "maxOutputTokens": 512, "topP": 0.9}
             }
-            
             response = requests.post(url, json=payload, timeout=30)
             
             if response.status_code == 200:
@@ -808,87 +857,43 @@ TRẢ LỜI THEO FORMAT JSON:
                         ai_result = json.loads(json_match.group())
                         if all(key in ai_result for key in ['bach_thu', 'song_thu', 'dan_de', 'confidence']):
                             return ai_result
-            
-            if attempt < retry_count - 1:
-                time.sleep(2 ** attempt)
-                
+            if attempt < retry_count - 1: time.sleep(2 ** attempt)
         except Exception as e:
-            if attempt < retry_count - 1:
-                time.sleep(2 ** attempt)
+            if attempt < retry_count - 1: time.sleep(2 ** attempt)
             continue
-    
     return None
 
-# =============================================================================
-# 🎲 PREDICTION - ENHANCED
-# =============================================================================
 def generate_predictions(historical_data):
-    all_loto = []
-    for date, data in historical_data.items():
-        for key, val in data.items():
-            if isinstance(val, list):
-                for v in val:
-                    if v and len(v) >= 2:
-                        all_loto.append(v[-2:])
-            elif val and len(val) >= 2:
-                all_loto.append(val[-2:])
-    
-    counter = Counter(all_loto)
-    hot_nums = [num for num, _ in counter.most_common(10)]
-    all_possible = [f"{i:02d}" for i in range(100)]
-    cold_nums = [num for num in all_possible if num not in counter][:10]
-    
-    # Calculate gan numbers (days since last appearance)
-    gan_nums = []
-    for num in all_possible[:10]:
-        days = 0
-        for date, data in historical_data.items():
-            found = False
-            for key, val in data.items():
-                if isinstance(val, list):
-                    if any(v.endswith(num) for v in val if v):
-                        found = True
-                        break
-                elif val and val.endswith(num):
-                    found = True
-                    break
-            if found:
-                break
-            days += 1
-        gan_nums.append((num, days))
+    """Generate predictions với AI và statistical analysis"""
+    patterns = analyze_patterns(historical_data)
     
     # Try Gemini AI first
-    gemini_result = query_gemini_ai(hot_nums, cold_nums, gan_nums)
+    gemini_result = query_gemini_ai(patterns)
     
     if gemini_result:
-        bt = gemini_result.get('bach_thu', hot_nums[0] if hot_nums else "00")
+        bt = gemini_result.get('bach_thu', patterns['hot_numbers'][0] if patterns['hot_numbers'] else "00")
         st_list = gemini_result.get('song_thu', ["00", "00"])
         st1, st2 = st_list[0], st_list[1] if len(st_list) > 1 else "00"
         dan_de = gemini_result.get('dan_de', [f"{i:02d}" for i in range(10)])
         confidence = gemini_result.get('confidence', 75)
-        analysis = gemini_result.get('analysis', "Gemini AI phân tích")
+        analysis = gemini_result.get('analysis', "AI phân tích xu hướng")
         using_ai = True
     else:
-        # Fallback to statistical method
-        bt = hot_nums[0] if hot_nums else f"{np.random.randint(0,100):02d}"
-        st1 = hot_nums[1] if len(hot_nums) > 1 else f"{np.random.randint(0,100):02d}"
-        st2 = cold_nums[0] if cold_nums else f"{np.random.randint(0,100):02d}"
-        dan_de = list(set(hot_nums[:4] + cold_nums[:3]))
-        while len(dan_de) < 10:
-            dan_de.append(f"{np.random.randint(0,100):02d}")
+        # Fallback to statistical analysis
+        bt = patterns['hot_numbers'][0] if patterns['hot_numbers'] else f"{np.random.randint(0,100):02d}"
+        st1 = patterns['hot_numbers'][1] if len(patterns['hot_numbers']) > 1 else f"{np.random.randint(0,100):02d}"
+        st2 = patterns['cold_numbers'][0] if patterns['cold_numbers'] else f"{np.random.randint(0,100):02d}"
+        dan_de = list(set(patterns['hot_numbers'][:5] + patterns['cold_numbers'][:3]))
+        while len(dan_de) < 10: dan_de.append(f"{np.random.randint(0,100):02d}")
         dan_de = sorted(dan_de)[:10]
         confidence = 65
-        analysis = "AI Phân tích tần suất"
+        analysis = "Phân tích tần suất thống kê"
         using_ai = False
     
     return {
-        "bach_thu": bt,
-        "song_thu": (st1, st2),
-        "xien_2": f"{bt} - {st1}",
-        "dan_de": dan_de,
-        "hot_numbers": hot_nums,
-        "cold_numbers": cold_nums,
-        "gan_numbers": gan_nums,
+        "bach_thu": bt, "song_thu": (st1, st2), "xien_2": f"{bt} - {st1}", "dan_de": dan_de,
+        "hot_numbers": patterns['hot_numbers'],
+        "cold_numbers": patterns['cold_numbers'],
         "confidence": confidence,
         "ai_analysis": analysis,
         "using_ai": using_ai
@@ -914,6 +919,7 @@ def main():
     init_auth()
     init_statistics()
     
+    # Check session
     if not check_session_valid():
         st.session_state.current_user = None
     
@@ -939,7 +945,6 @@ def main():
             if st.button("Đăng nhập", use_container_width=True, type="primary"):
                 if login(username, password):
                     st.success("✅ Đăng nhập thành công!")
-                    time.sleep(1)
                     st.rerun()
                 else:
                     st.error("❌ Sai username hoặc password")
@@ -956,12 +961,19 @@ def main():
         
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("### 👥 Dùng thử miễn phí")
-        st.info("🔓 Bạn có thể dùng thử các tính năng cơ bản mà không cần đăng nhập.")
+        st.info("🔓 Bạn có thể dùng thử các tính năng cơ bản.")
         if st.button("➡️ Tiếp tục với tài khoản Free", use_container_width=True):
             st.session_state.current_user = "guest"
             st.session_state.login_time = datetime.now()
             st.rerun()
         return
+    
+    # AUTO-CHECK RESULTS
+    try:
+        data = get_live_xsmb()
+        auto_check_results(data)  # Auto-check khi có data mới
+    except:
+        data = get_mock_data()
     
     # AUTHENTICATED APP
     try:
@@ -982,7 +994,7 @@ def main():
                 </span>
             </span>
         </h1>
-        <p style="margin:10px 0 0; font-size: 16px;">📊 Data Analytics Platform • Auto Refresh 120s</p>
+        <p style="margin:10px 0 0; font-size: 16px;">🔄 Auto-Update 60s • Data Analytics Platform</p>
     </div>
     ''', unsafe_allow_html=True)
     
@@ -993,17 +1005,19 @@ def main():
             user_info = get_user_info()
             until = user_info.get('vip_until', '') if user_info else ''
             st.markdown(f'<span class="vip-badge">VIP đến: {until[:10] if until else "N/A"}</span>', unsafe_allow_html=True)
+        
         if st.button("🚪 Đăng xuất", use_container_width=True):
             logout()
-            st.rerun()
+        
         st.divider()
         menu_options = ["🎯 Dự đoán", "💎 Gói VIP", "📊 Thống kê", "📜 Lịch sử", "🌐 Website XS"]
         page = st.radio("🧭 Menu", menu_options)
+        
         st.divider()
         st.markdown('''
         <div style="text-align: center; color: #8b949e; font-size: 13px; padding: 15px;">
             💎 AI-QUANTUM PRO 2026<br>
-            Dữ liệu thống kê tham khảo<br>
+            Auto-Update 60s<br>
             18+ only
         </div>
         ''', unsafe_allow_html=True)
@@ -1011,20 +1025,18 @@ def main():
     # MAIN CONTENT
     try:
         if page == "🎯 Dự đoán":
+            # Display today statistics first
+            display_today_statistics()
+            
+            st.markdown("---")
             st.markdown(f'''
             <div class="info-banner">
-                <b>📅 DỰ LIỆU PHÂN TÍCH NGÀY {today}</b><br>
-                <small>Dữ liệu tham khảo • Auto-update 120s</small>
+                <b>📅 DỰ ĐOÁN NGÀY {today}</b><br>
+                <small>🔄 Auto-update 60s • Cập nhật tự động</small>
             </div>
             ''', unsafe_allow_html=True)
             
             st.markdown("### 📡 KẾT QUẢ THAM KHẢO")
-            try:
-                data = get_live_xsmb()
-            except:
-                data = get_mock_data()
-            
-            historical = get_historical_data(30 if user_tier == 'free' else VIP_TIERS[user_tier]['data_depth'])
             
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -1036,118 +1048,111 @@ def main():
             
             db = data.get("Đặc Biệt", "....")
             st.markdown(f'''
-            <div class="today-result">
-                <div style="font-size: 20px; color: #8b949e; margin-bottom: 15px;">📊 KẾT QUẢ THAM KHẢO</div>
+            <div style="background: linear-gradient(135deg, #161b22, #1f2937); 
+                        border: 2px solid #D4AF37; border-radius: 15px; 
+                        padding: 30px; text-align: center; margin: 15px 0;">
+                <div style="font-size: 20px; color: #8b949e; margin-bottom: 15px;">🏆 ĐẶC BIỆT</div>
                 <div class="result-number">{db}</div>
             </div>
             ''', unsafe_allow_html=True)
             
             st.markdown("---")
-            st.markdown("### ✅ KIỂM TRA DỮ LIỆU NGÀY TRƯỚC")
-            if st.button(f"🔍 Check dữ liệu ngày {today}", use_container_width=True, type="primary"):
-                try:
-                    result = save_result_check(today, data)
-                    if result:
-                        st.success(f"✅ Đã cập nhật kết quả!")
-                        st.markdown(f'''
-                        <div style="background: rgba(212, 175, 55, 0.15); 
-                                    border-left: 4px solid #D4AF37; padding: 20px; border-radius: 0 8px 8px 0; margin: 15px 0;">
-                            <b style="font-size: 16px;">📅 {result['pred_date']} → {result['check_date']}</b>
-                            <div style="margin-top: 15px;">
-                                <div style="padding: 12px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; font-size: 15px;">
-                                    <span>📊 Data 1: <b>{result['bach_thu']['number']}</b></span>
-                                    <span class="{'win' if result['bach_thu']['win'] else 'loss'}">{'✅' if result['bach_thu']['win'] else '❌'}</span>
-                                </div>
-                                <div style="padding: 12px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; font-size: 15px;">
-                                    <span>📊 Data 2: <b>{'-'.join(result['song_thu']['numbers'])}</b></span>
-                                    <span class="{'win' if result['song_thu']['win'] else 'loss'}">{'✅' if result['song_thu']['win'] else '❌'}</span>
-                                </div>
-                                <div style="padding: 12px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; font-size: 15px;">
-                                    <span>📊 Data 3: <b>{result['xien_2']['pair']}</b></span>
-                                    <span class="{'win' if result['xien_2']['win'] else 'loss'}">{'✅' if result['xien_2']['win'] else '❌'}</span>
-                                </div>
-                                <div style="padding: 12px; display: flex; justify-content: space-between; font-size: 15px;">
-                                    <span>📊 Data 4</span>
-                                    <span class="{'win' if result['dan_de']['win'] else 'loss'}">{'✅' if result['dan_de']['win'] else '❌'}</span>
-                                </div>
-                            </div>
-                            <div style="margin-top: 15px; text-align: right; font-size: 16px;">
-                                <b>Tổng: {result['overall_wins']}/4</b>
-                            </div>
-                        </div>
-                        ''', unsafe_allow_html=True)
-                        st.rerun()
-                    else:
-                        st.info("ℹ️ Chưa có dữ liệu ngày trước để check")
-                except Exception as e:
-                    st.error(f"Lỗi check kết quả: {str(e)}")
+            st.markdown(f"### 🎯 DỰ ĐOÁN AI NGÀY {today}")
             
-            st.markdown("---")
-            st.markdown(f"### 🎯 PHÂN TÍCH AI NGÀY {today}")
             if new_predictions:
                 predictions = new_predictions
             else:
-                try:
-                    predictions = generate_predictions(historical)
-                    for p in st.session_state.statistics['predictions']:
-                        if p['date'] == today:
-                            p['predictions'] = {
-                                'bach_thu': predictions['bach_thu'],
-                                'song_thu': predictions['song_thu'],
-                                'xien_2': predictions['xien_2'],
-                                'dan_de': predictions['dan_de']
-                            }
-                            p['confidence'] = predictions['confidence']
-                            p['ai_analysis'] = predictions['ai_analysis']
-                            p['using_ai'] = predictions['using_ai']
-                            break
-                    save_statistics()
-                except Exception as e:
-                    st.error(f"Lỗi tạo dự đoán: {str(e)}")
-                    predictions = None
+                predictions = generate_predictions(get_historical_data(30))
+                # Update existing prediction
+                for p in st.session_state.statistics['predictions']:
+                    if p['date'] == today:
+                        p['predictions'] = predictions
+                        p['confidence'] = predictions['confidence']
+                        p['ai_analysis'] = predictions['ai_analysis']
+                        p['using_ai'] = predictions['using_ai']
+                        break
+                save_statistics()
             
-            if predictions:
-                if predictions['using_ai']:
-                    st.success("✅ Gemini AI Active")
-                else:
-                    st.warning("⚠️ Standard Analysis Mode")
-                
-                st.markdown(f'''
-                <div style="background: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 8px; padding: 15px; margin: 15px 0;">
-                    <b style="font-size: 16px;">🧠 PHÂN TÍCH:</b><br>{predictions['ai_analysis']}<br>
-                    <b style="font-size: 16px;">ĐỘ TIN CẬY:</b> {predictions['confidence']}%
-                </div>
-                ''', unsafe_allow_html=True)
-                
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    st.markdown(f'''<div class="pred-box"><div style="color:#8b949e; font-size:15px;">📊 DATA 1</div><div style="font-size:48px; color:#FFD700; font-weight:bold; margin:15px 0;">{predictions['bach_thu']}</div></div>''', unsafe_allow_html=True)
-                with c2:
-                    st.markdown(f'''<div class="pred-box"><div style="color:#8b949e; font-size:15px;">📊 DATA 2</div><div style="font-size:28px; color:#FFD700; font-weight:bold; margin:15px 0;">{predictions['song_thu'][0]} - {predictions['song_thu'][1]}</div></div>''', unsafe_allow_html=True)
-                with c3:
-                    st.markdown(f'''<div class="pred-box"><div style="color:#8b949e; font-size:15px;">📊 DATA 3</div><div style="font-size:24px; color:#FFD700; font-weight:bold; margin:15px 0;">{predictions['xien_2']}</div></div>''', unsafe_allow_html=True)
-                st.markdown(f'''<div class="pred-box"><div style="color:#8b949e; font-size:16px; margin-bottom:15px;">📊 DATA 4 (10 values)</div><div style="font-size:20px; color:#e6edf3;">{', '.join(predictions['dan_de'])}</div></div>''', unsafe_allow_html=True)
-                
-                if is_vip():
-                    st.markdown("---")
-                    st.markdown("### 🎲 PHÂN TÍCH CẶP SỐ (VIP)")
-                    try:
-                        bac_nho = generate_bac_nho(historical)
-                        for i, xien in enumerate(bac_nho, 1):
-                            st.markdown(f'''<div class="xien-box"><div style="font-size: 16px; color: #8b949e;">💎 Cặp {i} - {xien['frequency']} lần</div><div style="font-size: 52px; color: #FFD700; font-weight: bold;">{xien['pair']}</div></div>''', unsafe_allow_html=True)
-                    except:
-                        st.error("Lỗi tải bạc nhớ")
+            if predictions['using_ai']:
+                st.success("✅ Gemini AI Active")
+            else:
+                st.warning("⚠️ Statistical Analysis Mode")
+            
+            st.markdown(f'''
+            <div style="background: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; 
+                        border-radius: 8px; padding: 15px; margin: 15px 0;">
+                <b style="font-size: 16px;">🧠 PHÂN TÍCH:</b><br>{predictions['ai_analysis']}<br>
+                <b style="font-size: 16px;">ĐỘ TIN CẬY:</b> {predictions['confidence']}%
+            </div>
+            ''', unsafe_allow_html=True)
+            
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.markdown(f'''<div class="pred-box">
+                    <div style="color:#8b949e; font-size:15px;">🎯 BẠCH THỦ</div>
+                    <div style="font-size:48px; color:#FFD700; font-weight:bold; margin:15px 0;">
+                        {predictions['bach_thu']}
+                    </div>
+                </div>''', unsafe_allow_html=True)
+            with c2:
+                st.markdown(f'''<div class="pred-box">
+                    <div style="color:#8b949e; font-size:15px;">🎯 SONG THỦ</div>
+                    <div style="font-size:26px; color:#FFD700; font-weight:bold; margin:15px 0;">
+                        {predictions['song_thu'][0]} - {predictions['song_thu'][1]}
+                    </div>
+                </div>''', unsafe_allow_html=True)
+            with c3:
+                st.markdown(f'''<div class="pred-box">
+                    <div style="color:#8b949e; font-size:15px;">🎯 XIÊN 2</div>
+                    <div style="font-size:22px; color:#FFD700; font-weight:bold; margin:15px 0;">
+                        {predictions['xien_2']}
+                    </div>
+                </div>''', unsafe_allow_html=True)
+            
+            st.markdown(f'''<div class="pred-box">
+                <div style="color:#8b949e; font-size:16px; margin-bottom:15px;">📋 DÀN ĐỀ 10 SỐ</div>
+                <div style="font-size:20px; color:#e6edf3;">{', '.join(predictions['dan_de'])}</div>
+            </div>''', unsafe_allow_html=True)
+            
+            if is_vip():
+                st.markdown("---")
+                st.markdown("### 🎲 BẠC NHỚ (VIP)")
+                bac_nho = generate_bac_nho(get_historical_data(365))
+                for i, xien in enumerate(bac_nho, 1):
+                    st.markdown(f'''<div class="xien-box">
+                        <div style="font-size: 16px; color: #8b949e;">💎 Cặp {i} - {xien['frequency']} lần</div>
+                        <div style="font-size: 52px; color: #FFD700; font-weight: bold;">{xien['pair']}</div>
+                    </div>''', unsafe_allow_html=True)
+            
             st.markdown("---")
-            st.markdown('<div class="disclaimer">⚠️ Dữ liệu phân tích chỉ mang tính chất tham khảo. Người dùng tự chịu trách nhiệm với hành vi sử dụng.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="disclaimer">⚠️ Dữ liệu tham khảo. Chơi có trách nhiệm!</div>', unsafe_allow_html=True)
         
         elif page == "💎 Gói VIP":
-            try:
-                display_pricing_table()
-            except Exception as e:
-                st.error(f"Lỗi hiển thị gói VIP: {str(e)}")
+            display_pricing_table()
         
         elif page == "📊 Thống kê":
-            st.markdown("### 📈 THỐNG KÊ NGÀY")
+            st.markdown("### 📈 THỐNG KÊ CHI TIẾT")
+            
+            # Today stats
+            display_today_statistics()
+            
+            st.divider()
+            
+            # Overall stats
+            results = st.session_state.statistics.get('results', [])
+            total_checks = len(results)
+            total_wins = sum(r['overall_wins'] for r in results)
+            max_wins = total_checks * 4
+            win_rate = (total_wins / max_wins * 100) if max_wins > 0 else 0
+            
+            st.markdown("### 📊 TỔNG QUAN")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Tổng lần check", total_checks)
+            col2.metric("Tổng trúng", total_wins)
+            col3.metric("Tỷ lệ trúng", f"{win_rate:.1f}%")
+            
+            # Last 7 days
+            st.markdown("### 📅 7 NGÀY GẦN NHẤT")
             daily_stats = st.session_state.statistics.get('daily_stats', {})
             if daily_stats:
                 for date in sorted(daily_stats.keys(), reverse=True)[:7]:
@@ -1155,36 +1160,68 @@ def main():
                     checked = stats.get('checked', 0)
                     wins = stats.get('total_wins', 0)
                     rate = (wins / (checked * 4) * 100) if checked > 0 else 0
-                    st.markdown(f'''<div class="stat-card" style="margin: 8px 0;"><div style="font-size: 16px; font-weight: bold; color: #e6edf3;">📅 {date}</div><div style="display: flex; justify-content: space-around; margin-top: 10px;"><span class="win">✅ {wins}/4</span><span style="color: {'#3fb950' if rate >= 50 else '#f85149'}; font-size: 16px;">{rate:.0f}%</span></div></div>''', unsafe_allow_html=True)
-            else:
-                st.info("📭 Chưa có dữ liệu")
-            st.divider()
-            st.markdown("### 📈 TỔNG QUAN")
-            results = st.session_state.statistics.get('results', [])
-            total_checks = len(results)
-            total_wins = sum(r['overall_wins'] for r in results)
-            max_wins = total_checks * 4
-            win_rate = (total_wins / max_wins * 100) if max_wins > 0 else 0
-            col1, col2 = st.columns(2)
-            col1.markdown(f'''<div class="stat-card"><div class="stat-value win">{total_wins}</div><div class="stat-label">Trúng</div></div>''', unsafe_allow_html=True)
-            col2.markdown(f'''<div class="stat-card"><div class="stat-value loss">{max_wins - total_wins}</div><div class="stat-label">Trượt</div></div>''', unsafe_allow_html=True)
-            st.markdown(f'''<div class="stat-card" style="margin-top: 15px;"><div class="stat-value" style="color: {'#3fb950' if win_rate >= 50 else '#f85149'}; font-size: 36px;">{win_rate:.1f}%</div><div class="stat-label">Tỷ lệ trúng</div><div class="stat-label">{total_checks} lần check</div></div>''', unsafe_allow_html=True)
+                    
+                    st.markdown(f'''
+                    <div class="stat-card" style="margin: 8px 0;">
+                        <div style="font-size: 16px; font-weight: bold; color: #e6edf3;">📅 {date}</div>
+                        <div style="display: flex; justify-content: space-around; margin-top: 10px;">
+                            <span class="win">✅ {wins}/4 trúng</span>
+                            <span style="color: {'#3fb950' if rate >= 50 else '#f85149'}; font-size: 16px;">
+                                {rate:.0f}%
+                            </span>
+                        </div>
+                    </div>
+                    ''', unsafe_allow_html=True)
         
         elif page == "📜 Lịch sử":
-            st.markdown("### 📜 LỊCH SỬ PHÂN TÍCH")
+            st.markdown("### 📜 LỊCH SỬ DỰ ĐOÁN")
             results = st.session_state.statistics.get('results', [])
             if results:
                 dates = sorted(set(r['pred_date'] for r in results), reverse=True)
                 selected_date = st.selectbox("Chọn ngày", dates)
                 filtered = [r for r in results if r['pred_date'] == selected_date]
                 for r in filtered:
-                    st.markdown(f'''<div style="background: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; border-radius: 10px; padding: 20px; margin: 15px 0;"><b style="font-size: 16px;">📅 {r['pred_date']} → {r['check_date']}</b><div style="margin-top: 10px; font-size: 15px;">Data 1: {r['bach_thu']['number']} {'✅' if r['bach_thu']['win'] else '❌'}</div><div style="font-size: 15px;">Data 2: {'-'.join(r['song_thu']['numbers'])} {'✅' if r['song_thu']['win'] else '❌'}</div><div style="font-size: 15px;">Data 3: {r['xien_2']['pair']} {'✅' if r['xien_2']['win'] else '❌'}</div><div style="font-size: 15px;">Data 4: {'✅' if r['dan_de']['win'] else '❌'}</div><div style="margin-top: 10px;"><b>Tổng: {r['overall_wins']}/4</b></div></div>''', unsafe_allow_html=True)
+                    st.markdown(f'''
+                    <div style="background: rgba(212, 175, 55, 0.15); border: 1px solid #D4AF37; 
+                                border-radius: 10px; padding: 20px; margin: 15px 0;">
+                        <b style="font-size: 16px;">📅 {r['pred_date']} → {r['check_date']}</b>
+                        <div style="margin-top: 15px;">
+                            <div class="result-item">
+                                <b>Bạch thủ:</b> {r['bach_thu']['number']} 
+                                <span class="{'win' if r['bach_thu']['win'] else 'loss'}">
+                                    {'✅ TRÚNG' if r['bach_thu']['win'] else '❌ TRƯỢT'}
+                                </span>
+                            </div>
+                            <div class="result-item">
+                                <b>Song thủ:</b> {'-'.join(r['song_thu']['numbers'])}
+                                <span class="{'win' if r['song_thu']['win'] else 'loss'}">
+                                    {'✅ TRÚNG' if r['song_thu']['win'] else '❌ TRƯỢT'}
+                                </span>
+                            </div>
+                            <div class="result-item">
+                                <b>Xiên 2:</b> {r['xien_2']['pair']}
+                                <span class="{'win' if r['xien_2']['win'] else 'loss'}">
+                                    {'✅ TRÚNG' if r['xien_2']['win'] else '❌ TRƯỢT'}
+                                </span>
+                            </div>
+                            <div class="result-item">
+                                <b>Đề:</b> {r['dan_de']['matched'] if r['dan_de']['win'] else 'Không trúng'}
+                                <span class="{'win' if r['dan_de']['win'] else 'loss'}">
+                                    {'✅ TRÚNG' if r['dan_de']['win'] else '❌ TRƯỢT'}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="margin-top: 15px; text-align: center; font-size: 20px; font-weight: bold; color: #FFD700;">
+                            🎯 Tổng: {r['overall_wins']}/4 trúng
+                        </div>
+                    </div>
+                    ''', unsafe_allow_html=True)
             else:
                 st.info("📭 Chưa có lịch sử")
         
         elif page == "🌐 Website XS":
             st.markdown("### 🌐 XOSODAIPHAT.COM")
-            st.markdown("Xem kết quả trực tiếp từ website:")
+            st.markdown("Xem kết quả trực tiếp:")
             st.markdown('''
             <div class="iframe-container">
                 <iframe src="https://xosodaiphat.com/xsmb-xổ-số-miền-bắc.html" 
@@ -1196,7 +1233,7 @@ def main():
     
     except Exception as e:
         st.error(f"Lỗi hệ thống: {str(e)}")
-        st.error("Vui lòng refresh trang hoặc đăng nhập lại")
+        st.error("Vui lòng refresh trang (F5)")
 
 if __name__ == "__main__":
     main()
