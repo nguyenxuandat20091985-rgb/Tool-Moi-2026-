@@ -465,13 +465,10 @@ def display_pricing_table():
                         st.error(f"❌ Lỗi tải QR: {str(e)}")
                         st.info("💡 Kiểm tra kết nối internet hoặc thử lại sau")
                 
-                # Thông tin chuyển khoản chi tiết
+                # Hiển thị số tiền và nội dung chuyển khoản (ĐÃ XÓA THÔNG TIN TÀI KHOẢN)
                 st.markdown(f'''
                 <div style="background: #0d1117; padding: 20px; border-radius: 12px; margin: 20px 0; border: 2px solid #58a6ff;">
-                    <p style="margin: 10px 0; font-size: 16px;"><b>👤 Tên tài khoản:</b> <span style="color: #FFD700;">{BANK_INFO['account_name']}</span></p>
-                    <p style="margin: 10px 0; font-size: 16px;"><b>🔢 Số tài khoản:</b> <span style="color: #FFD700; font-size: 24px; font-weight: bold; letter-spacing: 2px;">{BANK_INFO['account_number']}</span></p>
-                    <p style="margin: 10px 0; font-size: 16px;"><b>🏦 Ngân hàng:</b> {BANK_INFO['bank']}</p>
-                    <p style="margin: 10px 0; font-size: 16px;"><b>💰 Số tiền:</b> <span style="color: #3fb950; font-size: 22px; font-weight: bold;">{tier['price']:,} VNĐ</span></p>
+                    <p style="margin: 10px 0; font-size: 16px;"><b>💰 Số tiền:</b> <span style="color: #3fb950; font-size: 24px; font-weight: bold;">{tier['price']:,} VNĐ</span></p>
                     <p style="margin: 10px 0; font-size: 16px;"><b>📝 Nội dung CK:</b> <span style="color: #ffa500; font-weight: 600; background: rgba(255,165,0,0.1); padding: 5px 10px; border-radius: 5px;">{transfer_message}</span></p>
                 </div>
                 ''', unsafe_allow_html=True)
