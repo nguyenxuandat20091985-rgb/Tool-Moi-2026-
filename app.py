@@ -1,6 +1,6 @@
 # =============================================================================
-# 💎 AI-QUANTUM PRO 2026 - ULTIMATE VERSION
-# Features: Multi-Tier Predictions • Auto-Update • Enhanced AI • Win/Loss Tracking
+# 💎 AI-QUANTUM PRO 2026 - ULTIMATE VERSION (FINAL FIX)
+# Features: Auto Win/Loss Display • Real-time Updates • Enhanced AI
 # =============================================================================
 import streamlit as st
 import requests
@@ -196,15 +196,12 @@ st.markdown("""
         border: 1px solid #f85149;
     }
     
-    .prediction-row {
+    .prediction-result {
         background: rgba(212, 175, 55, 0.1);
         border: 1px solid #D4AF37;
         border-radius: 8px;
-        padding: 12px;
-        margin: 8px 0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        padding: 15px;
+        margin: 10px 0;
     }
     
     h1, h2, h3, h4 {
@@ -565,12 +562,11 @@ def get_win_loss_stats():
     if not results:
         return None
     
-    total_predictions = len(results) * 4  # 4 predictions per day
+    total_predictions = len(results) * 4
     total_wins = sum(r['overall_wins'] for r in results)
     total_losses = total_predictions - total_wins
     win_rate = (total_wins / total_predictions * 100) if total_predictions > 0 else 0
     
-    # Win/Loss by prediction type
     bt_wins = sum(1 for r in results if r['bach_thu']['win'])
     st_wins = sum(1 for r in results if r['song_thu']['win'])
     xien_wins = sum(1 for r in results if r['xien_2']['win'])
@@ -615,6 +611,19 @@ def ensure_predictions_for_today():
         save_statistics()
         return pred_record, predictions
     return existing_pred, None
+
+def check_and_auto_update_predictions(current_data):
+    """Tự động kiểm tra và cập nhật dự đoán khi có kết quả mới"""
+    today = datetime.now().strftime("%d/%m")
+    yesterday = (datetime.now() - timedelta(days=1)).strftime("%d/%m")
+    
+    # Kiểm tra nếu hôm qua chưa check
+    yesterday_pred = get_prediction_for_date(yesterday)
+    if yesterday_pred and not yesterday_pred.get('checked', False):
+        result = save_result_check(today, current_data)
+        if result:
+            return result
+    return None
 
 def save_result_check(today_date, current_data):
     current_loto = []
@@ -775,7 +784,6 @@ def generate_bac_nho(historical_data):
 def query_gemini_ai_enhanced(hot_nums, cold_nums, gan_nums, vip_tier='free', retry_count=3):
     """AI phân tích nâng cao với phân cấp VIP"""
     
-    # Prompt khác nhau cho từng cấp VIP
     if vip_tier == 'free':
         prompt = f"""Chuyên gia xổ số MB cơ bản.
 
@@ -811,7 +819,7 @@ TRẢ LỜI JSON:
     "dan_de": ["00","01","02","07","10","13","14","60","67","93"],
     "confidence": 75
 }}"""
-    else:  # VIP cao cấp
+    else:
         prompt = f"""Chuyên gia xổ số MB cao cấp. Phân tích đa chiều, tối ưu tỷ lệ thắng.
 
 DỮ LIỆU CHI TIẾT:
@@ -886,7 +894,6 @@ def generate_predictions(historical_data, vip_tier='free'):
             days += 1
         gan_nums.append((num, days))
     
-    # Gọi AI với prompt phân cấp VIP
     gemini_result = query_gemini_ai_enhanced(hot_nums, cold_nums, gan_nums, vip_tier)
     
     if gemini_result:
@@ -898,7 +905,6 @@ def generate_predictions(historical_data, vip_tier='free'):
         analysis = gemini_result.get('analysis', "AI phân tích")
         using_ai = True
     else:
-        # Fallback với thuật toán thống kê
         bt = hot_nums[0] if hot_nums else f"{np.random.randint(0,100):02d}"
         st1 = hot_nums[1] if len(hot_nums) > 1 else f"{np.random.randint(0,100):02d}"
         st2 = cold_nums[0] if cold_nums else f"{np.random.randint(0,100):02d}"
@@ -1022,7 +1028,6 @@ def main():
             until = user_info.get('vip_until', '') if user_info else ''
             st.markdown(f'<span class="vip-badge">VIP đến: {until[:10] if until else "N/A"}</span>', unsafe_allow_html=True)
             
-            # Nút downgrade VIP → Free
             if st.button("⬇️ Chuyển về Free", use_container_width=True, key="downgrade_btn"):
                 if downgrade_to_free(current_user):
                     st.success("✅ Đã chuyển về tài khoản Free")
@@ -1060,7 +1065,11 @@ def main():
             except:
                 data = get_mock_data()
             
-            # Lấy data depth theo VIP
+            # Auto-check và cập nhật kết quả
+            auto_result = check_and_auto_update_predictions(data)
+            if auto_result:
+                st.success("✅ Tự động cập nhật kết quả ngày hôm qua!")
+            
             data_depth = VIP_TIERS[user_tier]['data_depth']
             historical = get_historical_data(data_depth)
             
@@ -1081,6 +1090,83 @@ def main():
                 <div class="result-number">{db}</div>
             </div>
             ''', unsafe_allow_html=True)
+            
+            # HIỂN THỊ DỰ ĐOÁN + KẾT QUẢ TRÚNG/TRƯỢT
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%d/%m")
+            yesterday_pred = get_prediction_for_date(yesterday)
+            
+            if yesterday_pred and yesterday_pred.get('checked', False):
+                # Tìm kết quả check
+                results = st.session_state.statistics.get('results', [])
+                yesterday_result = None
+                for r in results:
+                    if r['pred_date'] == yesterday:
+                        yesterday_result = r
+                        break
+                
+                if yesterday_result:
+                    st.markdown("### 📊 KẾT QUẢ DỰ ĐOÁN NGÀY HÔM QUA")
+                    
+                    preds = yesterday_pred['predictions']
+                    
+                    c1, c2, c3, c4 = st.columns(4)
+                    
+                    with c1:
+                        win_icon = "✅" if yesterday_result['bach_thu']['win'] else "❌"
+                        win_color = "#3fb950" if yesterday_result['bach_thu']['win'] else "#f85149"
+                        st.markdown(f'''
+                        <div class="pred-box" style="border-color: {win_color};">
+                            <div style="color:#8b949e; font-size:13px;">📊 DATA 1</div>
+                            <div style="font-size:32px; color:#FFD700; font-weight:bold; margin:10px 0;">{preds['bach_thu']}</div>
+                            <div style="font-size:24px; color:{win_color}; font-weight:bold;">{win_icon}</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    with c2:
+                        win_icon = "✅" if yesterday_result['song_thu']['win'] else "❌"
+                        win_color = "#3fb950" if yesterday_result['song_thu']['win'] else "#f85149"
+                        st.markdown(f'''
+                        <div class="pred-box" style="border-color: {win_color};">
+                            <div style="color:#8b949e; font-size:13px;">📊 DATA 2</div>
+                            <div style="font-size:20px; color:#FFD700; font-weight:bold; margin:10px 0;">{preds['song_thu'][0]}-{preds['song_thu'][1]}</div>
+                            <div style="font-size:24px; color:{win_color}; font-weight:bold;">{win_icon}</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    with c3:
+                        win_icon = "✅" if yesterday_result['xien_2']['win'] else "❌"
+                        win_color = "#3fb950" if yesterday_result['xien_2']['win'] else "#f85149"
+                        st.markdown(f'''
+                        <div class="pred-box" style="border-color: {win_color};">
+                            <div style="color:#8b949e; font-size:13px;">📊 DATA 3</div>
+                            <div style="font-size:18px; color:#FFD700; font-weight:bold; margin:10px 0;">{preds['xien_2']}</div>
+                            <div style="font-size:24px; color:{win_color}; font-weight:bold;">{win_icon}</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    with c4:
+                        win_icon = "✅" if yesterday_result['dan_de']['win'] else "❌"
+                        win_color = "#3fb950" if yesterday_result['dan_de']['win'] else "#f85149"
+                        st.markdown(f'''
+                        <div class="pred-box" style="border-color: {win_color};">
+                            <div style="color:#8b949e; font-size:13px;">📊 DATA 4</div>
+                            <div style="font-size:14px; color:#FFD700; font-weight:bold; margin:10px 0;">10 số</div>
+                            <div style="font-size:24px; color:{win_color}; font-weight:bold;">{win_icon}</div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    
+                    # Tổng kết
+                    total_wins = yesterday_result['overall_wins']
+                    st.markdown(f'''
+                    <div class="prediction-result" style="text-align: center; margin-top: 15px;">
+                        <div style="font-size: 18px; color: #e6edf3; margin-bottom: 10px;">
+                            <b>TỔNG KẾT: {total_wins}/4 DỰ ĐOÁN TRÚNG</b>
+                        </div>
+                        <div style="font-size: 32px; color: {'#3fb950' if total_wins >= 2 else '#f85149'}; font-weight: bold;">
+                            {'🎉 THẮNG LỚN!' if total_wins >= 3 else '✅ CÓ LÃI' if total_wins >= 2 else '❌ THUA'}
+                        </div>
+                    </div>
+                    ''', unsafe_allow_html=True)
             
             st.markdown("---")
             st.markdown("### ✅ KIỂM TRA DỮ LIỆU NGÀY TRƯỚC")
@@ -1215,7 +1301,6 @@ def main():
                 
                 st.divider()
                 
-                # Daily stats
                 st.markdown("### 📅 Thống kê theo ngày")
                 daily_stats = st.session_state.statistics.get('daily_stats', {})
                 if daily_stats:
