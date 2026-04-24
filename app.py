@@ -196,6 +196,17 @@ st.markdown("""
         border: 1px solid #f85149;
     }
     
+    .prediction-row {
+        background: rgba(212, 175, 55, 0.1);
+        border: 1px solid #D4AF37;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
     h1, h2, h3, h4 {
         font-weight: 700;
         color: #e6edf3;
